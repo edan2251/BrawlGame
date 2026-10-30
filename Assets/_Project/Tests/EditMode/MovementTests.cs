@@ -322,6 +322,7 @@ namespace Knockbox.Tests.EditMode
             // 벽 접촉: 공중에서 왼쪽 벽으로 대시해 닿으면 회복된다.
             var wall = TestWorlds.CreateAt(new Vec2(-12f, 6f), FarAway);
             Assert.IsTrue(Step(wall, In(-1, 0, D), SimEventType.Dash));
+            Assert.AreEqual(-1, P1(wall).Facing, "대시를 시작한 쪽을 바라봐야 함");
             Assert.AreEqual(0, P1(wall).DashCharges);
             guard = 0;
             while (P1(wall).WallSide == 0 && guard++ < 30)

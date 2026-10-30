@@ -56,6 +56,9 @@ namespace Knockbox.Simulation
             {
                 var direction = moveX == 0 && moveY == 0 ? new Vec2(f.Facing, 0f) : SimMath.Normalize(new Vec2(moveX, moveY));
                 f.DashDirection = direction;
+                // 대시를 시작하는 틱은 아직 조작 가능한 상태이므로 대시 쪽을 바라본다. 대시 중에는 바꾸지 않는다.
+                if (moveX != 0)
+                    f.Facing = (sbyte)moveX;
                 f.DashTicksLeft = m.DashTicks;
                 f.DashCharges--;
                 f.DashCooldown = m.DashCooldownTicks;

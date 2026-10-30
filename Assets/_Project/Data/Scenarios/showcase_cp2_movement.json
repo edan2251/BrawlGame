@@ -176,6 +176,18 @@
     },
     {
       "tick": 194,
+      "fighter": 0,
+      "field": "facing",
+      "equals": 1
+    },
+    {
+      "tick": 194,
+      "fighter": 1,
+      "field": "facing",
+      "equals": -1
+    },
+    {
+      "tick": 194,
       "fighter": 1,
       "field": "vel.x",
       "equals": -26

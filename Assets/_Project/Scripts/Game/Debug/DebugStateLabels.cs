@@ -50,7 +50,8 @@ namespace Knockbox.Game
         static void Place(TextMesh label, in FighterState f, Vector3 position, string name)
         {
             label.text = $"{name} {f.Action}";
-            label.transform.localPosition = position + new Vector3(0f, 0.65f, 0f);
+            // 화면 가장자리에서 잘리지 않게 가로 위치만 안쪽으로 당긴다.
+            label.transform.localPosition = new Vector3(Mathf.Clamp(position.x, -14.5f, 14.5f), position.y + 0.65f, 0f);
         }
     }
 }
