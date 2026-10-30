@@ -11,12 +11,13 @@ namespace Knockbox.Simulation
     public sealed class InputRecording
     {
         public const uint Magic = 0x5052424B; // "KBRP"
-        public const ushort FormatVersion = 1;
+        public const ushort FormatVersion = 2;
 
         readonly List<InputFrame> p1 = new List<InputFrame>();
         readonly List<InputFrame> p2 = new List<InputFrame>();
 
         public uint ConfigChecksum;
+        public uint ArenaChecksum;
         public uint Seed;
         public Vec2 Spawn0;
         public Vec2 Spawn1;
@@ -31,19 +32,20 @@ namespace Knockbox.Simulation
         public InputFrame GetP1(int index) => p1[index];
         public InputFrame GetP2(int index) => p2[index];
 
-        public static InputRecording Begin(SimConfig config, uint seed, Vec2 spawn0, Vec2 spawn1, MatchPhase startPhase, string arena, string mode)
+        public static InputRecording Begin(SimConfig config, ArenaDef arena, uint seed, Vec2 spawn0, Vec2 spawn1, MatchPhase startPhase, string mode)
         {
             var rec = new InputRecording
             {
                 ConfigChecksum = config.ComputeChecksum(),
+                ArenaChecksum = arena.ComputeChecksum(),
                 Seed = seed,
                 Spawn0 = spawn0,
                 Spawn1 = spawn1,
                 StartPhase = startPhase,
-                Arena = arena ?? "",
+                Arena = arena.Name ?? "",
                 Mode = mode ?? "",
             };
-            rec.InitialChecksum = SimState.CreateRound(config, seed, spawn0, spawn1, startPhase).ComputeChecksum();
+            rec.InitialChecksum = SimState.CreateRound(config, arena, seed, spawn0, spawn1, startPhase).ComputeChecksum();
             return rec;
         }
 
@@ -60,12 +62,15 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>기록의 시작 상태를 다시 만든다. 설정이나 시작 상태가 기록과 다르면 예외.</summary>
-        public SimState CreateInitialState(SimConfig config)
+        public SimState CreateInitialState(SimConfig config, ArenaDef arena)
         {
             uint configChecksum = config.ComputeChecksum();
             if (configChecksum != ConfigChecksum)
                 throw new InvalidOperationException($"설정 체크섬이 기록과 다름: {ConfigChecksum:X8} → {configChecksum:X8}");
-            var state = SimState.CreateRound(config, Seed, Spawn0, Spawn1, StartPhase);
+            uint arenaChecksum = arena.ComputeChecksum();
+            if (arenaChecksum != ArenaChecksum)
+                throw new InvalidOperationException($"맵 체크섬이 기록과 다름({Arena} → {arena.Name}): {ArenaChecksum:X8} → {arenaChecksum:X8}");
+            var state = SimState.CreateRound(config, arena, Seed, Spawn0, Spawn1, StartPhase);
             uint initial = state.ComputeChecksum();
             if (initial != InitialChecksum)
                 throw new InvalidOperationException($"시작 상태 체크섬이 기록과 다름: {InitialChecksum:X8} → {initial:X8}");
@@ -73,9 +78,9 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>새 SimWorld에서 처음부터 끝까지 재생하고 최종 체크섬을 돌려준다.</summary>
-        public uint Replay(SimConfig config)
+        public uint Replay(SimConfig config, ArenaDef arena)
         {
-            var world = new SimWorld(config, CreateInitialState(config));
+            var world = new SimWorld(config, arena, CreateInitialState(config, arena));
             for (int i = 0; i < p1.Count; i++)
                 world.Step(p1[i], p2[i]);
             return world.ComputeChecksum();
@@ -89,6 +94,7 @@ namespace Knockbox.Simulation
                 w.Write(Magic);
                 w.Write(FormatVersion);
                 w.Write(ConfigChecksum);
+                w.Write(ArenaChecksum);
                 w.Write(Seed);
                 w.Write(BitConverter.SingleToInt32Bits(Spawn0.X));
                 w.Write(BitConverter.SingleToInt32Bits(Spawn0.Y));
@@ -125,6 +131,7 @@ namespace Knockbox.Simulation
             var rec = new InputRecording
             {
                 ConfigChecksum = r.ReadUInt32(),
+                ArenaChecksum = r.ReadUInt32(),
                 Seed = r.ReadUInt32(),
                 Spawn0 = new Vec2(BitConverter.Int32BitsToSingle(r.ReadInt32()), BitConverter.Int32BitsToSingle(r.ReadInt32())),
                 Spawn1 = new Vec2(BitConverter.Int32BitsToSingle(r.ReadInt32()), BitConverter.Int32BitsToSingle(r.ReadInt32())),

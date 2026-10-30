@@ -23,7 +23,7 @@ namespace Knockbox.Tests.EditMode
         public void Scenario_ExpectsPass(string name)
         {
             var def = ScenarioJson.LoadByName(name);
-            var result = ScenarioRun.Run(def, SimConfig.CreateDefault());
+            var result = ScenarioRun.Run(def, SimConfig.CreateDefault(), ArenaFiles.LoadByName(def.Arena));
             Assert.AreEqual(def.Ticks, result.TicksRun);
             Assert.IsTrue(result.Passed, $"{name} 실패 {result.Failures.Count}건:\n" + string.Join("\n", result.Failures));
         }
@@ -37,7 +37,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(2, def.P1.Length);
             Assert.Greater(def.Expects.Length, 0);
 
-            var result = ScenarioRun.Run(def, SimConfig.CreateDefault());
+            var result = ScenarioRun.Run(def, SimConfig.CreateDefault(), TestWorlds.Box);
             Assert.AreEqual(def.Expects.Length, result.ExpectCount);
             Assert.IsTrue(result.Passed, string.Join("\n", result.Failures));
         }
@@ -54,7 +54,7 @@ namespace Knockbox.Tests.EditMode
                 { ""tick"": 20, ""fighter"": 0, ""field"": ""grounded"", ""equals"": true }
               ]
             }";
-            var result = ScenarioRun.Run(ScenarioJson.Parse(json), SimConfig.CreateDefault());
+            var result = ScenarioRun.Run(ScenarioJson.Parse(json), SimConfig.CreateDefault(), TestWorlds.Box);
             Assert.IsFalse(result.Passed);
             Assert.AreEqual(2, result.Failures.Count, string.Join("\n", result.Failures));
             StringAssert.Contains("vel.x", result.Failures[0]);
@@ -65,7 +65,7 @@ namespace Knockbox.Tests.EditMode
         public void ExpectOutsideScenarioLength_IsReported()
         {
             const string json = @"{ ""ticks"": 10, ""expect"": [ { ""tick"": 11, ""field"": ""pos.x"", ""min"": 0 } ] }";
-            var result = ScenarioRun.Run(ScenarioJson.Parse(json), SimConfig.CreateDefault());
+            var result = ScenarioRun.Run(ScenarioJson.Parse(json), SimConfig.CreateDefault(), TestWorlds.Box);
             Assert.IsFalse(result.Passed);
             StringAssert.Contains("길이", result.Failures[0]);
         }

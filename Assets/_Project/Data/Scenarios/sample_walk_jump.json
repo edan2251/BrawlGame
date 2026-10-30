@@ -15,7 +15,7 @@
     { "tick": 45, "fighter": 0, "field": "grounded", "equals": false },
     { "tick": 61, "fighter": 0, "field": "pos.y", "min": -3.8, "max": -3.6 },
     { "tick": 90, "fighter": 0, "field": "grounded", "equals": true },
-    { "tick": 90, "fighter": 1, "field": "pos.x", "equals": 6 },
+    { "tick": 90, "fighter": 1, "field": "pos.x", "equals": 12.5 },
     { "tick": 90, "fighter": 1, "field": "action", "equals": "Idle" }
   ]
 }

@@ -74,7 +74,7 @@ namespace Knockbox.Tests.PlayMode
                 Assert.AreEqual(def.Ticks, runner.World.State.Tick, "StopAtTick에서 정확히 멈춰야 함");
 
                 // 플레이 모드 실행 결과가 화면 없는 실행과 같은 상태에 도달해야 한다.
-                var headless = ScenarioRun.Run(def, SimConfig.CreateDefault());
+                var headless = ScenarioRun.Run(def, SimConfig.CreateDefault(), ArenaFiles.LoadByName(def.Arena));
                 Assert.AreEqual(headless.FinalChecksum, runner.World.ComputeChecksum(), $"{def.Name}: 플레이 모드와 헤드리스 결과가 다름");
                 played++;
             }

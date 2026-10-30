@@ -19,6 +19,10 @@ namespace Knockbox.Simulation
         RoundStart,
         RoundEnd,
         RoundTransition,
+        AirJump,
+        PadBounce,
+        /// <summary>경기장 밖으로 나가 되돌려짐. 벽으로 닫힌 경기장에서는 일어나면 안 되는 버그 신호.</summary>
+        OutOfBounds,
     }
 
     /// <summary>

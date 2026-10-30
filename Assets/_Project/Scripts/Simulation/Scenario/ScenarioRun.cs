@@ -15,12 +15,12 @@ namespace Knockbox.Simulation
     /// <summary>시나리오를 화면 없이 끝까지 진행하며 expect를 평가한다. 자동 테스트가 쓴다.</summary>
     public static class ScenarioRun
     {
-        public static ScenarioResult Run(ScenarioDef def, SimConfig config)
+        public static ScenarioResult Run(ScenarioDef def, SimConfig config, ArenaDef arena)
         {
             var result = new ScenarioResult { Name = def.Name, ExpectCount = def.Expects.Length };
             var p1 = ScenarioInputs.Build(def.P1, def.Ticks);
             var p2 = ScenarioInputs.Build(def.P2, def.Ticks);
-            var world = new SimWorld(config, ScenarioInputs.CreateInitialState(def, config));
+            var world = new SimWorld(config, arena, ScenarioInputs.CreateInitialState(def, config, arena));
 
             foreach (var e in def.Expects)
             {

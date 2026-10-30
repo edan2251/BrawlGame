@@ -12,6 +12,8 @@ namespace Knockbox.Game
     public sealed class MatchRunner : MonoBehaviour
     {
         [SerializeField] MovementTuning movementTuning;
+        [SerializeField] TextAsset[] arenaFiles;
+        [SerializeField] string arenaName = "Box";
         [SerializeField] uint seed = 1;
         [SerializeField, Range(0, InputDelayQueue.MaxDelay)] int inputDelayTicks;
         [SerializeField] bool startOnAwake = true;
@@ -48,6 +50,21 @@ namespace Knockbox.Game
         /// <summary>매 틱 Step 직후. 연출이 World.Events를 소비하는 지점이다.</summary>
         public event Action<MatchRunner> Ticked;
 
+        /// <summary>Begin 직후. 연출이 맵을 다시 그리는 지점이다.</summary>
+        public event Action<MatchRunner> MatchBegan;
+
+        /// <summary>
+        /// 멈춰 있으면 1(현재 상태를 그대로 그림), 진행 중이면 다음 틱까지의 비율.
+        /// 히트스탑 중 보간 금지는 연출 쪽에서 처리한다(CP4).
+        /// </summary>
+        public float RenderAlpha => Running ? clock.Alpha : 1f;
+
+        public string ArenaName
+        {
+            get => arenaName;
+            set => arenaName = value;
+        }
+
         public MovementTuning Tuning
         {
             get => movementTuning;
@@ -75,14 +92,32 @@ namespace Knockbox.Game
         public void StartNewMatch()
         {
             var config = SimConfigFactory.Create(movementTuning);
+            var arena = ResolveArena(arenaName);
             var phase = skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
-            var initial = SimState.CreateRound(config, seed, TempArena.DefaultSpawn(config, 0), TempArena.DefaultSpawn(config, 1), phase);
-            Begin(config, initial);
+            Begin(config, arena, SimState.CreateRound(config, arena, seed, phase));
         }
 
-        public void Begin(SimConfig config, in SimState initial)
+        /// <summary>등록된 맵 텍스트에서 찾고, 에디터에서는 없으면 디스크에서 읽는다.</summary>
+        public ArenaDef ResolveArena(string name)
         {
-            World = new SimWorld(config, initial);
+            if (arenaFiles != null)
+            {
+                foreach (var file in arenaFiles)
+                {
+                    if (file != null && file.name == name)
+                        return ArenaFiles.Parse(file.text, name);
+                }
+            }
+#if UNITY_EDITOR
+            return ArenaFiles.LoadByName(name);
+#else
+            throw new InvalidOperationException($"MatchRunner에 등록되지 않은 맵: {name}");
+#endif
+        }
+
+        public void Begin(SimConfig config, ArenaDef arena, in SimState initial)
+        {
+            World = new SimWorld(config, arena, initial);
             PreviousState = initial;
             delay1.Reset(inputDelayTicks);
             delay2.Reset(inputDelayTicks);
@@ -94,6 +129,7 @@ namespace Knockbox.Game
             if (syncTest != null)
                 syncTest = new SyncTest<SimWorld>(World);
             Running = true;
+            MatchBegan?.Invoke(this);
         }
 
         /// <summary>F8. 켜면 매 틱 7틱 되감기 검사를 하고 불일치를 오류 로그로 남긴다.</summary>
@@ -102,13 +138,13 @@ namespace Knockbox.Game
             syncTest = enabled && World != null ? new SyncTest<SimWorld>(World, rollbackTicks) : null;
         }
 
-        public void StartRecording(string arena, string mode)
+        public void StartRecording(string mode)
         {
             if (World == null)
                 return;
             var s = World.State;
             // 기록은 현재 상태를 시작점으로 삼을 수 없으므로(라운드 생성 값만 저장) 라운드 시작 직후에만 의미가 있다.
-            Recording = InputRecording.Begin(World.Config, s.Rng.State, s.Fighter0.Position, s.Fighter1.Position, s.Match.Phase, arena, mode);
+            Recording = InputRecording.Begin(World.Config, World.Arena, s.Rng.State, s.Fighter0.Position, s.Fighter1.Position, s.Match.Phase, mode);
             if (Recording.InitialChecksum != World.ComputeChecksum())
             {
                 Debug.LogWarning("[Knockbox] 입력 기록은 라운드 시작 상태에서만 시작할 수 있음");
@@ -158,6 +194,14 @@ namespace Knockbox.Game
                 World.Step(p1, p2);
             }
             TicksRun++;
+            for (int i = 0; i < World.Events.Count; i++)
+            {
+                ref readonly var e = ref World.Events[i];
+                if (e.Type == SimEventType.OutOfBounds)
+                    Debug.LogWarning($"[Knockbox] 경기장 밖으로 나가 되돌림(버그 신호): {e}");
+            }
+            if (World.Events.Dropped > 0)
+                Debug.LogWarning($"[Knockbox] 이벤트 버퍼가 넘쳐 {World.Events.Dropped}개를 버림(틱 {World.State.Tick})");
             Ticked?.Invoke(this);
 
             if (StopAtTick > 0 && World.State.Tick >= StopAtTick)

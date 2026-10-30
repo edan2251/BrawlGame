@@ -213,6 +213,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1419677610}
   - component: {fileID: 1419677609}
+  - component: {fileID: 1419677611}
   m_Layer: 0
   m_Name: Match
   m_TagString: Untagged
@@ -233,6 +234,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.MatchRunner
   movementTuning: {fileID: 11400000, guid: 751081705e6226444a225c2dd641e04f, type: 2}
+  arenaFiles:
+  - {fileID: 4900000, guid: 6e5e55105e542c54b86d1392e896a49d, type: 3}
+  - {fileID: 4900000, guid: e0fd09015d77ddc4da74104009896ba1, type: 3}
+  - {fileID: 4900000, guid: e5ff03fb447f936449090f4eadd7167d, type: 3}
+  arenaName: Box
   seed: 1
   inputDelayTicks: 0
   startOnAwake: 1
@@ -252,6 +258,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1419677611
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1419677608}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e36e2d9a41833014c8a05780f2b9c084, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.MatchPresenter
+  palette: {fileID: 11400000, guid: 5611a790978a020448f27e4432a3a1f5, type: 2}
+  showDebugLabels: 1
 --- !u!1 &1689522029
 GameObject:
   m_ObjectHideFlags: 0

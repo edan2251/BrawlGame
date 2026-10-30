@@ -40,32 +40,47 @@ namespace Knockbox.Simulation
 
         public readonly FighterState GetFighter(int index) => index == 0 ? Fighter0 : Fighter1;
 
+        /// <summary>맵의 시작 칸 위에 선 파이터의 중심 위치.</summary>
+        public static Vec2 SpawnCenter(SimConfig config, ArenaDef arena, int fighter) =>
+            arena.SpawnFoot(fighter) + new Vec2(0f, config.HalfBody);
+
         /// <summary>
-        /// 새 라운드 상태. 두 파이터는 서로를 바라본다.
+        /// 맵의 시작 위치로 새 라운드 상태를 만든다. 두 파이터는 서로를 바라본다.
         /// startPhase가 Fighting이면 카운트다운을 건너뛴다(시나리오와 테스트용).
         /// </summary>
-        public static SimState CreateRound(SimConfig config, uint seed, Vec2 spawn0, Vec2 spawn1, MatchPhase startPhase)
+        public static SimState CreateRound(SimConfig config, ArenaDef arena, uint seed, MatchPhase startPhase) =>
+            CreateRound(config, arena, seed, SpawnCenter(config, arena, 0), SpawnCenter(config, arena, 1), startPhase);
+
+        /// <summary>시작 위치(파이터 중심)를 직접 정한다.</summary>
+        public static SimState CreateRound(SimConfig config, ArenaDef arena, uint seed, Vec2 center0, Vec2 center1, MatchPhase startPhase)
         {
             var state = new SimState
             {
                 Tick = 0,
                 Rng = new SimRng(seed),
-                Fighter0 = CreateFighter(config, spawn0, spawn0.X <= spawn1.X ? 1 : -1),
-                Fighter1 = CreateFighter(config, spawn1, spawn1.X < spawn0.X ? 1 : -1),
+                Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1),
+                Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1),
             };
             state.Match.Round = 1;
             state.Match.SetPhase(startPhase);
             return state;
         }
 
-        static FighterState CreateFighter(SimConfig config, Vec2 spawn, int facing)
+        static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing)
         {
+            ref readonly var m = ref config.Movement;
             var f = new FighterState
             {
-                Position = spawn,
+                Position = center,
                 Facing = (sbyte)facing,
+                AirJumpsLeft = m.AirJumps,
+                DashCharges = m.DashCharges,
+                TicksSinceWall = FighterState.TimerCap,
+                DropThroughBox = FighterState.NoBox,
             };
-            f.Grounded = TempArena.IsOnFloor(config, spawn);
+            f.GroundBox = TerrainCollision.ProbeGround(center, config.HalfBody, arena, m.GroundProbeDistance, FighterState.NoBox);
+            f.Grounded = f.GroundBox != FighterState.NoBox;
+            f.TicksSinceGrounded = f.Grounded ? 0 : FighterState.TimerCap;
             f.Action = f.Grounded ? ActionState.Idle : ActionState.Airborne;
             return f;
         }

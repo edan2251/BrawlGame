@@ -107,41 +107,5 @@ namespace Knockbox.Tests.EditMode
                 Object.DestroyImmediate(tuning);
             }
         }
-
-        [Test]
-        public void TempMovement_ReachesRunSpeedInAboutSixTicks()
-        {
-            var world = TestWorlds.Create();
-            var right = new InputFrame(1, 0, InputButtons.None);
-            int ticks = 0;
-            while (world.State.Fighter0.Velocity.X < world.Config.Movement.MaxRunSpeed - 1e-4f && ticks < 60)
-            {
-                world.Step(right, default);
-                ticks++;
-            }
-            Assert.That(ticks, Is.InRange(5, 7));
-            Assert.AreEqual(ActionState.Run, world.State.Fighter0.Action);
-        }
-
-        [Test]
-        public void TempMovement_JumpEmitsJumpAndLandEvents()
-        {
-            var world = TestWorlds.Create();
-            var jump = new InputFrame(0, 0, InputButtons.Jump);
-            bool jumped = false, landed = false;
-            for (int t = 0; t < 120; t++)
-            {
-                world.Step(t == 0 ? jump : default, default);
-                for (int i = 0; i < world.Events.Count; i++)
-                {
-                    var e = world.Events[i];
-                    jumped |= e.Type == SimEventType.Jump && e.Fighter == 0;
-                    landed |= e.Type == SimEventType.Land && e.Fighter == 0;
-                }
-            }
-            Assert.IsTrue(jumped);
-            Assert.IsTrue(landed);
-            Assert.IsTrue(world.State.Fighter0.Grounded);
-        }
     }
 }

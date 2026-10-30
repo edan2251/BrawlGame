@@ -31,12 +31,15 @@ namespace Knockbox.Simulation
             return new InputFrame(x, y, buttons);
         }
 
-        /// <summary>시나리오의 시작 상태. 카운트다운을 건너뛰고 Fighting에서 시작한다.</summary>
-        public static SimState CreateInitialState(ScenarioDef def, SimConfig config)
+        /// <summary>
+        /// 시나리오의 시작 상태. 카운트다운을 건너뛰고 Fighting에서 시작한다.
+        /// spawn은 파이터 중심 좌표이고, 없으면 맵의 시작 칸 위에 선다.
+        /// </summary>
+        public static SimState CreateInitialState(ScenarioDef def, SimConfig config, ArenaDef arena)
         {
-            var spawn0 = def.HasSpawn ? def.Spawn0 : TempArena.DefaultSpawn(config, 0);
-            var spawn1 = def.HasSpawn ? def.Spawn1 : TempArena.DefaultSpawn(config, 1);
-            return SimState.CreateRound(config, def.Seed, spawn0, spawn1, MatchPhase.Fighting);
+            var spawn0 = def.HasSpawn ? def.Spawn0 : SimState.SpawnCenter(config, arena, 0);
+            var spawn1 = def.HasSpawn ? def.Spawn1 : SimState.SpawnCenter(config, arena, 1);
+            return SimState.CreateRound(config, arena, def.Seed, spawn0, spawn1, MatchPhase.Fighting);
         }
     }
 }

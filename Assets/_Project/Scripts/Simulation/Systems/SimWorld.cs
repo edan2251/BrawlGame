@@ -16,10 +16,12 @@ namespace Knockbox.Simulation
     {
         public SimState State;
         public readonly SimConfig Config;
+        public readonly ArenaDef Arena;
 
-        public SimWorld(SimConfig config, in SimState initial, int eventCapacity = SimEventBuffer.DefaultCapacity)
+        public SimWorld(SimConfig config, ArenaDef arena, in SimState initial, int eventCapacity = SimEventBuffer.DefaultCapacity)
         {
             Config = config;
+            Arena = arena;
             State = initial;
             Events = new SimEventBuffer(eventCapacity);
         }
@@ -47,10 +49,7 @@ namespace Knockbox.Simulation
                     StepCountdown(ref s);
                     break;
                 case MatchPhase.Fighting:
-                    // 두 파이터는 서로 영향을 주지 않으므로 순서와 무관하다.
-                    // 상호작용이 생기면(CP2 밀어내기, CP4 판정) 이전 상태에서 동시에 계산하고 동시에 적용한다.
-                    TempMovement.Step(ref s.Fighter0, p1, Config, 0, s.Tick, Events);
-                    TempMovement.Step(ref s.Fighter1, p2, Config, 1, s.Tick, Events);
+                    StepFighting(ref s, p1, p2);
                     s.Match.PhaseTick++;
                     break;
                 default:
@@ -60,6 +59,21 @@ namespace Knockbox.Simulation
 
             s.Fighter0.PrevButtons = p1.Buttons;
             s.Fighter1.PrevButtons = p2.Buttons;
+        }
+
+        /// <summary>
+        /// 두 파이터를 같은 이전 상태에서 따로 움직인 뒤, 몸 겹침을 동시에 풀고, 접촉을 판정한다.
+        /// 어느 단계에서도 번호로 우선순위를 정하지 않는다(01-architecture.md 4절 7항).
+        /// </summary>
+        void StepFighting(ref SimState s, in InputFrame p1, in InputFrame p2)
+        {
+            var prev0 = s.Fighter0;
+            var prev1 = s.Fighter1;
+            FighterMovement.Integrate(ref s.Fighter0, p1, Config, Arena, 0, s.Tick, Events, out var scratch0);
+            FighterMovement.Integrate(ref s.Fighter1, p2, Config, Arena, 1, s.Tick, Events, out var scratch1);
+            FighterPush.Resolve(ref s.Fighter0, ref s.Fighter1, prev0, prev1, Config, Arena);
+            FighterMovement.ResolveContacts(ref s.Fighter0, s.Fighter1, scratch0, Config, Arena, 0, s.Tick, Events);
+            FighterMovement.ResolveContacts(ref s.Fighter1, s.Fighter0, scratch1, Config, Arena, 1, s.Tick, Events);
         }
 
         void StepCountdown(ref SimState s)

@@ -20,8 +20,8 @@
   "expect": [
     { "tick": 41, "fighter": 0, "field": "pos.y", "min": -3.8, "max": -3.6 },
     { "tick": 41, "fighter": 1, "field": "pos.y", "min": -3.8, "max": -3.6 },
-    { "tick": 41, "fighter": 0, "field": "pos.x", "min": 0.9, "max": 1.2 },
-    { "tick": 41, "fighter": 1, "field": "pos.x", "min": -1.2, "max": -0.9 },
+    { "tick": 41, "fighter": 0, "field": "pos.x", "min": -5.6, "max": -5.3 },
+    { "tick": 41, "fighter": 1, "field": "pos.x", "min": 5.3, "max": 5.6 },
     { "tick": 100, "fighter": 0, "field": "facing", "equals": -1 },
     { "tick": 100, "fighter": 1, "field": "facing", "equals": 1 },
     { "tick": 150, "fighter": 0, "field": "grounded", "equals": true },

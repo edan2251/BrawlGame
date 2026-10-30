@@ -61,10 +61,11 @@ namespace Knockbox.Tests.EditMode
         public void RecordSerializeReplay_FinalChecksumMatches()
         {
             var config = SimConfig.CreateDefault();
-            var spawn0 = TempArena.DefaultSpawn(config, 0);
-            var spawn1 = TempArena.DefaultSpawn(config, 1);
-            var recording = InputRecording.Begin(config, 99, spawn0, spawn1, MatchPhase.Countdown, "Box", "Ram");
-            var world = new SimWorld(config, SimState.CreateRound(config, 99, spawn0, spawn1, MatchPhase.Countdown));
+            var arena = TestWorlds.Box;
+            var spawn0 = SimState.SpawnCenter(config, arena, 0);
+            var spawn1 = SimState.SpawnCenter(config, arena, 1);
+            var recording = InputRecording.Begin(config, arena, 99, spawn0, spawn1, MatchPhase.Countdown, "Ram");
+            var world = new SimWorld(config, arena, SimState.CreateRound(config, arena, 99, spawn0, spawn1, MatchPhase.Countdown));
 
             TestWorlds.RandomInputs(4242, 1800, out var p1, out var p2);
             for (int t = 0; t < p1.Length; t++)
@@ -87,18 +88,21 @@ namespace Knockbox.Tests.EditMode
                 Assert.AreEqual(p2[t], loaded.GetP2(t));
             }
 
-            Assert.AreEqual(recording.FinalChecksum, loaded.Replay(config));
+            Assert.AreEqual(recording.FinalChecksum, loaded.Replay(config, arena));
         }
 
         [Test]
         public void ReplayWithDifferentConfig_IsRejected()
         {
             var config = SimConfig.CreateDefault();
-            var recording = InputRecording.Begin(config, 1, TempArena.DefaultSpawn(config, 0), TempArena.DefaultSpawn(config, 1), MatchPhase.Fighting, "Box", "");
+            var arena = TestWorlds.Box;
+            var recording = InputRecording.Begin(config, arena, 1, SimState.SpawnCenter(config, arena, 0), SimState.SpawnCenter(config, arena, 1), MatchPhase.Fighting, "");
             var movement = MovementParams.Default;
             movement.MaxRunSpeed += 1f;
             var other = new SimConfig(movement, MatchParams.Default);
-            Assert.Throws<System.InvalidOperationException>(() => recording.Replay(other));
+            Assert.Throws<System.InvalidOperationException>(() => recording.Replay(other, arena));
+            Assert.Throws<System.InvalidOperationException>(() => recording.Replay(config, Knockbox.Game.ArenaFiles.LoadByName("Pit")));
+            Assert.DoesNotThrow(() => recording.Replay(config, arena));
         }
 
         [Test]

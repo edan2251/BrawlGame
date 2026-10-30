@@ -1,3 +1,7 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using Knockbox.Simulation;
 using UnityEngine;
 
@@ -5,10 +9,14 @@ namespace Knockbox.Game
 {
     /// <summary>
     /// 플레이 모드에서 시나리오를 MatchRunner로 재생하고, 진행하면서 expect를 평가한다.
-    /// 실패는 오류 로그로 남긴다(플레이 모드 테스트가 콘솔 오류로 잡는다). 캡처 저장은 CP2에서 붙인다.
+    /// 실패는 오류 로그로 남긴다(플레이 모드 테스트가 콘솔 오류로 잡는다).
+    /// 캡처 모드에서는 틱을 직접 진행하고, captures의 틱이 화면에 그려진 직후 PNG로 저장한다.
     /// </summary>
     public sealed class ScenarioPlayer : MonoBehaviour
     {
+        public const int CaptureWidth = 1920;
+        public const int CaptureHeight = 1080;
+
         [SerializeField] MatchRunner runner;
         [SerializeField] string scenarioName;
         [SerializeField] bool playOnStart;
@@ -23,6 +31,10 @@ namespace Knockbox.Game
         }
 
         public bool Finished => Current != null && runner != null && runner.World != null && runner.World.State.Tick >= Current.Ticks;
+
+        /// <summary>프로젝트 루트의 docs/progress/captures/&lt;label&gt;.</summary>
+        public static string CaptureFolder(string label) =>
+            Path.Combine(Directory.GetParent(Application.dataPath).FullName, "docs", "progress", "captures", label);
 
         void Start()
         {
@@ -41,8 +53,9 @@ namespace Knockbox.Game
             Current = def;
             FailureCount = 0;
             var config = SimConfigFactory.Create(runner.Tuning);
+            var arena = runner.ResolveArena(def.Arena);
             runner.InputDelayTicks = 0;
-            runner.Begin(config, ScenarioInputs.CreateInitialState(def, config));
+            runner.Begin(config, arena, ScenarioInputs.CreateInitialState(def, config, arena));
             runner.Player1Input = new FrameArrayInputSource(ScenarioInputs.Build(def.P1, def.Ticks));
             runner.Player2Input = new FrameArrayInputSource(ScenarioInputs.Build(def.P2, def.Ticks));
             runner.StopAtTick = def.Ticks;
@@ -66,6 +79,65 @@ namespace Knockbox.Game
                     continue;
                 FailureCount++;
                 Debug.LogError($"[Knockbox] 시나리오 {Current.Name}: {failure}");
+            }
+        }
+
+        /// <summary>
+        /// 시나리오들을 차례로 재생하며 캡처를 저장한다. 틱은 직접 진행하므로 실제 시간과 무관하다.
+        /// 끝나면 저장한 파일 목록을 넘긴다.
+        /// </summary>
+        public IEnumerator RunCaptures(IReadOnlyList<ScenarioDef> scenarios, string label, Camera camera, Action<List<string>> onDone)
+        {
+            var saved = new List<string>();
+            string folder = CaptureFolder(label);
+            Directory.CreateDirectory(folder);
+
+            foreach (var def in scenarios)
+            {
+                Play(def);
+                runner.Running = false;
+                var captures = new List<ScenarioCapture>(def.Captures);
+                captures.Sort((a, b) => a.Tick.CompareTo(b.Tick));
+                foreach (var capture in captures)
+                {
+                    while (runner.World.State.Tick < capture.Tick && runner.World.State.Tick < def.Ticks)
+                        runner.StepOnce();
+                    // 이번 프레임의 LateUpdate가 현재 상태를 그린 뒤에 찍는다.
+                    yield return null;
+                    yield return new WaitForEndOfFrame();
+                    string path = Path.Combine(folder, $"{def.Name}_{capture.Name}.png");
+                    SaveCameraImage(camera, path);
+                    saved.Add(path);
+                }
+                while (runner.World.State.Tick < def.Ticks)
+                    runner.StepOnce();
+                yield return null;
+            }
+            onDone?.Invoke(saved);
+        }
+
+        public static void SaveCameraImage(Camera camera, string path)
+        {
+            var rt = new RenderTexture(CaptureWidth, CaptureHeight, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            try
+            {
+                camera.targetTexture = rt;
+                camera.Render();
+                RenderTexture.active = rt;
+                var texture = new Texture2D(CaptureWidth, CaptureHeight, TextureFormat.RGB24, false);
+                texture.ReadPixels(new Rect(0, 0, CaptureWidth, CaptureHeight), 0, 0);
+                texture.Apply();
+                File.WriteAllBytes(path, texture.EncodeToPNG());
+                Destroy(texture);
+            }
+            finally
+            {
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                rt.Release();
+                Destroy(rt);
             }
         }
     }

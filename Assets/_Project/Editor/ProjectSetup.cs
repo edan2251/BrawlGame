@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Knockbox.Game;
+using Knockbox.Presentation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -19,13 +20,14 @@ namespace Knockbox.EditorTools
         public const string SandboxScenePath = ScenesFolder + "/Sandbox.unity";
         const string UrpAssetPath = "Assets/Settings/UniversalRP.asset";
 
-        // 05-presentation.md: 직교 크기 9(세로 18 유닛), 배경 bgBase #C9DCEB.
-        // PaletteAsset은 CP3에서 생긴다. 그 전까지 씬 생성기에만 이 값을 둔다.
+        // 05-presentation.md: 직교 크기 9(세로 18 유닛), 배경은 팔레트의 bgBase.
         const float CameraOrthoSize = 9f;
-        static readonly Color BgBase = new Color32(0xC9, 0xDC, 0xEB, 0xFF);
 
         public const string TuningFolder = "Assets/_Project/Data/Tuning";
         public const string MovementTuningPath = TuningFolder + "/MovementTuning.asset";
+        public const string ArtFolder = "Assets/_Project/Art";
+        public const string PalettePath = ArtFolder + "/Palette.asset";
+        public const string ArenasFolder = "Assets/_Project/Data/Arenas";
         public const string MatchObjectName = "Match";
         public const string ScenarioObjectName = "Scenario";
 
@@ -41,16 +43,36 @@ namespace Knockbox.EditorTools
         [MenuItem("Knockbox/Setup/Create Missing Tuning Assets")]
         public static void CreateMissingTuningAssets()
         {
-            if (AssetDatabase.LoadAssetAtPath<MovementTuning>(MovementTuningPath) != null)
+            CreateAssetIfMissing<MovementTuning>(MovementTuningPath);
+            CreateAssetIfMissing<PaletteAsset>(PalettePath);
+        }
+
+        static void CreateAssetIfMissing<T>(string path) where T : ScriptableObject
+        {
+            if (AssetDatabase.LoadAssetAtPath<T>(path) != null)
                 return;
-            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<MovementTuning>(), MovementTuningPath);
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<T>(), path);
             AssetDatabase.SaveAssets();
-            Debug.Log($"[Knockbox] 튜닝 에셋 생성: {MovementTuningPath}");
+            Debug.Log($"[Knockbox] 에셋 생성: {path}");
+        }
+
+        /// <summary>Data/Arenas의 맵 텍스트를 이름순으로.</summary>
+        static TextAsset[] LoadArenaFiles()
+        {
+            var list = new List<TextAsset>();
+            foreach (string guid in AssetDatabase.FindAssets("t:TextAsset", new[] { ArenasFolder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.EndsWith(".txt"))
+                    list.Add(AssetDatabase.LoadAssetAtPath<TextAsset>(path));
+            }
+            list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
+            return list.ToArray();
         }
 
         /// <summary>
         /// Main에는 MatchRunner(자동 시작), Sandbox에는 MatchRunner(수동 시작)와 ScenarioPlayer를 둔다.
-        /// 이미 있으면 건드리지 않는다. 끝나면 Main 씬을 연다.
+        /// 오브젝트가 이미 있으면 빠진 컴포넌트와 비어 있는 참조만 채운다. 끝나면 Main 씬을 연다.
         /// </summary>
         [MenuItem("Knockbox/Setup/Ensure Scene Objects")]
         public static void EnsureSceneObjects()
@@ -73,6 +95,30 @@ namespace Knockbox.EditorTools
                 var so = new SerializedObject(runner);
                 so.FindProperty("movementTuning").objectReferenceValue = AssetDatabase.LoadAssetAtPath<MovementTuning>(MovementTuningPath);
                 so.FindProperty("startOnAwake").boolValue = startOnAwake;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+
+            var runnerSo = new SerializedObject(runner);
+            var arenas = runnerSo.FindProperty("arenaFiles");
+            var arenaFiles = LoadArenaFiles();
+            bool arenasDiffer = arenas.arraySize != arenaFiles.Length;
+            for (int i = 0; !arenasDiffer && i < arenaFiles.Length; i++)
+                arenasDiffer = arenas.GetArrayElementAtIndex(i).objectReferenceValue != arenaFiles[i];
+            if (arenasDiffer)
+            {
+                arenas.arraySize = arenaFiles.Length;
+                for (int i = 0; i < arenaFiles.Length; i++)
+                    arenas.GetArrayElementAtIndex(i).objectReferenceValue = arenaFiles[i];
+                runnerSo.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+
+            if (runner.GetComponent<MatchPresenter>() == null)
+            {
+                var presenter = runner.gameObject.AddComponent<MatchPresenter>();
+                var so = new SerializedObject(presenter);
+                so.FindProperty("palette").objectReferenceValue = AssetDatabase.LoadAssetAtPath<PaletteAsset>(PalettePath);
                 so.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }
@@ -172,7 +218,8 @@ namespace Knockbox.EditorTools
             cam.orthographic = true;
             cam.orthographicSize = CameraOrthoSize;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = BgBase;
+            var palette = AssetDatabase.LoadAssetAtPath<PaletteAsset>(PalettePath);
+            cam.backgroundColor = palette != null ? palette.bgBase : ScriptableObject.CreateInstance<PaletteAsset>().bgBase;
             cam.nearClipPlane = 0.3f;
             cam.farClipPlane = 1000f;
 
