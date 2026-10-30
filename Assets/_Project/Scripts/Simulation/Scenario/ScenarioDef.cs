@@ -1,0 +1,89 @@
+namespace Knockbox.Simulation
+{
+    /// <summary>
+    /// 시나리오(06-match-and-tools.md 5절)를 파싱한 결과. JSON 읽기는 Game 계층(ScenarioJson)이 한다.
+    /// </summary>
+    public sealed class ScenarioDef
+    {
+        public string Name = "";
+        public string Arena = "Box";
+        public string Mode = "";
+        public bool Grab = true;
+        public int Ticks;
+        public uint Seed = 1;
+        public bool HasSpawn;
+        public Vec2 Spawn0;
+        public Vec2 Spawn1;
+        public ScenarioInput[] P1 = new ScenarioInput[0];
+        public ScenarioInput[] P2 = new ScenarioInput[0];
+        public ScenarioCapture[] Captures = new ScenarioCapture[0];
+        public ScenarioExpect[] Expects = new ScenarioExpect[0];
+    }
+
+    /// <summary>방향 입력의 비트 표현. 같은 틱에 좌우가 함께 눌리면 서로 상쇄한다.</summary>
+    [System.Flags]
+    public enum ScenarioDirections : byte
+    {
+        None = 0,
+        Left = 1 << 0,
+        Right = 1 << 1,
+        Up = 1 << 2,
+        Down = 1 << 3,
+    }
+
+    /// <summary>
+    /// 입력 항목. hold: From~To 틱 동안(양 끝 포함) 누르고 있음. press: At 틱부터 HoldFor 틱 동안 누름.
+    /// </summary>
+    public struct ScenarioInput
+    {
+        public bool IsPress;
+        public int From;
+        public int To;
+        public int At;
+        public int HoldFor;
+        public ScenarioDirections Directions;
+        public InputButtons Buttons;
+
+        public static ScenarioInput Hold(int from, int to, ScenarioDirections directions, InputButtons buttons) =>
+            new ScenarioInput { From = from, To = to, Directions = directions, Buttons = buttons };
+
+        public static ScenarioInput Press(int at, int holdFor, ScenarioDirections directions, InputButtons buttons) =>
+            new ScenarioInput { IsPress = true, At = at, HoldFor = holdFor < 1 ? 1 : holdFor, Directions = directions, Buttons = buttons };
+
+        public int FirstTick => IsPress ? At : From;
+        public int LastTick => IsPress ? At + HoldFor - 1 : To;
+    }
+
+    public struct ScenarioCapture
+    {
+        public int Tick;
+        public string Name;
+    }
+
+    public enum ExpectEquality : byte
+    {
+        None,
+        Number,
+        Bool,
+        Text,
+    }
+
+    /// <summary>
+    /// 틱 Tick(그 틱까지 Step을 진행한 직후의 상태)에서 Fighter의 Field를 검사한다.
+    /// 숫자는 Min/Max 범위, 또는 Equals* 중 하나와 비교한다.
+    /// </summary>
+    public struct ScenarioExpect
+    {
+        public int Tick;
+        public int Fighter;
+        public string Field;
+        public bool HasMin;
+        public float Min;
+        public bool HasMax;
+        public float Max;
+        public ExpectEquality Equality;
+        public float EqualsNumber;
+        public bool EqualsBool;
+        public string EqualsText;
+    }
+}

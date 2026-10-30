@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Knockbox.Game;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -23,11 +24,88 @@ namespace Knockbox.EditorTools
         const float CameraOrthoSize = 9f;
         static readonly Color BgBase = new Color32(0xC9, 0xDC, 0xEB, 0xFF);
 
+        public const string TuningFolder = "Assets/_Project/Data/Tuning";
+        public const string MovementTuningPath = TuningFolder + "/MovementTuning.asset";
+        public const string MatchObjectName = "Match";
+        public const string ScenarioObjectName = "Scenario";
+
         [MenuItem("Knockbox/Setup/Run All")]
         public static void RunAll()
         {
             ApplyProjectSettings();
+            CreateMissingTuningAssets();
             CreateMissingScenes();
+            EnsureSceneObjects();
+        }
+
+        [MenuItem("Knockbox/Setup/Create Missing Tuning Assets")]
+        public static void CreateMissingTuningAssets()
+        {
+            if (AssetDatabase.LoadAssetAtPath<MovementTuning>(MovementTuningPath) != null)
+                return;
+            AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<MovementTuning>(), MovementTuningPath);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Knockbox] 튜닝 에셋 생성: {MovementTuningPath}");
+        }
+
+        /// <summary>
+        /// Main에는 MatchRunner(자동 시작), Sandbox에는 MatchRunner(수동 시작)와 ScenarioPlayer를 둔다.
+        /// 이미 있으면 건드리지 않는다. 끝나면 Main 씬을 연다.
+        /// </summary>
+        [MenuItem("Knockbox/Setup/Ensure Scene Objects")]
+        public static void EnsureSceneObjects()
+        {
+            if (AnyOpenSceneDirty())
+                return;
+            EnsureSceneObjects(SandboxScenePath, startOnAwake: false, withScenarioPlayer: true);
+            EnsureSceneObjects(MainScenePath, startOnAwake: true, withScenarioPlayer: false);
+        }
+
+        static void EnsureSceneObjects(string scenePath, bool startOnAwake, bool withScenarioPlayer)
+        {
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            bool changed = false;
+
+            var runner = Object.FindFirstObjectByType<MatchRunner>();
+            if (runner == null)
+            {
+                runner = new GameObject(MatchObjectName).AddComponent<MatchRunner>();
+                var so = new SerializedObject(runner);
+                so.FindProperty("movementTuning").objectReferenceValue = AssetDatabase.LoadAssetAtPath<MovementTuning>(MovementTuningPath);
+                so.FindProperty("startOnAwake").boolValue = startOnAwake;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+
+            if (withScenarioPlayer && Object.FindFirstObjectByType<ScenarioPlayer>() == null)
+            {
+                var player = new GameObject(ScenarioObjectName).AddComponent<ScenarioPlayer>();
+                var so = new SerializedObject(player);
+                so.FindProperty("runner").objectReferenceValue = runner;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+
+            if (changed)
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+                Debug.Log($"[Knockbox] 씬 오브젝트 추가: {scenePath}");
+            }
+        }
+
+        static bool AnyOpenSceneDirty()
+        {
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var open = SceneManager.GetSceneAt(i);
+                if (open.isDirty)
+                {
+                    Debug.LogError($"[Knockbox] 저장하지 않은 씬이 열려 있어 멈춤: {open.name}");
+                    return true;
+                }
+            }
+            return false;
         }
 
         [MenuItem("Knockbox/Setup/Apply Project Settings")]
@@ -58,15 +136,8 @@ namespace Knockbox.EditorTools
         [MenuItem("Knockbox/Setup/Create Missing Scenes")]
         public static void CreateMissingScenes()
         {
-            for (int i = 0; i < SceneManager.sceneCount; i++)
-            {
-                var open = SceneManager.GetSceneAt(i);
-                if (open.isDirty)
-                {
-                    Debug.LogError($"[Knockbox] 저장하지 않은 씬이 열려 있어 씬 생성을 멈춤: {open.name}");
-                    return;
-                }
-            }
+            if (AnyOpenSceneDirty())
+                return;
 
             if (!AssetDatabase.IsValidFolder(ScenesFolder))
                 AssetDatabase.CreateFolder("Assets/_Project", "Scenes");
