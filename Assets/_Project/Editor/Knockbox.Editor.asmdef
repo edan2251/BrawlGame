@@ -1,0 +1,23 @@
+{
+  "name": "Knockbox.Editor",
+  "rootNamespace": "Knockbox.EditorTools",
+  "references": [
+    "Knockbox.Simulation",
+    "Knockbox.Presentation",
+    "Knockbox.Game",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Universal.2D.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

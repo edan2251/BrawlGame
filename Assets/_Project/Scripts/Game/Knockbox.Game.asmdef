@@ -1,0 +1,18 @@
+{
+  "name": "Knockbox.Game",
+  "rootNamespace": "Knockbox.Game",
+  "references": [
+    "Knockbox.Simulation",
+    "Knockbox.Presentation",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
