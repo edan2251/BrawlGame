@@ -18,6 +18,8 @@ namespace Knockbox.Game
         [SerializeField, Range(0, InputDelayQueue.MaxDelay)] int inputDelayTicks;
         [SerializeField] bool startOnAwake = true;
         [SerializeField] bool skipCountdown;
+        [Tooltip("켜면 경기 시작 때 P1 키보드 왼쪽, P2 첫 게임패드(없으면 키보드 오른쪽)를 붙인다")]
+        [SerializeField] bool useLocalDevices;
 
         readonly FixedTickClock clock = new FixedTickClock();
         readonly InputDelayQueue delay1 = new InputDelayQueue();
@@ -94,6 +96,11 @@ namespace Knockbox.Game
             var config = SimConfigFactory.Create(movementTuning);
             var arena = ResolveArena(arenaName);
             var phase = skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
+            if (useLocalDevices)
+            {
+                Player1Input = new KeyboardInputSource(KeyboardLayout.Left);
+                Player2Input = GamepadInputSource.Available(0) ? new GamepadInputSource(0) : new KeyboardInputSource(KeyboardLayout.Right);
+            }
             Begin(config, arena, SimState.CreateRound(config, arena, seed, phase));
         }
 

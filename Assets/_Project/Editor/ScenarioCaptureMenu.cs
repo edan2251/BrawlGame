@@ -19,7 +19,16 @@ namespace Knockbox.EditorTools
     {
         const string PendingKey = "Knockbox.ScenarioCapture.Pending";
         const string LabelKey = "Knockbox.ScenarioCapture.Label";
+        const string ResolutionModeKey = "Knockbox.ScenarioCapture.Resolutions";
         const string ProgressPath = "docs/progress/PROGRESS.md";
+        /// <summary>CP3-4: 여러 해상도에서 레이아웃과 HUD를 확인할 시나리오.</summary>
+        const string ResolutionScenario = "showcase_cp3_presentation";
+        static readonly (int width, int height, string suffix)[] Resolutions =
+        {
+            (1280, 720, "_720p"),
+            (2560, 1440, "_1440p"),
+            (1440, 1080, "_4x3"),
+        };
 
         static ScenarioCaptureMenu()
         {
@@ -27,9 +36,13 @@ namespace Knockbox.EditorTools
         }
 
         [MenuItem("Knockbox/Run Scenario Captures")]
-        public static void Run() => Run(CurrentCheckpointLabel());
+        public static void Run() => Run(CurrentCheckpointLabel(), false);
 
-        public static void Run(string label)
+        /// <summary>같은 장면을 1280×720, 2560×1440, 4:3(레터박스 확인)으로 찍는다.</summary>
+        [MenuItem("Knockbox/Run Scenario Captures (Resolutions)")]
+        public static void RunResolutions() => Run(CurrentCheckpointLabel(), true);
+
+        public static void Run(string label, bool resolutions)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -40,6 +53,7 @@ namespace Knockbox.EditorTools
                 return;
             EditorSceneManager.OpenScene(ProjectSetup.SandboxScenePath, OpenSceneMode.Single);
             SessionState.SetString(LabelKey, label);
+            SessionState.SetBool(ResolutionModeKey, resolutions);
             SessionState.SetBool(PendingKey, true);
             EditorApplication.isPlaying = true;
         }
@@ -82,12 +96,27 @@ namespace Knockbox.EditorTools
                 return;
             }
 
+            if (SessionState.GetBool(ResolutionModeKey, false))
+            {
+                player.StartCoroutine(RunResolutionCaptures(player, label, camera));
+                return;
+            }
             var scenarios = LoadShowcases();
             player.StartCoroutine(player.RunCaptures(scenarios, label, camera, saved =>
             {
                 Debug.Log($"[Knockbox] 시나리오 캡처 {saved.Count}장 저장: {ScenarioPlayer.CaptureFolder(label)}\n" + string.Join("\n", saved));
                 EditorApplication.isPlaying = false;
             }));
+        }
+
+        static System.Collections.IEnumerator RunResolutionCaptures(ScenarioPlayer player, string label, Camera camera)
+        {
+            var scenario = new List<ScenarioDef> { ScenarioJson.LoadByName(ResolutionScenario) };
+            var all = new List<string>();
+            foreach (var (width, height, suffix) in Resolutions)
+                yield return player.RunCaptures(scenario, label, camera, saved => all.AddRange(saved), width, height, suffix);
+            Debug.Log($"[Knockbox] 해상도별 캡처 {all.Count}장 저장: {ScenarioPlayer.CaptureFolder(label)}");
+            EditorApplication.isPlaying = false;
         }
     }
 }

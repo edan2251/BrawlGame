@@ -28,6 +28,8 @@ namespace Knockbox.EditorTools
         public const string ArtFolder = "Assets/_Project/Art";
         public const string PalettePath = ArtFolder + "/Palette.asset";
         public const string ArenasFolder = "Assets/_Project/Data/Arenas";
+        public const string SfxFolder = "Assets/_Project/Audio/Sfx";
+        public const string SfxLibraryPath = "Assets/_Project/Audio/SfxLibrary.asset";
         public const string MatchObjectName = "Match";
         public const string ScenarioObjectName = "Scenario";
 
@@ -36,6 +38,11 @@ namespace Knockbox.EditorTools
         {
             ApplyProjectSettings();
             CreateMissingTuningAssets();
+            if (AssetDatabase.LoadAssetAtPath<ShapeLibrary>(SpriteFactory.LibraryPath) == null)
+                SpriteFactory.Generate();
+            else
+                SpriteFactory.EnsureSortingLayers();
+            EnsureSfxLibrary();
             CreateMissingScenes();
             EnsureSceneObjects();
         }
@@ -54,6 +61,38 @@ namespace Knockbox.EditorTools
             AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<T>(), path);
             AssetDatabase.SaveAssets();
             Debug.Log($"[Knockbox] 에셋 생성: {path}");
+        }
+
+        /// <summary>SfxLibrary 에셋을 만들고 Tools/sfx_synth.py가 만든 WAV를 이름으로 연결한다.</summary>
+        [MenuItem("Knockbox/Setup/Ensure Sfx Library")]
+        public static void EnsureSfxLibrary()
+        {
+            var library = AssetDatabase.LoadAssetAtPath<SfxLibrary>(SfxLibraryPath);
+            if (library == null)
+            {
+                library = ScriptableObject.CreateInstance<SfxLibrary>();
+                AssetDatabase.CreateAsset(library, SfxLibraryPath);
+            }
+            var so = new SerializedObject(library);
+            bool changed = false;
+            var field = so.GetIterator();
+            field.NextVisible(true);
+            while (field.NextVisible(false))
+            {
+                if (field.propertyType != SerializedPropertyType.ObjectReference)
+                    continue;
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{SfxFolder}/{field.name}.wav");
+                if (clip != null && field.objectReferenceValue != clip)
+                {
+                    field.objectReferenceValue = clip;
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                so.ApplyModifiedPropertiesWithoutUndo();
+                AssetDatabase.SaveAssets();
+            }
         }
 
         /// <summary>Data/Arenas의 맵 텍스트를 이름순으로.</summary>
@@ -79,11 +118,11 @@ namespace Knockbox.EditorTools
         {
             if (AnyOpenSceneDirty())
                 return;
-            EnsureSceneObjects(SandboxScenePath, startOnAwake: false, withScenarioPlayer: true);
-            EnsureSceneObjects(MainScenePath, startOnAwake: true, withScenarioPlayer: false);
+            EnsureSceneObjects(SandboxScenePath, startOnAwake: false, withScenarioPlayer: true, localPlay: false);
+            EnsureSceneObjects(MainScenePath, startOnAwake: true, withScenarioPlayer: false, localPlay: true);
         }
 
-        static void EnsureSceneObjects(string scenePath, bool startOnAwake, bool withScenarioPlayer)
+        static void EnsureSceneObjects(string scenePath, bool startOnAwake, bool withScenarioPlayer, bool localPlay)
         {
             var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             bool changed = false;
@@ -95,7 +134,15 @@ namespace Knockbox.EditorTools
                 var so = new SerializedObject(runner);
                 so.FindProperty("movementTuning").objectReferenceValue = AssetDatabase.LoadAssetAtPath<MovementTuning>(MovementTuningPath);
                 so.FindProperty("startOnAwake").boolValue = startOnAwake;
+                so.FindProperty("useLocalDevices").boolValue = localPlay;
                 so.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+            var runnerFlags = new SerializedObject(runner);
+            if (runnerFlags.FindProperty("useLocalDevices").boolValue != localPlay)
+            {
+                runnerFlags.FindProperty("useLocalDevices").boolValue = localPlay;
+                runnerFlags.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }
 
@@ -114,12 +161,25 @@ namespace Knockbox.EditorTools
                 changed = true;
             }
 
-            if (runner.GetComponent<MatchPresenter>() == null)
+            var presenter = runner.GetComponent<MatchPresenter>();
+            if (presenter == null)
             {
-                var presenter = runner.gameObject.AddComponent<MatchPresenter>();
-                var so = new SerializedObject(presenter);
-                so.FindProperty("palette").objectReferenceValue = AssetDatabase.LoadAssetAtPath<PaletteAsset>(PalettePath);
-                so.ApplyModifiedPropertiesWithoutUndo();
+                presenter = runner.gameObject.AddComponent<MatchPresenter>();
+                changed = true;
+            }
+            changed |= FillReference(presenter, "palette", AssetDatabase.LoadAssetAtPath<PaletteAsset>(PalettePath));
+            changed |= FillReference(presenter, "shapes", AssetDatabase.LoadAssetAtPath<ShapeLibrary>(SpriteFactory.LibraryPath));
+            changed |= FillReference(presenter, "sfx", AssetDatabase.LoadAssetAtPath<SfxLibrary>(SfxLibraryPath));
+
+            if (localPlay && runner.GetComponent<DebugHotkeys>() == null)
+            {
+                runner.gameObject.AddComponent<DebugHotkeys>();
+                changed = true;
+            }
+            var mainCamera = Object.FindFirstObjectByType<Camera>();
+            if (mainCamera != null && mainCamera.GetComponent<CameraRig>() == null)
+            {
+                mainCamera.gameObject.AddComponent<CameraRig>();
                 changed = true;
             }
 
@@ -138,6 +198,18 @@ namespace Knockbox.EditorTools
                 EditorSceneManager.SaveScene(scene);
                 Debug.Log($"[Knockbox] 씬 오브젝트 추가: {scenePath}");
             }
+        }
+
+        /// <summary>비어 있는 참조만 채운다. 바꿨으면 true.</summary>
+        static bool FillReference(Object target, string property, Object value)
+        {
+            var so = new SerializedObject(target);
+            var prop = so.FindProperty(property);
+            if (prop.objectReferenceValue != null || value == null)
+                return false;
+            prop.objectReferenceValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return true;
         }
 
         static bool AnyOpenSceneDirty()
