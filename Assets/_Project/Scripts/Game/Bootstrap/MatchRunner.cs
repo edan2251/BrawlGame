@@ -14,6 +14,8 @@ namespace Knockbox.Game
         [SerializeField] MovementTuning movementTuning;
         [SerializeField] CombatTuning combatTuning;
         [SerializeField] CombatMode mode = CombatMode.Test;
+        [Tooltip("잡기 켜기/끄기(F4). 다음 StartNewMatch부터 적용")]
+        [SerializeField] bool grabEnabled = true;
         [SerializeField] TextAsset[] arenaFiles;
         [SerializeField] string arenaName = "Box";
         [SerializeField] uint seed = 1;
@@ -90,6 +92,13 @@ namespace Knockbox.Game
             set => mode = value;
         }
 
+        /// <summary>다음 StartNewMatch부터 적용된다.</summary>
+        public bool GrabEnabled
+        {
+            get => grabEnabled;
+            set => grabEnabled = value;
+        }
+
         public int InputDelayTicks
         {
             get => inputDelayTicks;
@@ -122,7 +131,7 @@ namespace Knockbox.Game
             configFromTuning = true;
         }
 
-        public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, mode);
+        public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, mode, grabEnabled);
 
         /// <summary>등록된 맵 텍스트에서 찾고, 에디터에서는 없으면 디스크에서 읽는다.</summary>
         public ArenaDef ResolveArena(string name)

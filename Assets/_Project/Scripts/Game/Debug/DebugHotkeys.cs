@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// 디버그 단축키(06-match-and-tools.md 4절) 중 지금 있는 기능만: F1 전투 모드 전환(라운드 리셋), F3 판정 오버레이, F5 라운드 리셋(튜닝 재적용),
+    /// 디버그 단축키(06-match-and-tools.md 4절) 중 지금 있는 기능만: F1 전투 모드 전환(라운드 리셋), F3 판정 오버레이,
+    /// F4 잡기 켜기/끄기(라운드 리셋), F5 라운드 리셋(튜닝 재적용),
     /// F6 P2 입력원 순환(키보드 오른쪽 → 게임패드 → 허수아비), `[` `]` 허수아비 행동 바꾸기,
     /// F7 흔들림 줄이기, F8 SyncTest, P 일시정지, O 정지 중 한 틱 진행. 나머지는 해당 CP에서 붙인다.
     /// 에디터와 개발 빌드에서만 동작한다.
@@ -42,6 +43,12 @@ namespace Knockbox.Game
                 runner.Mode = modes[next];
                 RestartKeepingDummy();
                 Debug.Log($"[Knockbox] 전투 모드: {runner.Mode}");
+            }
+            if (k.f4Key.wasPressedThisFrame)
+            {
+                runner.GrabEnabled = !runner.GrabEnabled;
+                RestartKeepingDummy();
+                Debug.Log($"[Knockbox] 잡기 {(runner.GrabEnabled ? "켬" : "끔")}");
             }
             if (k.f3Key.wasPressedThisFrame && presenter != null)
                 presenter.SetOverlay(!presenter.OverlayVisible);

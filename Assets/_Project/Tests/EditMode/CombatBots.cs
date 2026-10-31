@@ -12,33 +12,40 @@ namespace Knockbox.Tests.EditMode
         SimRng rng;
         int mode;
         int ticksLeft;
+        readonly bool grabs;
 
-        public CombatBot(uint seed)
+        /// <param name="grabs">true면 다가가서 잡고 던지는 행동을 섞는다(CP7). 기본값은 이전 CP 테스트의 입력을 바꾸지 않는다.</param>
+        public CombatBot(uint seed, bool grabs = false)
         {
             rng = new SimRng(seed);
             mode = 0;
             ticksLeft = 0;
+            this.grabs = grabs;
         }
 
         public InputFrame Next(in FighterState self, in FighterState other, int tick)
         {
             if (ticksLeft-- <= 0)
             {
-                mode = rng.Range(0, 6);
+                mode = rng.Range(0, grabs ? 7 : 6);
                 ticksLeft = rng.Range(6, 32);
             }
             float dx = other.Position.X - self.Position.X;
             int toward = dx > 0f ? 1 : dx < 0f ? -1 : self.Facing;
             float distance = dx < 0f ? -dx : dx;
             bool close = distance < 2.2f && (other.Position.Y - self.Position.Y) * (other.Position.Y - self.Position.Y) < 2.5f;
+            // 잡기 상자(몸 앞 0.65, 폭 0.7)가 닿는 거리.
+            bool grabRange = distance < 1.35f && (other.Position.Y - self.Position.Y) * (other.Position.Y - self.Position.Y) < 0.6f;
             var buttons = InputButtons.None;
             int moveX = toward;
             int moveY = 0;
             switch (mode)
             {
-                case 0: // 다가가서 연타
+                case 0: // 다가가서 연타(잡기를 쓰는 봇은 가끔 잡기를 섞는다)
                     if (close && tick % 5 == 0)
                         buttons |= InputButtons.Attack;
+                    else if (grabs && grabRange && tick % 5 == 2)
+                        buttons |= InputButtons.Grab;
                     break;
                 case 1: // 가드를 누르고 버틴다(가끔 다시 눌러 패링 구간을 연다)
                     moveX = 0;
@@ -59,6 +66,19 @@ namespace Knockbox.Tests.EditMode
                         buttons |= InputButtons.Dash;
                     if (close && tick % 3 == 0)
                         buttons |= InputButtons.Attack;
+                    break;
+                case 6: // 다가가서 잡고, 잡았으면 몇 틱 들고 있다가 위나 뒤로 던진다
+                    if (self.Action == ActionState.Holding)
+                    {
+                        if (self.ActionTick < 6)
+                            buttons |= InputButtons.Grab;
+                        moveX = tick % 2 == 0 ? -self.Facing : 0;
+                        moveY = tick % 3 == 0 ? 1 : 0;
+                    }
+                    else if (grabRange && tick % 3 == 0)
+                    {
+                        buttons |= InputButtons.Grab;
+                    }
                     break;
                 default: // 상대 공격 시작을 보고 가드
                     moveX = close ? 0 : toward;

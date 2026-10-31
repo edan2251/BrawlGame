@@ -10,7 +10,7 @@ namespace Knockbox.Game
     public static class ScenarioConfig
     {
         public static SimConfig Create(ScenarioDef def, MovementTuning movement = null, CombatTuning combat = null) =>
-            Apply(SimConfigFactory.Create(movement, combat, ParseMode(def.Mode)), def.Tuning);
+            Apply(SimConfigFactory.Create(movement, combat, ParseMode(def.Mode), def.Grab), def.Tuning);
 
         /// <summary>빈 문자열이면 테스트 모드.</summary>
         public static CombatMode ParseMode(string mode)
@@ -42,7 +42,7 @@ namespace Knockbox.Game
                     default: throw new FormatException($"tuning.{t.Path}: \"{parts[0]}\"는 Movement, Match, Combat 중 하나여야 함");
                 }
             }
-            return new SimConfig((MovementParams)movement, (MatchParams)match, (CombatParams)combat, source.Mode);
+            return new SimConfig((MovementParams)movement, (MatchParams)match, (CombatParams)combat, source.Mode, source.GrabEnabled);
         }
 
         static object SetPath(object boxed, string[] parts, int index, in ScenarioTuning t)

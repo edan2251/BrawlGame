@@ -38,6 +38,9 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(a.ParryTicks, b.ParryTicks, at + " parry");
             Assert.AreEqual(a.LungeBounces, b.LungeBounces, at + " lungeBounces");
             Assert.AreEqual(a.ContactCooldown, b.ContactCooldown, at + " contactCooldown");
+            Assert.AreEqual(a.ThrowPending, b.ThrowPending, at + " throwPending");
+            Assert.AreEqual(a.ThrowDirection.X, -b.ThrowDirection.X, Tolerance, at + " throwDirection.x");
+            Assert.AreEqual(a.ThrowDirection.Y, b.ThrowDirection.Y, Tolerance, at + " throwDirection.y");
         }
 
         [TestCase(11u)]

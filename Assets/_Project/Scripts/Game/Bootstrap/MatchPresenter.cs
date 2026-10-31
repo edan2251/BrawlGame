@@ -46,6 +46,7 @@ namespace Knockbox.Game
         CombatMode footerMode;
         IInputSource footerP2;
         DummyBehavior footerDummy;
+        bool footerGrab;
 
         public PaletteAsset Palette
         {
@@ -218,13 +219,14 @@ namespace Knockbox.Game
             var p2 = runner.Player2Input;
             var dummy = p2 is DummyInputSource d ? d.Behavior : DummyBehavior.Idle;
             if (footer == null || !ReferenceEquals(world.Arena.Name, footerArena) || world.Config.Mode != footerMode
-                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy)
+                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy || world.Config.GrabEnabled != footerGrab)
             {
                 footerArena = world.Arena.Name;
                 footerMode = world.Config.Mode;
                 footerP2 = p2;
                 footerDummy = dummy;
-                footer = $"{footerArena} / mode {footerMode} / P2 {InputSourceName(p2)}";
+                footerGrab = world.Config.GrabEnabled;
+                footer = $"{footerArena} / mode {footerMode}{(world.Config.GrabEnabled ? "" : " (no grab)")} / P2 {InputSourceName(p2)}";
             }
             return footer;
         }

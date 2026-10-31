@@ -29,6 +29,14 @@ namespace Knockbox.Simulation
         Lunge,
         /// <summary>모드 B: 공중에서 시작한 공격 도중 착지한 경직.</summary>
         LandingLag,
+        /// <summary>잡기: 시작 → 활성(잡기 상자) → 헛잡기 후딜. 행동 틱으로 단계를 나눈다.</summary>
+        Grab,
+        /// <summary>상대를 붙잡고 있음. 잡기 버튼을 떼거나 최대 시간이 지나면 던진다.</summary>
+        Holding,
+        /// <summary>붙잡혀 있음(움직일 수 없음).</summary>
+        Held,
+        /// <summary>던져진 상태. 피격 경직과 같은 규칙이고 벽꽝 기준이 낮다.</summary>
+        Thrown,
     }
 
     /// <summary>
@@ -105,6 +113,10 @@ namespace Knockbox.Simulation
         public int LungeBounces;
         /// <summary>남은 몸 충돌 판정 대기 틱(같은 두 파이터 사이 판정은 10틱에 한 번). 두 파이터가 같은 값을 갖는다.</summary>
         public int ContactCooldown;
+        /// <summary>붙잡은 쪽이 이번 틱에 던지기로 했다. 상호작용 판정에서 상대에게 적용한다.</summary>
+        public bool ThrowPending;
+        /// <summary>던질 방향(월드, 단위 벡터).</summary>
+        public Vec2 ThrowDirection;
 
         public const int NoAttack = -1;
 
@@ -113,7 +125,10 @@ namespace Knockbox.Simulation
 
         public readonly bool IsStunned =>
             Action == ActionState.Hitstun || Action == ActionState.GuardStun || Action == ActionState.Stagger
-            || Action == ActionState.Recoil || Action == ActionState.LandingLag;
+            || Action == ActionState.Recoil || Action == ActionState.LandingLag || Action == ActionState.Thrown;
+
+        /// <summary>날아가는 경직(지형에 부딪히면 벽꽝·튕김).</summary>
+        public readonly bool IsLaunched => Action == ActionState.Hitstun || Action == ActionState.Thrown;
 
         public readonly bool IsGuarding => Action == ActionState.Guard || Action == ActionState.GuardStun;
 
@@ -173,6 +188,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(PendingPresses), (int)PendingPresses);
             v.Value(nameof(LungeBounces), LungeBounces);
             v.Value(nameof(ContactCooldown), ContactCooldown);
+            v.Value(nameof(ThrowPending), ThrowPending);
+            v.Value("ThrowDirection.X", ThrowDirection.X);
+            v.Value("ThrowDirection.Y", ThrowDirection.Y);
         }
     }
 }

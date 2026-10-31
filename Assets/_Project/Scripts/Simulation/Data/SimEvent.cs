@@ -32,6 +32,10 @@ namespace Knockbox.Simulation
         LungeStart,
         /// <summary>몸 충돌 판정에서 계산한 위력(F3 오버레이용). Fighter의 위력이 Strength.</summary>
         PowerCheck,
+        /// <summary>잡기 시작(손을 뻗는 시점).</summary>
+        GrabStart,
+        /// <summary>잡기 풀기: 서로 잡아 반대로 튕김.</summary>
+        GrabBreak,
     }
 
     /// <summary>

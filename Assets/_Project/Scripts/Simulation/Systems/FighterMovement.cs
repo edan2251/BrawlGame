@@ -161,6 +161,7 @@ namespace Knockbox.Simulation
                     ApplyGravity(ref f, m, false, 0, 0);
                     break;
                 case ActionState.Attack:
+                case ActionState.Grab:
                     if (f.Grounded)
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     else
@@ -168,9 +169,15 @@ namespace Knockbox.Simulation
                     ApplyGravity(ref f, m, jumpHeld, 0, moveY);
                     break;
                 case ActionState.Hitstun:
+                case ActionState.Thrown:
                     if (f.Grounded)
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     ApplyGravity(ref f, m, false, 0, 0);
+                    break;
+                case ActionState.Holding:
+                case ActionState.Held:
+                    // 붙잡기 동안 둘 다 움직이지 않는다(공중이어도 떠 있음).
+                    f.Velocity = Vec2.Zero;
                     break;
                 case ActionState.Charge:
                     ApplyHorizontal(ref f, m, moveX, c.Charge.ChargeMoveMaxSpeed, 1f, 1f);
@@ -313,7 +320,7 @@ namespace Knockbox.Simulation
                 bounced = true;
                 events.Add(new SimEvent(tick, SimEventType.PadBounce, index, f.Position, new Vec2(0f, 1f), m.BouncePadSpeed));
             }
-            else if (f.Action == ActionState.Hitstun)
+            else if (f.IsLaunched)
             {
                 bounced = Rebound(ref f, contacts, config, index, tick, events);
             }
@@ -426,6 +433,10 @@ namespace Knockbox.Simulation
             float strongest = SimMath.Max(wall, SimMath.Max(floor, ceiling));
             if (strongest < c.BounceMinSpeed)
                 return false;
+            // 던져진 상태는 벽꽝 기준이 낮고(12) 데미지가 크다(10).
+            bool thrown = f.Action == ActionState.Thrown;
+            float splatSpeed = thrown ? c.Grab.ThrownSplatSpeed : c.WallSplatSpeed;
+            int splatDamage = thrown ? c.Grab.ThrownSplatDamage : c.WallSplatDamage;
 
             var v = f.Velocity;
             if (contacts.HitWall != 0)
@@ -452,13 +463,13 @@ namespace Knockbox.Simulation
                 point = new Vec2(f.Position.X, f.Position.Y + half);
             }
 
-            bool splat = strongest >= c.WallSplatSpeed;
+            bool splat = strongest >= splatSpeed;
             f.Velocity = v * (splat ? c.WallSplatRestitution : c.BounceRestitution);
             f.Grounded = false;
             f.GroundBox = FighterState.NoBox;
             if (splat)
             {
-                f.Health = SimMath.Max(0, f.Health - c.WallSplatDamage);
+                f.Health = SimMath.Max(0, f.Health - splatDamage);
                 f.StunTicks += c.WallSplatHitstun;
                 f.HitstopTicks = SimMath.Max(f.HitstopTicks, c.WallSplatHitstop);
                 events.Add(new SimEvent(tick, SimEventType.WallSplat, index, point, normal, strongest));

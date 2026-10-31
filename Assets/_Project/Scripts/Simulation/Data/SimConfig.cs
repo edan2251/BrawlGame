@@ -180,6 +180,8 @@ namespace Knockbox.Simulation
         public readonly MatchParams Match;
         public readonly CombatParams Combat;
         public readonly CombatMode Mode;
+        /// <summary>잡기 켜기/끄기(F4). 꺼져 있으면 잡기 입력을 무시한다.</summary>
+        public readonly bool GrabEnabled;
         public readonly float HalfBody;
 
         public SimConfig(in MovementParams movement, in MatchParams match)
@@ -187,8 +189,9 @@ namespace Knockbox.Simulation
         {
         }
 
-        public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, CombatMode mode)
+        public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, CombatMode mode, bool grabEnabled = true)
         {
+            GrabEnabled = grabEnabled;
             Movement = movement;
             Match = match;
             Combat = combat;
@@ -196,6 +199,7 @@ namespace Knockbox.Simulation
             Combat.Swing.Forward = Prepare(combat.Swing.Forward);
             Combat.Swing.Up = Prepare(combat.Swing.Up);
             Combat.Swing.Down = Prepare(combat.Swing.Down);
+            Combat.Grab.NeutralThrowDirection = SimMath.Normalize(combat.Grab.NeutralThrowDirection);
             Mode = mode;
             HalfBody = movement.BodySize * 0.5f;
         }
@@ -242,6 +246,7 @@ namespace Knockbox.Simulation
             Combat.Visit(ref v);
             v.End();
             v.Value(nameof(Mode), (int)Mode);
+            v.Value(nameof(GrabEnabled), GrabEnabled);
         }
     }
 }

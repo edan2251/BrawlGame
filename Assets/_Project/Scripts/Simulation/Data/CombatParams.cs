@@ -22,6 +22,84 @@ namespace Knockbox.Simulation
         public const int SwingDown = 3;
     }
 
+    /// <summary>보조 스킬: 잡기와 던지기(03-combat.md 6절). 두 모드 공통.</summary>
+    [Serializable]
+    public struct GrabParams
+    {
+        public int StartupTicks;
+        public int ActiveTicks;
+        /// <summary>헛잡기 후딜.</summary>
+        public int WhiffRecoveryTicks;
+        /// <summary>잡기 상자 중심의 몸 앞 거리.</summary>
+        public float BoxOffset;
+        public float BoxWidth;
+        public float BoxHeight;
+        /// <summary>붙잡은 상대를 고정하는 몸 앞 거리.</summary>
+        public float HoldOffset;
+        public int MaxHoldTicks;
+        public float ThrowSpeed;
+        public int ThrowDamage;
+        /// <summary>던져진 상태(피격 경직과 같은 규칙) 틱.</summary>
+        public int ThrownTicks;
+        /// <summary>중립 던지기 방향(바라보는 쪽 기준). 설정을 만들 때 정규화한다.</summary>
+        public Vec2 NeutralThrowDirection;
+        /// <summary>뒤로 던질 때 상대를 등 뒤로 옮기는 거리.</summary>
+        public float BackThrowOffset;
+        public float ThrownSplatSpeed;
+        public int ThrownSplatDamage;
+        /// <summary>잡기 풀기: 서로 반대로 튕기는 속도, 반동, 히트스탑.</summary>
+        public float TechSpeed;
+        public int TechRecoilTicks;
+        public int TechHitstop;
+
+        public readonly int TotalWhiffTicks => StartupTicks + ActiveTicks + WhiffRecoveryTicks;
+
+        public static GrabParams Default => new GrabParams
+        {
+            StartupTicks = 5,
+            ActiveTicks = 3,
+            WhiffRecoveryTicks = 22,
+            BoxOffset = 0.65f,
+            BoxWidth = 0.7f,
+            BoxHeight = 0.9f,
+            HoldOffset = 0.8f,
+            MaxHoldTicks = 20,
+            ThrowSpeed = 28f,
+            ThrowDamage = 6,
+            ThrownTicks = 24,
+            NeutralThrowDirection = new Vec2(0.8660254f, 0.5f),
+            BackThrowOffset = 0.95f,
+            ThrownSplatSpeed = 12f,
+            ThrownSplatDamage = 10,
+            TechSpeed = 10f,
+            TechRecoilTicks = 12,
+            TechHitstop = 6,
+        };
+
+        public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
+        {
+            v.Value(nameof(StartupTicks), StartupTicks);
+            v.Value(nameof(ActiveTicks), ActiveTicks);
+            v.Value(nameof(WhiffRecoveryTicks), WhiffRecoveryTicks);
+            v.Value(nameof(BoxOffset), BoxOffset);
+            v.Value(nameof(BoxWidth), BoxWidth);
+            v.Value(nameof(BoxHeight), BoxHeight);
+            v.Value(nameof(HoldOffset), HoldOffset);
+            v.Value(nameof(MaxHoldTicks), MaxHoldTicks);
+            v.Value(nameof(ThrowSpeed), ThrowSpeed);
+            v.Value(nameof(ThrowDamage), ThrowDamage);
+            v.Value(nameof(ThrownTicks), ThrownTicks);
+            v.Value("NeutralThrowDirection.X", NeutralThrowDirection.X);
+            v.Value("NeutralThrowDirection.Y", NeutralThrowDirection.Y);
+            v.Value(nameof(BackThrowOffset), BackThrowOffset);
+            v.Value(nameof(ThrownSplatSpeed), ThrownSplatSpeed);
+            v.Value(nameof(ThrownSplatDamage), ThrownSplatDamage);
+            v.Value(nameof(TechSpeed), TechSpeed);
+            v.Value(nameof(TechRecoilTicks), TechRecoilTicks);
+            v.Value(nameof(TechHitstop), TechHitstop);
+        }
+    }
+
     /// <summary>모드 B: 무기 휘두르기(03-combat.md 5절).</summary>
     [Serializable]
     public struct SwingModeParams
@@ -401,6 +479,7 @@ namespace Knockbox.Simulation
         public AttackDef TestAttack;
         public ChargeModeParams Charge;
         public SwingModeParams Swing;
+        public GrabParams Grab;
 
         public static CombatParams Default => new CombatParams
         {
@@ -447,6 +526,7 @@ namespace Knockbox.Simulation
             TestAttack = AttackDef.TestJab,
             Charge = ChargeModeParams.Default,
             Swing = SwingModeParams.Default,
+            Grab = GrabParams.Default,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -492,6 +572,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Swing));
             Swing.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Grab));
+            Grab.Visit(ref v);
             v.End();
         }
     }
