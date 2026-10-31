@@ -25,7 +25,7 @@ namespace Knockbox.Tests.EditMode
             return new SimWorld(config, arena, SimState.CreateRound(config, arena, 1, center0, center1, MatchPhase.Fighting));
         }
 
-        /// <summary>테스트 안에 둔 문자 격자(32 × 18) 맵. 첫 줄 앞의 빈 줄과 들여쓰기는 무시한다.</summary>
+        /// <summary>테스트 안에 둔 문자 격자(32 × 18) 맵. 첫 줄 앞의 빈 줄과 들여쓰기는 무시한다. 좌우 대칭이 아니어도 된다.</summary>
         public static ArenaDef Grid(string name, string grid)
         {
             var lines = grid.Replace("\r\n", "\n").Split('\n');
@@ -37,7 +37,7 @@ namespace Knockbox.Tests.EditMode
                 if (trimmed.Length > 0)
                     sb.Append(trimmed).Append('\n');
             }
-            return ArenaParser.Parse(sb.ToString());
+            return ArenaParser.Parse(sb.ToString(), requireSymmetry: false);
         }
 
         public static SimConfig Config(System.Func<MovementParams, MovementParams> change)

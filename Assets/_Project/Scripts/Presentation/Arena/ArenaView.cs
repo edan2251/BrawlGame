@@ -33,7 +33,7 @@ namespace Knockbox.Presentation
                 var b = arena.GetBox(i);
                 // 경기장 맨 위 테두리 줄은 그리지 않는다: 화면 위에 띠나 액자가 없어야 하고(08 4·7절), 광원이 그 바깥에 있다.
                 // 천장은 시뮬레이션에 그대로 있다(화면 위 끝에 부딪힌다).
-                if (b.MinY >= ArenaDef.HalfHeight - 1f - 1e-3f)
+                if (b.MinY >= arena.HalfHeight - 1f - 1e-3f)
                     continue;
                 switch (b.Kind)
                 {

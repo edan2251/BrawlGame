@@ -103,7 +103,7 @@ namespace Knockbox.Tests.EditMode
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 var b = arena.GetBox(i);
-                if (b.Kind == TerrainKind.Spike || b.MaxY >= ArenaDef.HalfHeight - 0.5f)
+                if (b.Kind == TerrainKind.Spike || b.MaxY >= arena.HalfHeight - 0.5f)
                     continue;
                 if (b.Kind != TerrainKind.Solid)
                 {

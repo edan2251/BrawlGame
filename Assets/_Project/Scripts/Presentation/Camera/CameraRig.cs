@@ -1,3 +1,4 @@
+using Knockbox.Simulation;
 using UnityEngine;
 
 namespace Knockbox.Presentation
@@ -13,8 +14,8 @@ namespace Knockbox.Presentation
     [RequireComponent(typeof(Camera))]
     public sealed class CameraRig : MonoBehaviour
     {
-        public const float ArenaHalfWidth = 16f;
-        public const float ArenaHalfHeight = 9f;
+        /// <summary>좌우 테두리 벽(1유닛)은 이만큼만 보여도 된다(08 4절: 테두리는 일부가 화면 밖으로 나가도 된다).</summary>
+        public const float SideWallShown = 0.5f;
         public const float MaxShake = 0.35f;
         public const float ReducedShakeScale = 0.3f;
         const float TraumaDecay = 1.6f;
@@ -29,6 +30,18 @@ namespace Knockbox.Presentation
 
         /// <summary>흔들림 줄이기(F7). 켜면 흔들림 30%, 화면 전체 번쩍임과 색 반전 끔(CP4).</summary>
         public bool ReduceMotion { get; set; }
+
+        /// <summary>화면에 맞추는 경기장 반폭·반높이. 맵이 바뀌면 FitArena로 바꾼다.</summary>
+        public float ArenaHalfWidth { get; private set; } = ArenaDef.ClassicColumns * 0.5f;
+        public float ArenaHalfHeight { get; private set; } = ArenaDef.ClassicRows * 0.5f;
+
+        public void FitArena(ArenaDef arena)
+        {
+            ArenaHalfWidth = arena.HalfWidth;
+            ArenaHalfHeight = arena.HalfHeight;
+            if (cam != null)
+                Frame();
+        }
         public float Trauma => trauma;
         public Vector2 ShakeOffset { get; private set; }
 
@@ -77,7 +90,8 @@ namespace Knockbox.Presentation
         void Frame()
         {
             float aspect = cam.aspect;
-            float sizeForWidth = ArenaHalfWidth / Mathf.Max(aspect, 0.01f);
+            // 세로는 경기장 전체, 가로는 좌우 벽이 SideWallShown만큼 보이도록. 32 × 18은 16:9에 꼭 맞는다.
+            float sizeForWidth = (ArenaHalfWidth - 1f + SideWallShown) / Mathf.Max(aspect, 0.01f);
             cam.orthographicSize = Mathf.Max(ArenaHalfHeight, sizeForWidth) * (1f - Zoom);
         }
     }

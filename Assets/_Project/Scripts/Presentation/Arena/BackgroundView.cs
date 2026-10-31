@@ -13,23 +13,23 @@ namespace Knockbox.Presentation
     /// </summary>
     public sealed class BackgroundView : MonoBehaviour
     {
-        /// <summary>광원 위치: 경기장 위쪽 끝에서 화면 높이의 3/4 위(D-028 "지금보다 높이", 이전 1/4).</summary>
-        public static readonly Vector2 DefaultLight = new Vector2(0f, ArenaDef.HalfHeight + ArenaDef.Rows * 0.75f);
+        /// <summary>광원 위치: 경기장 위쪽 끝에서 경기장 높이의 3/4 위(D-028 "지금보다 높이", 이전 1/4).</summary>
+        public static Vector2 DefaultLight(ArenaDef arena) => new Vector2(0f, arena.HalfHeight + arena.Rows * 0.75f);
 
         /// <summary>그림자 영역 밝기 = 같은 곳의 빛 × (1 − ShadowStrength). D-028 (1): 65~85%.</summary>
         public const float ShadowStrength = 0.25f;
         /// <summary>
-        /// 밝기 = (광원~화면 위 가운데 거리 / 광원~점 거리)^FalloffExponent. 광원이 위로 13.5에 있을 때
-        /// 화면 아래 가운데 약 0.55, 아래 구석 약 0.5(D-028 (3): 40~60%).
+        /// 밝기 = (광원~화면 위 가운데 거리 / 광원~점 거리)^FalloffExponent. 광원이 경기장 높이의 3/4 위에 있을 때
+        /// 화면 아래 가운데 약 0.55, 아래 구석 약 0.5(D-028 (3): 40~60%). 비율이라 경기장 크기와 상관없다.
         /// </summary>
         public const float FalloffExponent = 0.7f;
         /// <summary>넓은 광원의 반폭과 표본 수(반그림자).</summary>
         const float LightHalfWidth = 2f;
         const int LightSamples = 8;
-        /// <summary>텍스처 해상도(유닛당 텍셀)와 덮는 범위. 흔들림·확대에도 가장자리가 보이지 않게 화면보다 넓게.</summary>
+        /// <summary>텍스처 해상도(유닛당 텍셀)와 경기장보다 넓게 덮는 여유. 흔들림·확대에도 가장자리가 보이지 않게.</summary>
         const int TexelsPerUnit = 6;
-        const float CoverWidth = ArenaDef.Columns + 4f;
-        const float CoverHeight = ArenaDef.Rows + 2.25f;
+        const float CoverMarginX = 4f;
+        const float CoverMarginY = 2.25f;
         /// <summary>그림자 마스크 흐림(상자 흐림 반경 텍셀 × 횟수). 경계 전환 폭이 1080p에서 30픽셀 이상(D-028 (2)).</summary>
         const int BlurRadius = 2;
         const int BlurPasses = 2;
@@ -52,6 +52,10 @@ namespace Knockbox.Presentation
         float[] shadowMask;
         int width;
         int height;
+        float coverWidth;
+        float coverHeight;
+        float halfWidth = ArenaDef.ClassicColumns * 0.5f;
+        float halfHeight = ArenaDef.ClassicRows * 0.5f;
 
         public Vector2 LightPosition => lightPoint;
 
@@ -68,8 +72,12 @@ namespace Knockbox.Presentation
                 return;
             currentKey = key;
             lightPoint = lightPosition;
-            width = Mathf.RoundToInt(CoverWidth * TexelsPerUnit);
-            height = Mathf.RoundToInt(CoverHeight * TexelsPerUnit);
+            halfWidth = arena.HalfWidth;
+            halfHeight = arena.HalfHeight;
+            coverWidth = arena.Columns + CoverMarginX;
+            coverHeight = arena.Rows + CoverMarginY;
+            width = Mathf.RoundToInt(coverWidth * TexelsPerUnit);
+            height = Mathf.RoundToInt(coverHeight * TexelsPerUnit);
             shadowMask = ComputeShadowMask(arena);
             if (!Cache.TryGetValue(key, out var texture) || texture == null)
             {
@@ -91,12 +99,12 @@ namespace Knockbox.Presentation
         }
 
         Vector2 TexelCenter(int x, int y) =>
-            new Vector2(-CoverWidth * 0.5f + (x + 0.5f) / TexelsPerUnit, -CoverHeight * 0.5f + (y + 0.5f) / TexelsPerUnit);
+            new Vector2(-coverWidth * 0.5f + (x + 0.5f) / TexelsPerUnit, -coverHeight * 0.5f + (y + 0.5f) / TexelsPerUnit);
 
         /// <summary>광원 감쇠(위쪽 가운데 1, 아래·가장자리로 서서히 어두워짐).</summary>
         public float Falloff(Vector2 point)
         {
-            float top = Mathf.Abs(lightPoint.y - ArenaDef.HalfHeight);
+            float top = Mathf.Abs(lightPoint.y - halfHeight);
             float distance = Mathf.Max(top, Vector2.Distance(point, lightPoint));
             return Mathf.Pow(top / distance, FalloffExponent);
         }
@@ -106,8 +114,8 @@ namespace Knockbox.Presentation
         {
             if (shadowMask == null)
                 return 0f;
-            float fx = (point.x + CoverWidth * 0.5f) * TexelsPerUnit - 0.5f;
-            float fy = (point.y + CoverHeight * 0.5f) * TexelsPerUnit - 0.5f;
+            float fx = (point.x + coverWidth * 0.5f) * TexelsPerUnit - 0.5f;
+            float fy = (point.y + coverHeight * 0.5f) * TexelsPerUnit - 0.5f;
             int x0 = Mathf.Clamp(Mathf.FloorToInt(fx), 0, width - 1), y0 = Mathf.Clamp(Mathf.FloorToInt(fy), 0, height - 1);
             int x1 = Mathf.Min(x0 + 1, width - 1), y1 = Mathf.Min(y0 + 1, height - 1);
             float tx = Mathf.Clamp01(fx - x0), ty = Mathf.Clamp01(fy - y0);
@@ -131,7 +139,7 @@ namespace Knockbox.Presentation
                 float minY = b.Kind == TerrainKind.OneWay ? b.MaxY - ArenaView.OneWayThickness : b.MinY;
                 var rect = Rect.MinMaxRect(b.MinX, minY, b.MaxX, b.MaxY);
                 all.Add(rect);
-                if (b.Kind != TerrainKind.Spike && b.MaxY < ArenaDef.HalfHeight - 1e-3f)
+                if (b.Kind != TerrainKind.Spike && b.MaxY < halfHeight - 1e-3f)
                     boxes.Add(rect);
             }
             var mask = new float[width * height];
@@ -261,8 +269,8 @@ namespace Knockbox.Presentation
 
         void Respawn(int i, bool anywhere)
         {
-            float y = anywhere ? random.Range(-ArenaDef.HalfHeight + 1f, ArenaDef.HalfHeight - 1f) : random.Range(-ArenaDef.HalfHeight + 1f, -2f);
-            motePosition[i] = new Vector2(random.Range(-ArenaDef.HalfWidth + 1f, ArenaDef.HalfWidth - 1f), y);
+            float y = anywhere ? random.Range(-halfHeight + 1f, halfHeight - 1f) : random.Range(-halfHeight + 1f, -2f);
+            motePosition[i] = new Vector2(random.Range(-halfWidth + 1f, halfWidth - 1f), y);
             moteVelocity[i] = new Vector2(random.Range(-0.18f, 0.18f), random.Range(0.06f, 0.28f));
             moteSize[i] = random.Range(0.06f, 0.12f);
         }
@@ -275,7 +283,7 @@ namespace Knockbox.Presentation
             for (int i = 0; i < MoteCount; i++)
             {
                 motePosition[i] += moteVelocity[i] * dt;
-                if (motePosition[i].y > ArenaDef.HalfHeight - 0.5f || Mathf.Abs(motePosition[i].x) > ArenaDef.HalfWidth - 0.5f)
+                if (motePosition[i].y > halfHeight - 0.5f || Mathf.Abs(motePosition[i].x) > halfWidth - 0.5f)
                     Respawn(i, false);
                 motes[i].transform.localPosition = motePosition[i];
                 ShapeLibrary.SetSize(motes[i], moteSize[i], moteSize[i]);

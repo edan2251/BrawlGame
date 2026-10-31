@@ -33,11 +33,11 @@ namespace Knockbox.Tests.EditMode
         public static ArenaDef Build(string name, Func<int, int, char> cells)
         {
             var sb = new StringBuilder();
-            for (int r = 0; r < ArenaDef.Rows; r++)
+            for (int r = 0; r < ArenaDef.ClassicRows; r++)
             {
-                for (int c = 0; c < ArenaDef.Columns; c++)
+                for (int c = 0; c < ArenaDef.ClassicColumns; c++)
                 {
-                    bool border = r == 0 || r == ArenaDef.Rows - 1 || c == 0 || c == ArenaDef.Columns - 1;
+                    bool border = r == 0 || r == ArenaDef.ClassicRows - 1 || c == 0 || c == ArenaDef.ClassicColumns - 1;
                     // 시작 표시는 맨 윗줄에 둔다. 테스트는 CreateAt으로 위치를 직접 정한다.
                     char ch = border ? '#' : r == 1 && c == 3 ? '1' : r == 1 && c == 28 ? '2' : '.';
                     char extra = cells(c, r);

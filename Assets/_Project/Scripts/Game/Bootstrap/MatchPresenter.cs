@@ -47,6 +47,8 @@ namespace Knockbox.Game
         int queued;
         double lastSimTime;
         int renderedRound;
+        /// <summary>지금 그려진 맵. 시뮬레이션의 현재 맵(라운드마다 바뀔 수 있다)과 다르면 다시 그린다.</summary>
+        ArenaDef builtArena;
 
         // 디버그 글자 아래줄: 바뀔 때만 새로 만든다.
         string footer;
@@ -190,14 +192,24 @@ namespace Knockbox.Game
         public BackgroundView Background => background;
         public PostFx PostFx => postFx;
 
+        /// <summary>맵을 그린다: 테마, 배경(빛과 그림자), 지형, KO 파편 충돌, 카메라 맞춤, HUD 위치.</summary>
+        void BuildArena(ArenaDef arena)
+        {
+            builtArena = arena;
+            CurrentTheme = palette.Theme(ThemeIndex(arena));
+            background.Build(arena, CurrentTheme, palette, shapes, BackgroundView.DefaultLight(arena));
+            background.ResetMotes();
+            arenaView.Build(arena, CurrentTheme, palette, shapes);
+            koShatter.BuildArena(arena);
+            if (cameraRig != null)
+                cameraRig.FitArena(arena);
+            hud.SetArena(arena);
+        }
+
         void OnMatchBegan(MatchRunner r)
         {
-            CurrentTheme = palette.Theme(ThemeIndex(r.World.Arena));
-            background.Build(r.World.Arena, CurrentTheme, palette, shapes, BackgroundView.DefaultLight);
-            background.ResetMotes();
+            BuildArena(r.World.Arena);
             postFx.ResetEffects();
-            arenaView.Build(r.World.Arena, CurrentTheme, palette, shapes);
-            koShatter.BuildArena(r.World.Arena);
             shattered[0] = shattered[1] = false;
             countdownKey = -1;
             fighter0.ResetPose();
@@ -267,7 +279,14 @@ namespace Knockbox.Game
             if (current.Match.Round != renderedRound)
             {
                 // 새 라운드(또는 새 경기): 시작 위치로 순간 이동했으므로 보간하지 않고 발을 새로 디딘다.
+                // 맵 순환(CP12)이면 맵도 바뀌었다.
                 renderedRound = current.Match.Round;
+                if (world.Arena != builtArena)
+                {
+                    BuildArena(world.Arena);
+                    fx.Clear();
+                    dust.Clear();
+                }
                 fighter0.ResetPose();
                 fighter1.ResetPose();
                 koShatter.Clear();

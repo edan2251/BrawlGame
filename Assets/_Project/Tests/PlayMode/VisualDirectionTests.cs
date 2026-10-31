@@ -67,12 +67,12 @@ namespace Knockbox.Tests.PlayMode
         static ArenaDef EmptyArena()
         {
             var rows = new System.Text.StringBuilder("name: Empty\n---\n");
-            for (int r = 0; r < ArenaDef.Rows; r++)
+            for (int r = 0; r < ArenaDef.ClassicRows; r++)
             {
-                for (int c = 0; c < ArenaDef.Columns; c++)
+                for (int c = 0; c < ArenaDef.ClassicColumns; c++)
                 {
-                    bool border = r == 0 || r == ArenaDef.Rows - 1 || c == 0 || c == ArenaDef.Columns - 1;
-                    rows.Append(border ? '#' : r == ArenaDef.Rows - 2 && c == 3 ? '1' : r == ArenaDef.Rows - 2 && c == ArenaDef.Columns - 4 ? '2' : '.');
+                    bool border = r == 0 || r == ArenaDef.ClassicRows - 1 || c == 0 || c == ArenaDef.ClassicColumns - 1;
+                    rows.Append(border ? '#' : r == ArenaDef.ClassicRows - 2 && c == 3 ? '1' : r == ArenaDef.ClassicRows - 2 && c == ArenaDef.ClassicColumns - 4 ? '2' : '.');
                 }
                 rows.Append('\n');
             }

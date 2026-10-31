@@ -81,8 +81,8 @@ namespace Knockbox.Simulation
             }
 
             // 경기장은 벽으로 닫혀 있으므로 여기 걸리면 버그 신호다.
-            float limitX = ArenaDef.HalfWidth - half;
-            float limitY = ArenaDef.HalfHeight - half;
+            float limitX = arena.HalfWidth - half;
+            float limitY = arena.HalfHeight - half;
             if (position.X < -limitX || position.X > limitX || position.Y < -limitY || position.Y > limitY)
             {
                 position.X = SimMath.Clamp(position.X, -limitX, limitX);

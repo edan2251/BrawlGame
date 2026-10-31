@@ -25,7 +25,7 @@ namespace Knockbox.Tests.EditMode
             var arena = ArenaFiles.LoadByName("Box");
             float half = config.HalfBody;
             float size = config.Movement.BodySize;
-            float ceiling = ArenaDef.HalfHeight - 1f;
+            float ceiling = arena.HalfHeight - 1f;
             var prevA = new FighterState { Position = new Vec2(3f, ceiling - half - 0.05f) };
             var prevB = new FighterState { Position = new Vec2(3f, prevA.Position.Y - size) };
             var a = prevA;
@@ -48,7 +48,7 @@ namespace Knockbox.Tests.EditMode
         {
             var arena = ArenaFiles.LoadByName("Box");
             const float half = 0.45f;
-            float ceiling = ArenaDef.HalfHeight - 1f;
+            float ceiling = arena.HalfHeight - 1f;
             // 천장 상자(가로 32)에 위로 0.2 파고든 상태에서 오른쪽으로 0.1 움직였다.
             var position = new Vec2(5.1f, ceiling - half + 0.2f);
             bool hit = TerrainCollision.ResolveX(ref position, 1, half, arena, 5f);
@@ -56,7 +56,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(5.1f, position.X, 1e-5f, "천장 상자의 반대쪽 끝으로 순간이동하면 안 됨");
 
             // 옆벽에 가로로 들어간 경우는 그대로 막는다.
-            float wall = ArenaDef.HalfWidth - 1f;
+            float wall = arena.HalfWidth - 1f;
             var side = new Vec2(wall - half + 0.1f, 0f);
             Assert.IsTrue(TerrainCollision.ResolveX(ref side, 1, half, arena, wall - half - 0.05f));
             Assert.AreEqual(wall - half, side.X, 1e-5f);

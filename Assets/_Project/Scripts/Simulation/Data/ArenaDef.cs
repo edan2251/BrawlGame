@@ -33,28 +33,37 @@ namespace Knockbox.Simulation
     }
 
     /// <summary>
-    /// 경기장(04-arena.md). 32 × 18 유닛, 항상 벽으로 닫혀 있다.
+    /// 경기장(04-arena.md). 항상 벽으로 닫혀 있다. 크기는 맵마다: v1(테스트 고정 자료) 32 × 18, v2(경기 순환) 36 × 20.
     /// 시뮬레이션과 연출이 같은 상자 목록을 쓴다. 상태가 아니라 설정처럼 라운드 동안 바뀌지 않는다.
     /// </summary>
     public sealed class ArenaDef
     {
-        public const int Columns = 32;
-        public const int Rows = 18;
-        public const float HalfWidth = Columns * 0.5f;
-        public const float HalfHeight = Rows * 0.5f;
+        public const int ClassicColumns = 32;
+        public const int ClassicRows = 18;
 
         readonly ArenaBox[] boxes;
 
         /// <param name="spawnFoot0">P1 시작 칸의 가로 중심과 칸 바닥 높이. 파이터는 이 점 위에 선다.</param>
         public ArenaDef(string name, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1)
+            : this(name, ClassicColumns, ClassicRows, boxes, spawnFoot0, spawnFoot1)
+        {
+        }
+
+        public ArenaDef(string name, int columns, int rows, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1)
         {
             Name = name;
+            Columns = columns;
+            Rows = rows;
             this.boxes = boxes;
             SpawnFoot0 = spawnFoot0;
             SpawnFoot1 = spawnFoot1;
         }
 
         public string Name { get; }
+        public int Columns { get; }
+        public int Rows { get; }
+        public float HalfWidth => Columns * 0.5f;
+        public float HalfHeight => Rows * 0.5f;
         public Vec2 SpawnFoot0 { get; }
         public Vec2 SpawnFoot1 { get; }
         public int BoxCount => boxes.Length;
@@ -78,6 +87,8 @@ namespace Knockbox.Simulation
         public uint ComputeChecksum()
         {
             var h = Hasher.Create();
+            h.AddInt(Columns);
+            h.AddInt(Rows);
             h.AddInt(boxes.Length);
             for (int i = 0; i < boxes.Length; i++)
             {

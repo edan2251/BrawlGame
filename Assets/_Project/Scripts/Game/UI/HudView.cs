@@ -18,8 +18,8 @@ namespace Knockbox.Game
         const float TrailSpeed = 2.5f;
         const float SlotSize = 0.24f;
         const float SlotGap = 0.12f;
-        /// <summary>점수 점 첫 줄(P1) 위치: 경기장 왼쪽 위 안쪽(테두리 벽 아래).</summary>
-        static readonly Vector2 SlotOrigin = new Vector2(-ArenaDef.HalfWidth + 1.45f, ArenaDef.HalfHeight - 1.45f);
+        /// <summary>점수 점 첫 줄(P1) 위치: 경기장 왼쪽 위 안쪽(테두리 벽 아래). SetArena로 맵에 맞춘다.</summary>
+        Vector2 SlotOrigin = SlotOriginFor(ArenaDef.ClassicColumns * 0.5f, ArenaDef.ClassicRows * 0.5f);
         const int MaxSlots = 9;
         const float BannerY = 1.6f;
         const float SubY = -0.6f;
@@ -50,6 +50,10 @@ namespace Knockbox.Game
         /// <summary>지금 가운데 문구(없으면 빈 문자열). 테스트·캡처 확인용.</summary>
         public string Banner => shownBanner ?? "";
         public string SubText => shownSub ?? "";
+
+        static Vector2 SlotOriginFor(float halfWidth, float halfHeight) => new Vector2(-halfWidth + 1.45f, halfHeight - 1.45f);
+
+        public void SetArena(ArenaDef arena) => SlotOrigin = SlotOriginFor(arena.HalfWidth, arena.HalfHeight);
 
         public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)
         {
