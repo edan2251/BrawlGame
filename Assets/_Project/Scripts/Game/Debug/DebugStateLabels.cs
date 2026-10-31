@@ -82,6 +82,17 @@ namespace Knockbox.Game
             label1.gameObject.SetActive(visible);
         }
 
+        /// <summary>위 틱 줄, 아래 설정 줄, 파이터 위 상태 글자를 각각 켜고 끈다(바뀔 때만).</summary>
+        public void SetVisibility(bool headerVisible, bool footerVisible, bool fightersVisible)
+        {
+            if (header.gameObject.activeSelf != headerVisible)
+                header.gameObject.SetActive(headerVisible);
+            if (footer.gameObject.activeSelf != footerVisible)
+                footer.gameObject.SetActive(footerVisible);
+            if (label0.gameObject.activeSelf != fightersVisible)
+                SetFighterLabels(fightersVisible);
+        }
+
         static void UpdateLabel(TextMesh label, string name, in FighterState f, ref int shownKey)
         {
             int key = (int)f.Action | (f.StunTicks << 8) | (f.HitstopTicks << 20);

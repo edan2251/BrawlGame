@@ -345,7 +345,7 @@ namespace Knockbox.EditorTools
                                      $"{chosen.FightingTicks / 60f:F1}초 | {winner} | {chosen.Hit} | {chosen.GuardHit} | {chosen.Parry} | {chosen.Clash} | {chosen.WallSplat} | {chosen.Throw} | {chosen.Spike} | {attacks} | " +
                                      $"{ended[0].FightingTicks / 60f:F1} / {chosen.FightingTicks / 60f:F1} / {ended[ended.Count - 1].FightingTicks / 60f:F1}초, {ended.Count}/{Candidates} |");
                     Debug.Log($"[Knockbox] 봇 영상 {job.Name}: 시드 {chosen.Seed}, 라운드 {chosen.FightingTicks / 60f:F1}초, {chosen.Frames + 1}프레임({(chosen.Frames + 1) / (float)Fps:F1}초), " +
-                              $"{bytes / (1024f * 1024f):F1} MB, 효과음 {sounds.Count}개(섞은 최대 {peak:F2}, 0.8 위로 눌러 준 샘플 {clipped}), " +
+                              $"{bytes / (1024f * 1024f):F1} MB, 효과음 {sounds.Count}개(섞은 최대 {peak:F2} → 리미터 뒤 {Knockbox.Presentation.SfxMaster.Limit(peak):F2}, 0.8 위 샘플 {clipped}), " +
                               $"체크섬 헤드리스 {chosen.Checksum:X8} / 소리 재생 {audioPass:X8} / 영상 재생 {videoPass:X8}{(same ? "" : " 불일치")}");
                 }
             }
@@ -416,7 +416,7 @@ namespace Knockbox.EditorTools
             sheet.SetPixels32(pixels);
         }
 
-        /// <summary>기록한 효과음을 48 kHz 스테레오로 섞는다(음높이는 선형 보간 재표본화, 볼륨은 PlayOneShot 볼륨, 0.8 위는 부드럽게 제한).</summary>
+        /// <summary>기록한 효과음을 48 kHz 스테레오로 섞는다(음높이는 선형 보간 재표본화, 볼륨은 PlayOneShot 볼륨, 게임과 같은 리미터).</summary>
         static NativeArray<float> Mix(List<(int frame, AudioClip clip, float volume, float pitch)> sounds, int frames, out float peak, out int clipped)
         {
             var mix = new float[frames * SamplesPerFrame * 2];
@@ -447,8 +447,7 @@ namespace Knockbox.EditorTools
                     }
                 }
             }
-            // 여러 소리가 겹친 순간만 부드럽게 눌러 1을 넘지 않게 한다(0.8까지는 그대로).
-            const float Knee = 0.8f;
+            // 게임의 OutputLimiter와 같은 리미터(볼륨 여유는 SfxPlayer가 이미 곱했다).
             peak = 0f;
             clipped = 0;
             for (int i = 0; i < mix.Length; i++)
@@ -456,12 +455,9 @@ namespace Knockbox.EditorTools
                 float v = Mathf.Abs(mix[i]);
                 if (v > peak)
                     peak = v;
-                if (v > Knee)
-                {
+                if (v > Knockbox.Presentation.SfxMaster.Knee)
                     clipped++;
-                    float over = (v - Knee) / (1f - Knee);
-                    mix[i] = Mathf.Sign(mix[i]) * (Knee + (1f - Knee) * (float)System.Math.Tanh(over));
-                }
+                mix[i] = Knockbox.Presentation.SfxMaster.Limit(mix[i]);
             }
             return new NativeArray<float>(mix, Allocator.Persistent);
         }

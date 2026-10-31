@@ -92,7 +92,7 @@ namespace Knockbox.Tests.PlayMode
             var help = presenter.Help;
             Assert.IsNotNull(help);
             Assert.IsFalse(help.Visible, "에디터에서는 닫힌 채 시작(빌드에서만 처음에 열림)");
-            foreach (string key in new[] { "F1 ", "F2 ", "F3 ", "F4 ", "F5 ", "F6 ", "F7 ", "F8 ", "F9 ", "F10 ", "F11 ", "[ ]", "P pause", "O step", "~ close" })
+            foreach (string key in new[] { "F1 ", "F2 ", "F3 ", "F4 ", "F5 ", "F6 ", "F7 ", "F8 ", "F9 ", "F10 ", "F11 ", "F12 ", "[ ]", "P pause", "O step", "~ close" })
                 StringAssert.Contains(key, HelpOverlay.Text);
             foreach (string control in new[] { "WASD", "SPACE", "LSHIFT", "ARROWS", "NUM0", "NUM4" })
                 StringAssert.Contains(control, HelpOverlay.Text);
@@ -144,6 +144,15 @@ namespace Knockbox.Tests.PlayMode
             TestContext.WriteLine($"봇 공격 {botAttacks}, 명중 {hits}");
             Assert.Greater(botAttacks, 5, "봇이 직접 공격해야 함");
             Assert.Greater(hits, 0);
+        }
+
+        [UnityTest]
+        public IEnumerator AudioListener_HasOutputLimiter()
+        {
+            yield return LoadSandbox();
+            var listener = Object.FindFirstObjectByType<AudioListener>();
+            Assert.IsNotNull(listener);
+            Assert.IsNotNull(listener.GetComponent<Knockbox.Presentation.OutputLimiter>(), "최종 출력 리미터가 AudioListener 오브젝트에 있어야 함(F-2)");
         }
 
         [UnityTest]

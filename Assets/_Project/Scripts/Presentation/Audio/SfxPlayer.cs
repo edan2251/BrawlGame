@@ -38,7 +38,7 @@ namespace Knockbox.Presentation
 
         public int PlayedThisFrame { get; private set; }
 
-        /// <summary>실제로 재생한 효과음(클립, 볼륨, 최종 음높이). 봇 영상 녹화가 소리를 따로 섞을 때 쓴다.</summary>
+        /// <summary>실제로 재생한 효과음(클립, 전체 볼륨 여유를 곱한 볼륨, 최종 음높이). 봇 영상 녹화가 소리를 따로 섞을 때 쓴다.</summary>
         public event System.Action<AudioClip, float, float> Played;
         int countedFrame = -1;
 
@@ -75,8 +75,9 @@ namespace Knockbox.Presentation
             var voice = voices[nextVoice];
             nextVoice = (nextVoice + 1) % Voices;
             voice.pitch = pitch * (1f + random.Range(-PitchRange, PitchRange));
-            voice.PlayOneShot(clip, volume);
-            Played?.Invoke(clip, volume, voice.pitch);
+            float scaled = volume * SfxMaster.Gain;
+            voice.PlayOneShot(clip, scaled);
+            Played?.Invoke(clip, scaled, voice.pitch);
             PlayedThisFrame++;
             return true;
         }

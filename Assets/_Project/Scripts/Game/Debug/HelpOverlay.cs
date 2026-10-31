@@ -16,12 +16,12 @@ namespace Knockbox.Game
             "P2  ARROWS move   NUM0 jump   NUM1 attack   NUM2 dash   NUM3 guard   NUM4 grab\n" +
             "PAD  stick/dpad   A jump   X attack   B/RT dash   LB/LT guard   Y grab\n" +
             "\n" +
-            "F1 combat mode (A charge / B swing / test)    F2 next arena\n" +
+            "F1 combat mode (A charge / B swing, frozen)    F2 next arena\n" +
             "F3 hitbox overlay    F4 grab on/off    F5 reset round\n" +
             "F6 P2 input (keyboard / pad / dummy / bot)    [ ] dummy behavior\n" +
             "F7 reduce shake    F8 sync test    F11 tuning preset (default / fast)\n" +
             "F9 start/stop input recording    F10 replay last recording\n" +
-            "P pause    O step one tick    ~ close this help";
+            "P pause    O step one tick    F12 debug text    ~ close this help";
 
         TextMesh text;
         SpriteRenderer panel;

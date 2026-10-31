@@ -33,6 +33,9 @@ namespace Knockbox.Game
         SfxPlayer sfxPlayer;
         CameraRig cameraRig;
         DebugStateLabels labels;
+        /// <summary>디버그 글자(상태, 틱, 설정 줄). 빌드에서는 기본으로 숨기고 F12로 켠다(08 6절). 에디터는 켠 채 시작.</summary>
+        bool debugText;
+        bool fighterLabelsAllowed = true;
         HitboxOverlay overlay;
         HelpOverlay help;
         KoShatter koShatter;
@@ -110,10 +113,15 @@ namespace Knockbox.Game
             hud.Setup(palette, shapes);
             sfxPlayer = Create<SfxPlayer>("Sfx");
             sfxPlayer.Setup(sfx);
+            // 최종 출력 리미터는 AudioListener와 같은 오브젝트에 있어야 전체 소리에 걸린다(F-2).
+            var listener = Object.FindFirstObjectByType<AudioListener>();
+            if (listener != null && listener.GetComponent<OutputLimiter>() == null)
+                listener.gameObject.AddComponent<OutputLimiter>();
             if (showDebugLabels)
             {
                 labels = Create<DebugStateLabels>("Debug Labels");
                 labels.Setup(palette.ink, palette.shadow);
+                debugText = Application.isEditor;
             }
             overlay = Create<HitboxOverlay>("Hitbox Overlay");
             overlay.Setup(palette, shapes);
@@ -193,11 +201,12 @@ namespace Knockbox.Game
         }
 
         /// <summary>파이터 위 상태 글자만 켜고 끈다(위·아래 설정 줄은 그대로). 봇 영상은 끈다.</summary>
-        public void SetFighterLabels(bool visible)
-        {
-            if (labels != null)
-                labels.SetFighterLabels(visible);
-        }
+        public void SetFighterLabels(bool visible) => fighterLabelsAllowed = visible;
+
+        public bool DebugTextVisible => debugText;
+
+        /// <summary>F12: 디버그 글자 전체. 꺼져 있어도 입력 기록·재생 중에는 설정 줄(REC·REPLAY)이 보인다.</summary>
+        public void SetDebugText(bool visible) => debugText = visible;
 
         /// <summary>F3 판정 오버레이.</summary>
         public void SetOverlay(bool visible)
@@ -251,7 +260,11 @@ namespace Knockbox.Game
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
                 world.Config.Match, world.Config.Combat.MaxHealth, dt);
             if (labels != null && labels.gameObject.activeSelf)
+            {
+                bool recordingOrReplay = runner.Recording != null || runner.Playback != null;
+                labels.SetVisibility(debugText, debugText || recordingOrReplay, debugText && fighterLabelsAllowed);
                 labels.Render(current, body0, body1, Footer(world));
+            }
             if (overlay.gameObject.activeSelf)
                 overlay.Render(current, world.Config, dt);
         }
@@ -316,7 +329,7 @@ namespace Knockbox.Game
                 footerP2 = p2;
                 footerDummy = dummy;
                 footerGrab = world.Config.GrabEnabled;
-                footer = $"{footerArena} / mode {footerMode}{(world.Config.GrabEnabled ? "" : " (no grab)")} / {footerPreset} / P2 {InputSourceName(p2)}"
+                footer = $"{footerArena} / mode {footerMode}{(footerMode == CombatMode.Swing ? " [frozen]" : "")}{(world.Config.GrabEnabled ? "" : " (no grab)")} / {footerPreset} / P2 {InputSourceName(p2)}"
                          + (recording ? " / REC" : "") + (playback ? " / REPLAY" : "");
             }
             return footer;

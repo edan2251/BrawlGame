@@ -15,7 +15,8 @@ namespace Knockbox.Game
         [SerializeField] CombatTuning combatTuning;
         [Tooltip("F11로 순환하는 전투 튜닝 프리셋(기본, 더 빠르게)")]
         [SerializeField] CombatTuning[] combatPresets;
-        [SerializeField] CombatMode mode = CombatMode.Test;
+        [Tooltip("전투 모드. 확정 방향은 Charge(모드 A, D-017). Swing은 동결(D-018), Test는 에디터 전용")]
+        [SerializeField] CombatMode mode = CombatMode.Charge;
         [Tooltip("잡기 켜기/끄기(F4). 다음 StartNewMatch부터 적용")]
         [SerializeField] bool grabEnabled = true;
         [SerializeField] TextAsset[] arenaFiles;
