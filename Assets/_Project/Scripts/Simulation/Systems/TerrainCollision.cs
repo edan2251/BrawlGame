@@ -44,8 +44,9 @@ namespace Knockbox.Simulation
             {
                 if (sx != 0f)
                 {
+                    float fromX = position.X;
                     position.X += sx;
-                    if (ResolveX(ref position, sx > 0f ? 1 : -1, half, arena))
+                    if (ResolveX(ref position, sx > 0f ? 1 : -1, half, arena, fromX))
                     {
                         contacts.HitWall = sx > 0f ? 1 : -1;
                         contacts.WallImpactSpeed = sideSpeed;
@@ -94,8 +95,12 @@ namespace Knockbox.Simulation
             p.X + half > b.MinX + Epsilon && p.X - half < b.MaxX - Epsilon &&
             p.Y + half > b.MinY + Epsilon && p.Y - half < b.MaxY - Epsilon;
 
-        /// <summary>direction 쪽으로 움직이다 막는 지형에 들어갔으면 그 면까지 되돌린다.</summary>
-        public static bool ResolveX(ref Vec2 position, int direction, float half, ArenaDef arena)
+        /// <summary>
+        /// fromX에서 direction 쪽으로 움직이다 막는 지형에 들어갔으면 그 면까지 되돌린다.
+        /// fromX에서 이미 가로로 겹쳐 있던 상자(위아래로 파고든 상자)는 가로로 막지 않는다. 그런 상자를 가로로 밀어내면
+        /// 상자 반대쪽 끝으로 순간이동한다(CP9 QA F-1: 천장 상자 폭 32 → x −16.45).
+        /// </summary>
+        public static bool ResolveX(ref Vec2 position, int direction, float half, ArenaDef arena, float fromX)
         {
             bool hit = false;
             float limit = 0f;
@@ -103,6 +108,9 @@ namespace Knockbox.Simulation
             {
                 ref readonly var b = ref arena.GetBox(i);
                 if (!b.BlocksAllSides || !Overlaps(position, half, b))
+                    continue;
+                bool enteredSideways = direction > 0 ? fromX + half <= b.MinX + Epsilon : fromX - half >= b.MaxX - Epsilon;
+                if (!enteredSideways)
                     continue;
                 float candidate = direction > 0 ? b.MinX - half : b.MaxX + half;
                 if (!hit || (direction > 0 ? candidate < limit : candidate > limit))
@@ -139,6 +147,40 @@ namespace Knockbox.Simulation
                 return false;
             position.Y = top + half;
             return true;
+        }
+
+        /// <summary>몸 상자가 막는 지형(단방향 발판 제외)과 겹치는가.</summary>
+        public static bool OverlapsSolid(Vec2 position, float half, ArenaDef arena)
+        {
+            for (int i = 0; i < arena.BoxCount; i++)
+            {
+                ref readonly var b = ref arena.GetBox(i);
+                if (b.BlocksAllSides && Overlaps(position, half, b))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 겹친 막는 지형 중 아랫면이 aboveY보다 위인 것(천장)이 있으면 그 아랫면 밑으로 내린다.
+        /// aboveY는 옮기기 전 몸 중심 높이로, 옆벽처럼 원래 몸 높이에 걸친 상자는 보지 않기 위한 기준이다.
+        /// </summary>
+        public static bool ResolveCeiling(ref Vec2 position, float half, ArenaDef arena, float aboveY)
+        {
+            bool hit = false;
+            float bottom = 0f;
+            for (int i = 0; i < arena.BoxCount; i++)
+            {
+                ref readonly var b = ref arena.GetBox(i);
+                if (!b.BlocksAllSides || b.MinY <= aboveY || !Overlaps(position, half, b))
+                    continue;
+                if (!hit || b.MinY < bottom)
+                    bottom = b.MinY;
+                hit = true;
+            }
+            if (hit)
+                position.Y = bottom - half;
+            return hit;
         }
 
         static bool ResolveUp(ref Vec2 position, float half, ArenaDef arena)

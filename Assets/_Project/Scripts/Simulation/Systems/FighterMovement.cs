@@ -609,18 +609,10 @@ namespace Knockbox.Simulation
 
             bool aWasAbove = !frozenA && prevA.Position.Y - prevB.Position.Y >= size - eps && a.Velocity.Y <= 0f;
             bool bWasAbove = !frozenB && prevB.Position.Y - prevA.Position.Y >= size - eps && b.Velocity.Y <= 0f;
-            if (aWasAbove)
-            {
-                a.Position.Y = b.Position.Y + size;
-                a.Velocity.Y = 0f;
+            if (aWasAbove && TryStack(ref a, ref b, frozenB, size, half, arena))
                 return;
-            }
-            if (bWasAbove)
-            {
-                b.Position.Y = a.Position.Y + size;
-                b.Velocity.Y = 0f;
+            if (bWasAbove && TryStack(ref b, ref a, frozenA, size, half, arena))
                 return;
-            }
 
             int direction = SimMath.Sign(dx);
             if (direction == 0)
@@ -630,14 +622,41 @@ namespace Knockbox.Simulation
             float overlap = size - SimMath.Abs(dx);
             if (!frozenA)
             {
+                float fromX = a.Position.X;
                 a.Position.X -= direction * (overlap * (frozenB ? 1f : 0.5f));
-                TerrainCollision.ResolveX(ref a.Position, -direction, half, arena);
+                TerrainCollision.ResolveX(ref a.Position, -direction, half, arena, fromX);
             }
             if (!frozenB)
             {
+                float fromX = b.Position.X;
                 b.Position.X += direction * (overlap * (frozenA ? 1f : 0.5f));
-                TerrainCollision.ResolveX(ref b.Position, direction, half, arena);
+                TerrainCollision.ResolveX(ref b.Position, direction, half, arena, fromX);
             }
+        }
+
+        /// <summary>
+        /// 위에서 내려온 파이터(top)를 아래 파이터 머리 위에 세운다(02-movement.md 7절). 아래 파이터가 솟아올라 위 파이터가
+        /// 천장 속으로 들어가게 되면, 위 파이터는 천장 바로 아래에 두고 아래 파이터를 그만큼 내리며 위로 가던 속도를 멈춘다(CP9 QA F-1).
+        /// 둘이 쌓일 높이가 없거나 아래 파이터가 히트스탑 중이면 false: 옆으로 밀어내는 규칙으로 넘긴다.
+        /// </summary>
+        static bool TryStack(ref FighterState top, ref FighterState bottom, bool bottomFrozen, float size, float half, ArenaDef arena)
+        {
+            var place = new Vec2(top.Position.X, bottom.Position.Y + size);
+            if (arena == null || !TerrainCollision.ResolveCeiling(ref place, half, arena, top.Position.Y))
+            {
+                top.Position.Y = place.Y;
+                top.Velocity.Y = 0f;
+                return true;
+            }
+            var below = new Vec2(bottom.Position.X, place.Y - size);
+            if (bottomFrozen || TerrainCollision.OverlapsSolid(below, half, arena))
+                return false;
+            top.Position.Y = place.Y;
+            top.Velocity.Y = 0f;
+            bottom.Position.Y = below.Y;
+            if (bottom.Velocity.Y > 0f)
+                bottom.Velocity.Y = 0f;
+            return true;
         }
     }
 }

@@ -426,7 +426,7 @@ namespace Knockbox.Simulation
             victim.Velocity = Vec2.Zero;
             victim.Position = new Vec2(grabber.Position.X + g.HoldOffset * grabber.Facing, grabber.Position.Y);
             if (arena != null)
-                TerrainCollision.ResolveX(ref victim.Position, grabber.Facing, config.HalfBody, arena);
+                TerrainCollision.ResolveX(ref victim.Position, grabber.Facing, config.HalfBody, arena, grabber.Position.X);
             events.Add(new SimEvent(tick, SimEventType.Grab, victimIndex, victim.Position, new Vec2(grabber.Facing, 0f), 0f));
         }
 
@@ -443,7 +443,7 @@ namespace Knockbox.Simulation
             {
                 victim.Position = new Vec2(thrower.Position.X - g.BackThrowOffset * thrower.Facing, thrower.Position.Y);
                 if (arena != null)
-                    TerrainCollision.ResolveX(ref victim.Position, -thrower.Facing, config.HalfBody, arena);
+                    TerrainCollision.ResolveX(ref victim.Position, -thrower.Facing, config.HalfBody, arena, thrower.Position.X);
             }
             victim.Velocity = direction * g.ThrowSpeed;
             victim.Health = SimMath.Max(0, victim.Health - g.ThrowDamage);
