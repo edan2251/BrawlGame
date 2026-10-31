@@ -54,6 +54,8 @@ namespace Knockbox.Presentation
         {
             trauma = 0f;
             zoomLeft = 0f;
+            // 흔들림 노이즈도 처음부터: 캡처가 앞서 재생한 시나리오에 따라 달라지지 않게.
+            noiseTime = 0f;
         }
 
         /// <summary>연출 시간으로 진행한다(멈추면 흔들림도 멈춘다).</summary>

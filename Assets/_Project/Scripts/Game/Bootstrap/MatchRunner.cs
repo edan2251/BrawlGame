@@ -13,6 +13,8 @@ namespace Knockbox.Game
     {
         [SerializeField] MovementTuning movementTuning;
         [SerializeField] CombatTuning combatTuning;
+        [Tooltip("F11로 순환하는 전투 튜닝 프리셋(기본, 더 빠르게)")]
+        [SerializeField] CombatTuning[] combatPresets;
         [SerializeField] CombatMode mode = CombatMode.Test;
         [Tooltip("잡기 켜기/끄기(F4). 다음 StartNewMatch부터 적용")]
         [SerializeField] bool grabEnabled = true;
@@ -83,6 +85,74 @@ namespace Knockbox.Game
         {
             get => combatTuning;
             set => combatTuning = value;
+        }
+
+        public string PresetName => combatTuning != null && !string.IsNullOrEmpty(combatTuning.PresetName) ? combatTuning.PresetName : "default";
+
+        /// <summary>F11: 다음 전투 튜닝 프리셋으로 바꾼다(다음 StartNewMatch부터).</summary>
+        public void CyclePreset()
+        {
+            if (combatPresets == null || combatPresets.Length == 0)
+                return;
+            int index = System.Array.IndexOf(combatPresets, combatTuning);
+            combatTuning = combatPresets[(index + 1) % combatPresets.Length];
+        }
+
+        /// <summary>재생 중인 입력 기록(F10). 끝나면 최종 체크섬을 기록 시점과 비교해 로그로 남긴다.</summary>
+        public InputRecording Playback { get; private set; }
+
+        /// <summary>
+        /// 입력 기록을 처음부터 재생한다. 지금 튜닝과 기록의 모드로 설정을 만들고, 설정·맵 체크섬이 다르면 경고한다.
+        /// </summary>
+        public bool PlayRecording(InputRecording recording)
+        {
+            if (recording == null)
+                return false;
+            CombatMode recordedMode;
+            if (!System.Enum.TryParse(recording.Mode, out recordedMode))
+                recordedMode = mode;
+            var config = FindRecordedConfig(recording, recordedMode);
+            if (config == null)
+            {
+                Debug.LogWarning("[Knockbox] 기록과 같은 튜닝 설정을 찾지 못해 재생 결과가 다를 수 있음");
+                config = SimConfigFactory.Create(movementTuning, combatTuning, recordedMode, grabEnabled);
+            }
+            var arena = ResolveArena(recording.Arena);
+            if (arena.ComputeChecksum() != recording.ArenaChecksum)
+                Debug.LogWarning("[Knockbox] 기록과 맵이 달라 재생 결과가 다를 수 있음");
+            var p1 = new InputFrame[recording.Count];
+            var p2 = new InputFrame[recording.Count];
+            for (int i = 0; i < recording.Count; i++)
+            {
+                p1[i] = recording.GetP1(i);
+                p2[i] = recording.GetP2(i);
+            }
+            Begin(config, arena, SimState.CreateRound(config, arena, recording.Seed, recording.Spawn0, recording.Spawn1, recording.StartPhase));
+            // 기록된 입력은 이미 지연을 거친 값이다.
+            delay1.Reset(0);
+            delay2.Reset(0);
+            Player1Input = new FrameArrayInputSource(p1);
+            Player2Input = new FrameArrayInputSource(p2);
+            Playback = recording;
+            return true;
+        }
+
+        /// <summary>지금 프리셋들과 잡기 켬·끔 중에서 기록의 설정 체크섬과 같은 설정을 찾는다. 없으면 null.</summary>
+        SimConfig FindRecordedConfig(InputRecording recording, CombatMode recordedMode)
+        {
+            for (int p = -1; p < (combatPresets != null ? combatPresets.Length : 0); p++)
+            {
+                var tuning = p < 0 ? combatTuning : combatPresets[p];
+                if (p >= 0 && (tuning == null || tuning == combatTuning))
+                    continue;
+                for (int g = 0; g < 2; g++)
+                {
+                    var config = SimConfigFactory.Create(movementTuning, tuning, recordedMode, g == 0 ? grabEnabled : !grabEnabled);
+                    if (config.ComputeChecksum() == recording.ConfigChecksum)
+                        return config;
+                }
+            }
+            return null;
         }
 
         /// <summary>다음 StartNewMatch부터 적용된다.</summary>
@@ -156,6 +226,7 @@ namespace Knockbox.Game
             World = new SimWorld(config, arena, initial);
             PreviousState = initial;
             configFromTuning = false;
+            Playback = null;
             delay1.Reset(inputDelayTicks);
             delay2.Reset(inputDelayTicks);
             clock.Reset();
@@ -245,6 +316,15 @@ namespace Knockbox.Game
             Ticked?.Invoke(this);
             if (roundTransition)
                 ApplyTuningAtRoundTransition();
+
+            if (Playback != null && TicksRun == Playback.Count)
+            {
+                bool same = !Playback.HasFinalChecksum || World.ComputeChecksum() == Playback.FinalChecksum;
+                if (same)
+                    Debug.Log($"[Knockbox] 기록 재생 끝({Playback.Count}틱): 최종 체크섬이 기록과 같음");
+                else
+                    Debug.LogWarning($"[Knockbox] 기록 재생 끝({Playback.Count}틱): 최종 체크섬이 기록과 다름");
+            }
 
             if (StopAtTick > 0 && World.State.Tick >= StopAtTick)
                 Running = false;

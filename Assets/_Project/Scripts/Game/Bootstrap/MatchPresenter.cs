@@ -34,6 +34,7 @@ namespace Knockbox.Game
         CameraRig cameraRig;
         DebugStateLabels labels;
         HitboxOverlay overlay;
+        HelpOverlay help;
         KoShatter koShatter;
         readonly bool[] shattered = new bool[2];
         int countdownKey = -1;
@@ -50,6 +51,9 @@ namespace Knockbox.Game
         IInputSource footerP2;
         DummyBehavior footerDummy;
         bool footerGrab;
+        string footerPreset;
+        bool footerRecording;
+        bool footerPlayback;
 
         public PaletteAsset Palette
         {
@@ -65,6 +69,7 @@ namespace Knockbox.Game
         public bool OverlayVisible => overlay != null && overlay.gameObject.activeSelf;
         public SfxLibrary Library => sfx;
         public HudView Hud => hud;
+        public HelpOverlay Help => help;
         public KoShatter KoShatter => koShatter;
 
         /// <summary>연출 물리(KO 파편)를 켜고 끈다. 시뮬레이션 결과와 무관해야 한다(CP8-5).</summary>
@@ -113,6 +118,9 @@ namespace Knockbox.Game
             overlay = Create<HitboxOverlay>("Hitbox Overlay");
             overlay.Setup(palette, shapes);
             overlay.gameObject.SetActive(false);
+            help = Create<HelpOverlay>("Help");
+            help.Setup(palette, shapes);
+            help.Visible = false;
 
             var cam = Camera.main;
             if (cam != null)
@@ -287,15 +295,22 @@ namespace Knockbox.Game
         {
             var p2 = runner.Player2Input;
             var dummy = p2 is DummyInputSource d ? d.Behavior : DummyBehavior.Idle;
+            bool recording = runner.Recording != null;
+            bool playback = runner.Playback != null;
             if (footer == null || !ReferenceEquals(world.Arena.Name, footerArena) || world.Config.Mode != footerMode
-                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy || world.Config.GrabEnabled != footerGrab)
+                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy || world.Config.GrabEnabled != footerGrab
+                || !ReferenceEquals(runner.PresetName, footerPreset) || recording != footerRecording || playback != footerPlayback)
             {
+                footerPreset = runner.PresetName;
+                footerRecording = recording;
+                footerPlayback = playback;
                 footerArena = world.Arena.Name;
                 footerMode = world.Config.Mode;
                 footerP2 = p2;
                 footerDummy = dummy;
                 footerGrab = world.Config.GrabEnabled;
-                footer = $"{footerArena} / mode {footerMode}{(world.Config.GrabEnabled ? "" : " (no grab)")} / P2 {InputSourceName(p2)}";
+                footer = $"{footerArena} / mode {footerMode}{(world.Config.GrabEnabled ? "" : " (no grab)")} / {footerPreset} / P2 {InputSourceName(p2)}"
+                         + (recording ? " / REC" : "") + (playback ? " / REPLAY" : "");
             }
             return footer;
         }

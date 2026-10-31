@@ -27,6 +27,7 @@ namespace Knockbox.EditorTools
         public const string TuningFolder = "Assets/_Project/Data/Tuning";
         public const string MovementTuningPath = TuningFolder + "/MovementTuning.asset";
         public const string CombatTuningPath = TuningFolder + "/CombatTuning.asset";
+        public const string CombatTuningFastPath = TuningFolder + "/CombatTuningFast.asset";
         public const string ArtFolder = "Assets/_Project/Art";
         public const string PalettePath = ArtFolder + "/Palette.asset";
         public const string ArenasFolder = "Assets/_Project/Data/Arenas";
@@ -54,6 +55,15 @@ namespace Knockbox.EditorTools
         {
             CreateAssetIfMissing<MovementTuning>(MovementTuningPath);
             CreateAssetIfMissing<CombatTuning>(CombatTuningPath);
+            if (AssetDatabase.LoadAssetAtPath<CombatTuning>(CombatTuningFastPath) == null)
+            {
+                var fast = ScriptableObject.CreateInstance<CombatTuning>();
+                fast.PresetName = "fast";
+                fast.Combat = CombatPresets.Fast;
+                AssetDatabase.CreateAsset(fast, CombatTuningFastPath);
+                AssetDatabase.SaveAssets();
+                Debug.Log($"[Knockbox] 에셋 생성: {CombatTuningFastPath}");
+            }
             CreateAssetIfMissing<PaletteAsset>(PalettePath);
         }
 
@@ -173,6 +183,16 @@ namespace Knockbox.EditorTools
             }
 
             changed |= FillReference(runner, "combatTuning", AssetDatabase.LoadAssetAtPath<CombatTuning>(CombatTuningPath));
+            var presets = new SerializedObject(runner);
+            var presetList = presets.FindProperty("combatPresets");
+            if (presetList.arraySize != 2)
+            {
+                presetList.arraySize = 2;
+                presetList.GetArrayElementAtIndex(0).objectReferenceValue = AssetDatabase.LoadAssetAtPath<CombatTuning>(CombatTuningPath);
+                presetList.GetArrayElementAtIndex(1).objectReferenceValue = AssetDatabase.LoadAssetAtPath<CombatTuning>(CombatTuningFastPath);
+                presets.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
 
             var presenter = runner.GetComponent<MatchPresenter>();
             if (presenter == null)
