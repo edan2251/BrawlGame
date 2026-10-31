@@ -157,3 +157,6 @@ Desktop.ini
 
 # 입력 기록 (회귀용으로 남길 것은 Assets/_Project/Data/Scenarios/replays/ 로 옮겨 커밋)
 /Replays/
+
+# 로컬 전용 참고 자료(다른 게임의 영상 캡처 포함). 저장소가 공개라 절대 커밋하지 않는다(CR-001 0절)
+/References/
