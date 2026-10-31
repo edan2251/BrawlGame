@@ -295,6 +295,33 @@ namespace Knockbox.Game
                 case SimEventType.PowerCheck:
                     overlay.ShowPower(e.Fighter, e.Strength);
                     break;
+                case SimEventType.Grab:
+                {
+                    // 손이 붙는 순간: 양쪽 짧은 번쩍임, 작은 고리, 약한 흔들림.
+                    int grabber = 1 - e.Fighter;
+                    Fighter(grabber).Flash(2f * Frame);
+                    fx.RingBurst(onBody, palette.flash, 0.2f, 1.0f, 0.12f);
+                    AddTrauma(0.12f);
+                    sfxPlayer.Play(Sfx.Guard, 0.8f);
+                    break;
+                }
+                case SimEventType.Throw:
+                    // 던지기: 크게 휘두르는 바람 소리와 흔들림. 던져진 쪽은 잔상(FighterView).
+                    dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 3, 2f, -e.Direction.X);
+                    fx.Shards(onBody, V(e.Direction), 50f, 4, palette.FighterBody(1 - e.Fighter), 9f, 0.18f, 0.35f);
+                    AddTrauma(0.22f);
+                    sfxPlayer.Play(Sfx.Dash);
+                    sfxPlayer.Play(Sfx.HitWeak, 0.7f);
+                    break;
+                case SimEventType.GrabBreak:
+                    // 잡기 풀기: 불꽃과 고리, 양쪽 외곽선 번쩍임.
+                    fx.Sparks(onBody, 8, 11f);
+                    fx.RingBurst(onBody, palette.spark, 0.3f, 1.4f, 0.18f);
+                    fighter0.FlashOutline(3f * Frame);
+                    fighter1.FlashOutline(3f * Frame);
+                    AddTrauma(0.2f);
+                    sfxPlayer.Play(Sfx.Clash, 0.7f);
+                    break;
 
                 case SimEventType.Hit:
                 {

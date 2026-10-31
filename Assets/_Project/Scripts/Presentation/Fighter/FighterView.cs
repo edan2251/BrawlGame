@@ -12,6 +12,7 @@ namespace Knockbox.Presentation
     /// 위력 6 이상이면 hazard 외곽선, 팔을 진행 방향으로 뻗는다.
     /// 모드 B: 앞손이 연출 전용 무기를 쥔다. 활성 틱에는 손잡이를 첫 판정 원, 무기 끝을 마지막 판정 원 중심에 맞춰
     /// 무기 끝의 궤적이 시뮬레이션 판정과 일치한다. 시작·후딜은 휴식 자세와 첫·끝 키프레임 사이를 보간한다.
+    /// 잡기: 두 팔을 잡기 상자 쪽으로 뻗고, 붙잡는 동안 손이 상대 몸에 붙는다. 던져진 쪽은 구르며 잔상을 남긴다.
     /// 시간은 시뮬레이션 시간으로 받는다(dt). 그래서 캡처와 실제 플레이가 같은 모습이 된다.
     /// </summary>
     public sealed class FighterView : MonoBehaviour
@@ -215,6 +216,14 @@ namespace Knockbox.Presentation
                     Flash(6f / 60f);
                     shake = Mathf.Max(shake, 0.12f);
                     break;
+                case SimEventType.Grab:
+                    // 손이 붙는 순간 짧은 번쩍임(붙잡힌 쪽).
+                    Flash(2f / 60f);
+                    break;
+                case SimEventType.Throw:
+                    Impulse(e.Direction, 0.3f);
+                    trailTimer = 0f;
+                    break;
             }
         }
 
@@ -414,6 +423,36 @@ namespace Knockbox.Presentation
                 rig.SetHands(front + new Vector2(-facing * (0.2f + 0.14f * charge), -0.1f), back + new Vector2(-facing * (0.28f + 0.1f * charge), -0.12f), LimbRig.ArmLayers.BothBack);
                 return;
             }
+            if (f.Action == ActionState.Grab)
+            {
+                // 잡기: 두 팔을 잡기 상자 쪽으로 뻗는다(시작 동안 점점, 헛잡기 후딜 동안 거둬들임).
+                ref readonly var g = ref config.Combat.Grab;
+                float gt = Mathf.Max(0f, f.ActionTick - 1 + alpha);
+                float reach = gt < g.StartupTicks ? Smooth(gt / g.StartupTicks)
+                    : gt < g.StartupTicks + g.ActiveTicks ? 1f
+                    : 1f - Smooth((gt - g.StartupTicks - g.ActiveTicks) / g.WhiffRecoveryTicks);
+                var box = position + new Vector2(g.BoxOffset * facing, 0.1f);
+                var restFront = front + new Vector2(facing * 0.16f, -0.38f);
+                var restBack = back + new Vector2(-facing * 0.16f, -0.38f);
+                rig.SetHands(Vector2.Lerp(restFront, box + new Vector2(0.05f * facing, 0.18f), reach),
+                    Vector2.Lerp(restBack, box + new Vector2(0f, -0.12f), reach), LimbRig.ArmLayers.BothFront);
+                return;
+            }
+            if (f.Action == ActionState.Holding)
+            {
+                // 붙잡기: 두 손을 상대 몸 가까운 쪽에 붙인다(상대는 몸 앞 0.8).
+                ref readonly var g = ref config.Combat.Grab;
+                var victimEdge = position + new Vector2((g.HoldOffset - config.HalfBody + 0.02f) * facing, 0.1f);
+                rig.SetHands(victimEdge + new Vector2(0f, 0.2f), victimEdge + new Vector2(0f, -0.15f), LimbRig.ArmLayers.BothFront);
+                return;
+            }
+            if (f.Action == ActionState.Held)
+            {
+                // 붙잡힘: 팔을 위로 버둥거린다.
+                float wave = Mathf.Sin(wobbleTime * 24f) * 0.08f;
+                rig.SetHands(front + new Vector2(facing * 0.1f, 0.3f + wave), back + new Vector2(-facing * 0.1f, 0.3f - wave), LimbRig.ArmLayers.Natural);
+                return;
+            }
             if (f.Action == ActionState.Lunge)
             {
                 // 돌진: 두 팔을 진행 방향으로 뻗는다.
@@ -456,7 +495,7 @@ namespace Knockbox.Presentation
         /// <summary>피격 경직 중에는 속도에 비례해 구르듯 회전한다. 끝나면 가까운 바로 선 자세로 돌아온다.</summary>
         void UpdateSpin(in FighterState f, float dt)
         {
-            if (f.Action == ActionState.Hitstun)
+            if (f.IsLaunched)
             {
                 float speed = Mathf.Sqrt(f.Velocity.X * f.Velocity.X + f.Velocity.Y * f.Velocity.Y);
                 float direction = f.Velocity.X > 0.01f ? -1f : f.Velocity.X < -0.01f ? 1f : -f.Facing;
@@ -543,7 +582,7 @@ namespace Knockbox.Presentation
             float open = blinkLeft > 0f ? 0.15f : 1f;
             float wide = 1f;
             // 맞았을 때는 찡그린 납작한 선, 가드 중에는 가늘게.
-            if (f.Action == ActionState.Hitstun || f.Action == ActionState.KO || f.Action == ActionState.Stagger)
+            if (f.IsLaunched || f.Action == ActionState.KO || f.Action == ActionState.Stagger || f.Action == ActionState.Held)
             {
                 open = 0.035f / eyeSize.y;
                 wide = 1.35f;
@@ -582,13 +621,15 @@ namespace Knockbox.Presentation
 
         void UpdateGhosts(in FighterState f, float dt, SimConfig config)
         {
-            // 돌진: 위력에 비례하는 길이의 잔상을 계속 남긴다(시간이 흐를 때만).
-            if (f.Action == ActionState.Lunge && f.HitstopTicks == 0 && dt > 0f)
+            // 돌진: 위력에 비례하는 길이의 잔상. 던져진 쪽: 빠르게 나는 동안 잔상(시간이 흐를 때만).
+            float speedNow = Mathf.Sqrt(f.Velocity.X * f.Velocity.X + f.Velocity.Y * f.Velocity.Y);
+            bool thrownTrail = f.Action == ActionState.Thrown && speedNow > 8f;
+            if ((f.Action == ActionState.Lunge || thrownTrail) && f.HitstopTicks == 0 && dt > 0f)
             {
                 trailTimer -= dt;
                 if (trailTimer <= 0f)
                 {
-                    float power = Mathf.Sqrt(f.Velocity.X * f.Velocity.X + f.Velocity.Y * f.Velocity.Y) * FighterCombat.Aggression(f, config);
+                    float power = f.Action == ActionState.Lunge ? speedNow * FighterCombat.Aggression(f, config) : speedNow * 0.6f;
                     EmitGhost(TrailLifeBase + power * TrailLifePerPower);
                     trailTimer = TrailInterval;
                 }

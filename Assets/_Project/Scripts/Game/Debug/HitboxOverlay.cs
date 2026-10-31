@@ -7,7 +7,7 @@ namespace Knockbox.Game
     /// <summary>
     /// F3 판정 오버레이(06-match-and-tools.md 4절): 시뮬레이션의 몸 상자, 활성 공격 판정 원, 속도 벡터,
     /// 패링 구간을 실제 시뮬레이션 위치(보간 없음)에 그린다. 상태 이름과 틱 번호는 DebugStateLabels가 함께 보여 준다.
-    /// 모드 A: 몸 충돌 판정을 한 순간 양쪽 위력 숫자를 0.6초 동안 띄운다(6 이상이면 위험색). 잡기 상자는 CP7에서 더한다.
+    /// 모드 A: 몸 충돌 판정을 한 순간 양쪽 위력 숫자를 0.6초 동안 띄운다(6 이상이면 위험색). 잡기 상자는 활성 틱에 spark 색.
     /// </summary>
     public sealed class HitboxOverlay : MonoBehaviour
     {
@@ -22,6 +22,7 @@ namespace Knockbox.Game
             public SpriteRenderer[] Circles;
             public SpriteRenderer Velocity;
             public SpriteRenderer Parry;
+            public SpriteRenderer[] GrabBox;
         }
 
         readonly FighterMarks[] marks = new FighterMarks[2];
@@ -80,7 +81,10 @@ namespace Knockbox.Game
                 {
                     Box = new SpriteRenderer[4],
                     Circles = new SpriteRenderer[AttackDef.MaxCircles],
+                    GrabBox = new SpriteRenderer[4],
                 };
+                for (int i = 0; i < 4; i++)
+                    m.GrabBox[i] = ShapeLibrary.Create(transform, $"P{k + 1}Grab{i}", shapes.Square, SortingLayers.UI, SortingOrder + 1, palette.spark);
                 for (int i = 0; i < 4; i++)
                     m.Box[i] = ShapeLibrary.Create(transform, $"P{k + 1}Box{i}", shapes.Square, SortingLayers.UI, SortingOrder, palette.ink);
                 for (int i = 0; i < m.Circles.Length; i++)
@@ -144,6 +148,21 @@ namespace Knockbox.Game
                 m.Velocity.transform.localPosition = c + v.normalized * (length * 0.5f);
                 m.Velocity.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg);
                 ShapeLibrary.SetSize(m.Velocity, length, Line);
+            }
+
+            bool grabbing = FighterCombat.IsGrabActive(f, config);
+            for (int i = 0; i < 4; i++)
+                m.GrabBox[i].enabled = grabbing;
+            if (grabbing)
+            {
+                ref readonly var g = ref config.Combat.Grab;
+                var gc = FighterCombat.GrabBoxCenter(f, config);
+                var center = new Vector2(gc.X, gc.Y);
+                float hw = g.BoxWidth * 0.5f, hh = g.BoxHeight * 0.5f;
+                PlaceRect(m.GrabBox[0], center + new Vector2(0f, hh), g.BoxWidth + Line, Line);
+                PlaceRect(m.GrabBox[1], center - new Vector2(0f, hh), g.BoxWidth + Line, Line);
+                PlaceRect(m.GrabBox[2], center + new Vector2(hw, 0f), Line, g.BoxHeight + Line);
+                PlaceRect(m.GrabBox[3], center - new Vector2(hw, 0f), Line, g.BoxHeight + Line);
             }
 
             m.Parry.enabled = f.ParryTicks > 0;
