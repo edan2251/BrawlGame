@@ -117,6 +117,36 @@ namespace Knockbox.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator BotOpponent_FightsBackAsP2()
+        {
+            yield return LoadSandbox();
+            runner.Mode = CombatMode.Swing;
+            runner.ArenaName = "Box";
+            runner.StartNewMatch();
+            runner.Running = false;
+            var bot = new BotInputSource(() => runner.World, 1, 0xB07u);
+            runner.Player1Input = new DummyInputSource(DummyBehavior.WalkBackAndForth);
+            runner.Player2Input = bot;
+            Assert.AreEqual("bot", MatchPresenter.InputSourceName(bot));
+            int botAttacks = 0, hits = 0;
+            for (int i = 0; i < 1200; i++)
+            {
+                runner.StepOnce();
+                for (int e = 0; e < runner.World.Events.Count; e++)
+                {
+                    var ev = runner.World.Events[e];
+                    botAttacks += ev.Type == SimEventType.AttackStart && ev.Fighter == 1 ? 1 : 0;
+                    hits += ev.Type == SimEventType.Hit ? 1 : 0;
+                }
+                if (i % 20 == 0)
+                    yield return null;
+            }
+            TestContext.WriteLine($"봇 공격 {botAttacks}, 명중 {hits}");
+            Assert.Greater(botAttacks, 5, "봇이 직접 공격해야 함");
+            Assert.Greater(hits, 0);
+        }
+
+        [UnityTest]
         public IEnumerator ArenaCycle_StartsMatchOnEachMap()
         {
             yield return LoadSandbox();

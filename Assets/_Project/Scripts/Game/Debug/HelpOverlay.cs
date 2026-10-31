@@ -18,7 +18,7 @@ namespace Knockbox.Game
             "\n" +
             "F1 combat mode (A charge / B swing / test)    F2 next arena\n" +
             "F3 hitbox overlay    F4 grab on/off    F5 reset round\n" +
-            "F6 P2 input (keyboard / pad / dummy)    [ ] dummy behavior\n" +
+            "F6 P2 input (keyboard / pad / dummy / bot)    [ ] dummy behavior\n" +
             "F7 reduce shake    F8 sync test    F11 tuning preset (default / fast)\n" +
             "F9 start/stop input recording    F10 replay last recording\n" +
             "P pause    O step one tick    ~ close this help";

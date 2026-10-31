@@ -1,4 +1,5 @@
 using System;
+using Knockbox.Game;
 using Knockbox.Simulation;
 using NUnit.Framework;
 

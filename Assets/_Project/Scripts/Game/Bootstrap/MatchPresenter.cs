@@ -192,6 +192,13 @@ namespace Knockbox.Game
                 labels.gameObject.SetActive(visible);
         }
 
+        /// <summary>파이터 위 상태 글자만 켜고 끈다(위·아래 설정 줄은 그대로). 봇 영상은 끈다.</summary>
+        public void SetFighterLabels(bool visible)
+        {
+            if (labels != null)
+                labels.SetFighterLabels(visible);
+        }
+
         /// <summary>F3 판정 오버레이.</summary>
         public void SetOverlay(bool visible)
         {
@@ -322,6 +329,7 @@ namespace Knockbox.Game
                 case KeyboardInputSource _: return "keyboard";
                 case GamepadInputSource _: return "gamepad";
                 case DummyInputSource d: return "dummy " + d.Behavior;
+                case BotInputSource _: return "bot";
                 case FrameArrayInputSource _: return "scenario";
                 default: return source == null ? "none" : "idle";
             }

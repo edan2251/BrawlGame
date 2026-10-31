@@ -20,12 +20,14 @@ namespace Knockbox.Game
         MatchPresenter presenter;
         CameraRig cameraRig;
         readonly DummyInputSource dummy = new DummyInputSource();
+        BotInputSource bot;
         static readonly string[] Arenas = { "Box", "Towers", "Pit" };
 
         void Awake()
         {
             runner = GetComponent<MatchRunner>();
             presenter = GetComponent<MatchPresenter>();
+            bot = new BotInputSource(() => runner.World, 1, 0xB07u);
         }
 
         void Start()
@@ -147,6 +149,11 @@ namespace Knockbox.Game
             runner.StartNewMatch();
             if (p2 is DummyInputSource)
                 runner.Player2Input = p2;
+            else if (p2 is BotInputSource b)
+            {
+                b.Reset();
+                runner.Player2Input = b;
+            }
         }
 
         void CycleP2Input()
@@ -157,6 +164,11 @@ namespace Knockbox.Game
                 next = GamepadInputSource.Available(0) ? new GamepadInputSource(0) : (IInputSource)dummy;
             else if (current is GamepadInputSource)
                 next = dummy;
+            else if (current is DummyInputSource)
+            {
+                bot.Reset();
+                next = bot;
+            }
             else
                 next = new KeyboardInputSource(KeyboardLayout.Right);
             runner.Player2Input = next;

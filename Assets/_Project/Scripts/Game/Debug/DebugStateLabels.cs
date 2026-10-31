@@ -76,6 +76,12 @@ namespace Knockbox.Game
         // 글자 한 줄 높이(48 × 0.12 / 10 ≈ 0.58)보다 조금 크게.
         const float LineHeight = 0.6f;
 
+        public void SetFighterLabels(bool visible)
+        {
+            label0.gameObject.SetActive(visible);
+            label1.gameObject.SetActive(visible);
+        }
+
         static void UpdateLabel(TextMesh label, string name, in FighterState f, ref int shownKey)
         {
             int key = (int)f.Action | (f.StunTicks << 8) | (f.HitstopTicks << 20);
