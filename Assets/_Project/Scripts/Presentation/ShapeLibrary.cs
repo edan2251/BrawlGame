@@ -65,6 +65,8 @@ namespace Knockbox.Presentation
         public Sprite Circle => circle != null ? circle : Square;
         public Sprite Triangle => triangle != null ? triangle : Square;
         public Sprite Ring => ring != null ? ring : Square;
+        /// <summary>글로용 부드러운 원(실행 중 생성).</summary>
+        public Sprite SoftCircle => ShapeSprites.SoftCircle;
 
         /// <summary>9-슬라이스 스프라이트를 쓰는 렌더러. 크기는 size로 정한다.</summary>
         public static SpriteRenderer CreateSliced(Transform parent, string name, Sprite sprite, string layer, int order, Color color)

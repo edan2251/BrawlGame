@@ -50,6 +50,9 @@ namespace Knockbox.Presentation
         PaletteAsset palette;
         Transform pose;
         SpriteRenderer body;
+        SpriteRenderer glow;
+        const float GlowSize = 2.4f;
+        const float BodyGlowAlpha = 0.16f;
         SpriteRenderer outline;
         readonly SpriteRenderer[] eyes = new SpriteRenderer[2];
         readonly SpriteRenderer[] ghosts = new SpriteRenderer[GhostCount];
@@ -122,6 +125,10 @@ namespace Knockbox.Presentation
             pose.SetParent(transform, false);
             pose.localPosition = new Vector3(0f, VisualLift - BodySize * 0.5f, 0f);
 
+            // 몸 둘레의 은은한 빛 번짐(08 5절 "캐릭터 몸의 밝은 부분 정도만 살짝"): 지형 뒤가 아니라 팔다리 뒤에 둔다.
+            glow = ShapeLibrary.Create(pose, "Glow", shapes.SoftCircle, SortingLayers.LimbBack, -20, palette.FighterBody(fighter));
+            glow.transform.localPosition = new Vector3(0f, BodySize * 0.5f, 0f);
+            ShapeLibrary.SetSize(glow, GlowSize, GlowSize);
             outline = ShapeLibrary.CreateSliced(pose, "Outline", shapes.RoundedOutline, SortingLayers.Fighter, 0, palette.ink);
             outline.transform.localPosition = new Vector3(0f, BodySize * 0.5f, 0f);
             ShapeLibrary.SetSize(outline, OutlineSize, OutlineSize);
@@ -423,6 +430,13 @@ namespace Knockbox.Presentation
             else
                 line = palette.ink;
             outline.color = line;
+            // 글로: 평소 몸 색, 번쩍일 때 흰색, 충전 2·3단계는 에너지 색으로 조금 더 밝게.
+            if (flashLeft > 0f)
+                glow.color = PaletteAsset.WithAlpha(palette.flash, 0.4f);
+            else if (f.Action == ActionState.Charge && ChargeStage(f, config) >= 2)
+                glow.color = PaletteAsset.WithAlpha(palette.energy, 0.3f);
+            else
+                glow.color = PaletteAsset.WithAlpha(palette.FighterBody(index), f.Action == ActionState.KO ? 0f : BodyGlowAlpha);
             flashLeft = Mathf.Max(0f, flashLeft - dt);
             outlineFlashLeft = Mathf.Max(0f, outlineFlashLeft - dt);
         }

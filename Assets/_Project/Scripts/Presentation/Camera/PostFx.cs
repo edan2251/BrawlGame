@@ -5,16 +5,14 @@ using UnityEngine.Rendering.Universal;
 namespace Knockbox.Presentation
 {
     /// <summary>
-    /// 후처리(08-visual-direction.md 5절). 실행 중에 만드는 전역 Volume 하나:
-    /// 블룸(문턱값을 높게 두어 흰 섬광, 에너지 색, 캐릭터 몸의 밝은 부분만), 색수차 펄스(평소 0, KO에 강하게, 강한 명중·벽꽝에 약하게),
+    /// 후처리(08-visual-direction.md 5절). 실행 중에 만드는 전역 Volume 하나: 색수차 펄스(평소 0, KO에 강하게, 강한 명중·벽꽝에 약하게),
     /// 약한 비네트. 흔들림 줄이기(F7)를 켜면 색수차를 끈다. 연출 전용이고 시뮬레이션과 무관하다.
+    /// 블룸은 URP Bloom 대신 연출별 글로(ImpactFx.Glow, 파이터 몸 글로)로 낸다: URP Bloom은 문턱값의 절반부터 번지기 시작해서
+    /// (soft knee) 가장 밝은 지형(사이언 #0AB2E6)까지 번지고, 아주 어두운 배경에서는 그 번짐이 바닥·벽 주변 배경을 눈에 띄게 밝혔다
+    /// (빈 경기장 사이언 테마 아래쪽 밝기 58% → 72%). 지형은 번지지 않아야 한다(08 5절).
     /// </summary>
     public sealed class PostFx : MonoBehaviour
     {
-        /// <summary>감마 공간 문턱값. 고정 지형 중 가장 밝은 사이언(#0AB2E6, 최대 채널 0.90)은 넘지 않고, 에너지 민트(0.94)와 흰색, 몸 색(1.0)은 넘는다.</summary>
-        public const float BloomThreshold = 0.92f;
-        public const float BloomIntensity = 0.6f;
-        public const float BloomScatter = 0.6f;
         public const float VignetteIntensity = 0.2f;
 
         Volume volume;
@@ -44,10 +42,9 @@ namespace Knockbox.Presentation
         {
             profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.hideFlags = HideFlags.HideAndDontSave;
+            // 프로젝트 기본 볼륨의 블룸이 켜져 있어도 쓰지 않는다(위 설명).
             var bloom = profile.Add<Bloom>(true);
-            bloom.threshold.Override(BloomThreshold);
-            bloom.intensity.Override(BloomIntensity);
-            bloom.scatter.Override(BloomScatter);
+            bloom.intensity.Override(0f);
             aberration = profile.Add<ChromaticAberration>(true);
             aberration.intensity.Override(0f);
             var vignette = profile.Add<Vignette>(true);

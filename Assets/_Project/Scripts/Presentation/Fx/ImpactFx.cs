@@ -11,6 +11,7 @@ namespace Knockbox.Presentation
     {
         const int ShardCapacity = 96;
         const int RingCapacity = 12;
+        const int GlowCapacity = 10;
         const int RayCapacity = 48;
         const int CrackCapacity = 6;
         const int CrackLines = 7;
@@ -43,6 +44,7 @@ namespace Knockbox.Presentation
             public float Age;
             public float Life;
             public Color Color;
+            public float Alpha;
         }
 
         struct Ray
@@ -64,6 +66,9 @@ namespace Knockbox.Presentation
         readonly Shard[] shards = new Shard[ShardCapacity];
         readonly SpriteRenderer[] ringRenderers = new SpriteRenderer[RingCapacity];
         readonly Ring[] rings = new Ring[RingCapacity];
+        readonly SpriteRenderer[] glowRenderers = new SpriteRenderer[GlowCapacity];
+        readonly Ring[] glows = new Ring[GlowCapacity];
+        int nextGlow;
         readonly SpriteRenderer[] rayRenderers = new SpriteRenderer[RayCapacity];
         readonly Ray[] rays = new Ray[RayCapacity];
         readonly SpriteRenderer[] crackRenderers = new SpriteRenderer[CrackCapacity * CrackLines];
@@ -94,6 +99,12 @@ namespace Knockbox.Presentation
                 ringRenderers[i] = ShapeLibrary.Create(transform, "Ring", shapes.Ring, SortingLayers.Fx, 10, palette.flash);
                 ringRenderers[i].enabled = false;
                 rings[i].Age = rings[i].Life = 1f;
+            }
+            for (int i = 0; i < GlowCapacity; i++)
+            {
+                glowRenderers[i] = ShapeLibrary.Create(transform, "Glow", shapes.SoftCircle, SortingLayers.Fx, 1, palette.flash);
+                glowRenderers[i].enabled = false;
+                glows[i].Age = glows[i].Life = 1f;
             }
             for (int i = 0; i < RayCapacity; i++)
             {
@@ -127,6 +138,11 @@ namespace Knockbox.Presentation
             {
                 rings[i].Age = rings[i].Life;
                 ringRenderers[i].enabled = false;
+            }
+            for (int i = 0; i < GlowCapacity; i++)
+            {
+                glows[i].Age = glows[i].Life;
+                glowRenderers[i].enabled = false;
             }
             for (int i = 0; i < RayCapacity; i++)
             {
@@ -205,6 +221,24 @@ namespace Knockbox.Presentation
             r.Color = color;
             ringRenderers[nextRing].enabled = true;
             nextRing = (nextRing + 1) % RingCapacity;
+        }
+
+        /// <summary>
+        /// 밝은 연출 둘레의 부드러운 빛 번짐(08 5절의 블룸 대신). 지름 size의 70%에서 size로 커지며 alpha에서 사라진다.
+        /// 지형은 번지지 않고 이 연출만 번진다.
+        /// </summary>
+        public void Glow(Vector2 position, Color color, float size, float alpha, float life)
+        {
+            ref var g = ref glows[nextGlow];
+            g.Position = position;
+            g.From = size * 0.7f;
+            g.To = size;
+            g.Age = 0f;
+            g.Life = life;
+            g.Color = color;
+            g.Alpha = alpha;
+            glowRenderers[nextGlow].enabled = true;
+            nextGlow = (nextGlow + 1) % GlowCapacity;
         }
 
         /// <summary>클래시의 별 모양 폭발: 접점에서 뻗는 빛살 count개.</summary>
@@ -290,6 +324,25 @@ namespace Knockbox.Presentation
                 var color = s.Color;
                 color.a = t < 0.6f ? 1f : 1f - (t - 0.6f) / 0.4f;
                 sr.color = color;
+                active++;
+            }
+
+            for (int i = 0; i < GlowCapacity; i++)
+            {
+                ref var g = ref glows[i];
+                if (g.Age >= g.Life)
+                    continue;
+                g.Age += dt;
+                if (g.Age >= g.Life)
+                {
+                    glowRenderers[i].enabled = false;
+                    continue;
+                }
+                float t = g.Age / g.Life;
+                float size = Mathf.Lerp(g.From, g.To, 1f - (1f - t) * (1f - t));
+                glowRenderers[i].transform.localPosition = g.Position;
+                ShapeLibrary.SetSize(glowRenderers[i], size, size);
+                glowRenderers[i].color = PaletteAsset.WithAlpha(g.Color, g.Alpha * (1f - t) * (1f - t));
                 active++;
             }
 

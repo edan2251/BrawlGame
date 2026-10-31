@@ -480,6 +480,7 @@ namespace Knockbox.Game
                     fx.Shards(onBody, V(e.Direction), 75f, shards - shards / 3, palette.hit, 8f + damage * 0.35f, 0.24f);
                     fx.Shards(onBody, V(e.Direction), 60f, shards / 3, palette.FighterBody(attacker), 8f + damage * 0.35f, 0.24f);
                     fx.RingBurst(onBody, palette.flash, 0.3f, 1.5f + damage * 0.04f);
+                    fx.Glow(onBody, palette.flash, 2.2f + damage * 0.06f, 0.45f, 0.2f);
                     AddTrauma(0.2f + damage * 0.016f);
                     if (damage >= 15f)
                     {
@@ -502,6 +503,7 @@ namespace Knockbox.Game
                     var color = palette.FighterBody(e.Fighter);
                     fx.RingBurst(center, color, 0.6f, 3.2f, 0.28f);
                     fx.RingBurst(center, palette.flash, 0.3f, 2.0f, 0.18f);
+                    fx.Glow(center, palette.energy, 3.2f, 0.5f, 0.3f);
                     Fighter(e.Fighter).FlashOutline(4f * Frame);
                     if (!reduceMotion)
                         fx.ScreenFlash(true);
@@ -514,6 +516,8 @@ namespace Knockbox.Game
                     fx.Star(onBody, 8, 1.1f);
                     fx.Sparks(onBody, 12, 15f);
                     fx.RingBurst(onBody, palette.energy, 0.2f, 1.2f, 0.15f);
+                    fx.Glow(onBody, palette.flash, 2.6f, 0.5f, 0.22f);
+                    fx.Glow(onBody, palette.energy, 3.6f, 0.3f, 0.3f);
                     fighter0.FlashOutline(4f * Frame);
                     fighter1.FlashOutline(4f * Frame);
                     AddTrauma(0.3f);
@@ -528,6 +532,7 @@ namespace Knockbox.Game
                     dust.Burst(point, 4, 2.6f, Mathf.Abs(normal.x) > 0.5f ? normal.x : 0f);
                     fx.Shards(point, normal, 110f, 6, CurrentTheme.terrain, 7f, 0.15f, 0.55f);
                     fx.RingBurst(point, palette.flash, 0.3f, 1.8f, 0.2f);
+                    fx.Glow(point, palette.flash, 2.8f, 0.35f, 0.22f);
                     AddTrauma(0.5f);
                     Punch(0.02f, 8f * Frame);
                     postFx.Pulse(0.25f, 0.15f);
@@ -546,6 +551,7 @@ namespace Knockbox.Game
                     // 큰 폭발. 히트스탑 20틱 뒤 진 쪽 몸이 조각난다(UpdateKnockout).
                     var center = Fighter(e.Fighter).BodyCenter;
                     fx.RingBurst(center, palette.flash, 0.5f, 4.5f, 0.35f);
+                    fx.Glow(center, palette.flash, 6f, 0.5f, 0.4f);
                     fx.Shards(center, Vector2.up, 360f, 10, palette.FighterBody(e.Fighter), 12f, 0.26f, 0.6f);
                     if (!reduceMotion)
                         fx.ScreenFlash(false);

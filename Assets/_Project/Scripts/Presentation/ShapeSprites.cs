@@ -8,6 +8,44 @@ namespace Knockbox.Presentation
     public static class ShapeSprites
     {
         static Sprite square;
+        static Sprite softCircle;
+
+        /// <summary>
+        /// 가운데가 불투명하고 가장자리로 부드럽게 사라지는 흰 원(지름 1유닛). 블룸 대신 쓰는 글로(08 5절)용 마스크.
+        /// </summary>
+        public static Sprite SoftCircle
+        {
+            get
+            {
+                if (softCircle != null)
+                    return softCircle;
+                const int size = 64;
+                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp,
+                    hideFlags = HideFlags.HideAndDontSave,
+                    name = "KnockboxSoftCircle",
+                };
+                var pixels = new Color32[size * size];
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = (x + 0.5f) / size * 2f - 1f, dy = (y + 0.5f) / size * 2f - 1f;
+                        float r2 = Mathf.Clamp01(dx * dx + dy * dy);
+                        float a = (1f - r2) * (1f - r2);
+                        pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+                    }
+                }
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                softCircle = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+                softCircle.hideFlags = HideFlags.HideAndDontSave;
+                softCircle.name = "KnockboxSoftCircle";
+                return softCircle;
+            }
+        }
 
         /// <summary>한 변 1유닛, 가운데 기준의 흰 사각형.</summary>
         public static Sprite Square
@@ -35,32 +73,21 @@ namespace Knockbox.Presentation
         }
 
         /// <summary>
-        /// 배경 질감용 저주파 노이즈 마스크(08 4절): 흰색에 노이즈 값을 알파로 담는다(0 ~ maxAlpha).
-        /// 색은 이 마스크를 그리는 렌더러가 팔레트에서 정한다. Mathf.PerlinNoise라 실행마다 같다.
+        /// 배경 질감용 저주파 노이즈 값(0~1, 08 4절): 큰 얼룩 + 붓질 같은 가로로 긴 결. Mathf.PerlinNoise라 실행마다 같다.
         /// </summary>
-        public static Texture2D NoiseMask(int width, int height, float scale, float maxAlpha)
+        public static float[] NoiseValues(int width, int height, float scale)
         {
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
-            {
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp,
-                hideFlags = HideFlags.HideAndDontSave,
-                name = "KnockboxNoise",
-            };
-            var pixels = new Color32[width * height];
+            var values = new float[width * height];
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
                 {
-                    // 두 옥타브: 큰 얼룩 + 붓질 같은 가로로 긴 결.
                     float n = Mathf.PerlinNoise(x * scale + 17.3f, y * scale + 41.9f) * 0.7f
                               + Mathf.PerlinNoise(x * scale * 3.1f + 5.1f, y * scale * 9.7f + 2.7f) * 0.3f;
-                    pixels[y * width + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(Mathf.Clamp01(n) * maxAlpha * 255f));
+                    values[y * width + x] = Mathf.Clamp01(n);
                 }
             }
-            texture.SetPixels32(pixels);
-            texture.Apply(false, true);
-            return texture;
+            return values;
         }
     }
 }
