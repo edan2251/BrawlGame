@@ -40,7 +40,7 @@ namespace Knockbox.Game
             text.fontSize = FontSize;
             text.characterSize = CharacterSize;
             text.anchor = anchor;
-            text.color = color;
+            text.color = Knockbox.Presentation.PaletteAsset.ForText(color);
             return text;
         }
 

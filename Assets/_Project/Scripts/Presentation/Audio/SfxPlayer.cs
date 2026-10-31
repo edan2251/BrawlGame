@@ -13,6 +13,12 @@ namespace Knockbox.Presentation
         Parry,
         Guard,
         WallSplat,
+        Grab,
+        Throw,
+        Spike,
+        Pad,
+        Countdown,
+        KO,
     }
 
     /// <summary>
@@ -46,8 +52,8 @@ namespace Knockbox.Presentation
                 lastFrame[i] = -1;
         }
 
-        /// <summary>재생했으면 true, 같은 프레임 중복이라 건너뛰었으면 false.</summary>
-        public bool Play(Sfx sfx, float volume = 1f)
+        /// <summary>재생했으면 true, 같은 프레임 중복이라 건너뛰었으면 false. pitch는 무작위 ±5%에 곱한다(GO 같은 변형).</summary>
+        public bool Play(Sfx sfx, float volume = 1f, float pitch = 1f)
         {
             int frame = Time.frameCount;
             if (countedFrame != frame)
@@ -65,7 +71,7 @@ namespace Knockbox.Presentation
                 return false;
             var voice = voices[nextVoice];
             nextVoice = (nextVoice + 1) % Voices;
-            voice.pitch = 1f + random.Range(-PitchRange, PitchRange);
+            voice.pitch = pitch * (1f + random.Range(-PitchRange, PitchRange));
             voice.PlayOneShot(clip, volume);
             PlayedThisFrame++;
             return true;

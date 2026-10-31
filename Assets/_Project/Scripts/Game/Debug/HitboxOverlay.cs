@@ -52,7 +52,7 @@ namespace Knockbox.Game
                 return;
             powerShown[fighter] = power;
             powerLabels[fighter].text = power.ToString("0.0");
-            powerLabels[fighter].color = power >= 6f ? palette.hazard : palette.ink;
+            powerLabels[fighter].color = PaletteAsset.ForText(power >= 6f ? palette.hazard : palette.ink);
         }
 
         public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)

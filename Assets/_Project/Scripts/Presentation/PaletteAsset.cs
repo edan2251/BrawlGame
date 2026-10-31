@@ -25,6 +25,12 @@ namespace Knockbox.Presentation
         public Color spark = Hex(0xFFF3B0);
 
         public Color FighterBody(int fighter) => fighter == 0 ? p1Body : p2Body;
+
+        /// <summary>
+        /// TextMesh(내장 글꼴 셰이더)는 정점 색을 색 공간에 맞게 바꾸지 않아 Linear 프로젝트에서 밝게 바랜다.
+        /// 글자 색은 이 함수를 거쳐 스프라이트와 같은 색으로 보이게 한다.
+        /// </summary>
+        public static Color ForText(Color color) => QualitySettings.activeColorSpace == ColorSpace.Linear ? color.linear : color;
         public Color FighterShade(int fighter) => fighter == 0 ? p1Shade : p2Shade;
 
         static Color Hex(int rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);

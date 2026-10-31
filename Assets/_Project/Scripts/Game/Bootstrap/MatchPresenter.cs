@@ -34,6 +34,9 @@ namespace Knockbox.Game
         CameraRig cameraRig;
         DebugStateLabels labels;
         HitboxOverlay overlay;
+        KoShatter koShatter;
+        readonly bool[] shattered = new bool[2];
+        int countdownKey = -1;
 
         readonly SimEvent[] queue = new SimEvent[EventQueueCapacity];
         int queued;
@@ -60,6 +63,20 @@ namespace Knockbox.Game
         public CameraRig CameraRig => cameraRig;
         public SfxPlayer SfxPlayer => sfxPlayer;
         public bool OverlayVisible => overlay != null && overlay.gameObject.activeSelf;
+        public SfxLibrary Library => sfx;
+        public HudView Hud => hud;
+        public KoShatter KoShatter => koShatter;
+
+        /// <summary>연출 물리(KO 파편)를 켜고 끈다. 시뮬레이션 결과와 무관해야 한다(CP8-5).</summary>
+        public bool PresentationPhysics
+        {
+            get => koShatter == null || koShatter.PhysicsEnabled;
+            set
+            {
+                if (koShatter != null)
+                    koShatter.PhysicsEnabled = value;
+            }
+        }
 
         /// <summary>마지막 LateUpdate에서 쓴 연출 dt(초).</summary>
         public float LastDt { get; private set; }
@@ -82,6 +99,8 @@ namespace Knockbox.Game
             dust.Setup(palette, shapes);
             fx = Create<ImpactFx>("Impact Fx");
             fx.Setup(palette, shapes);
+            koShatter = Create<KoShatter>("KO Shatter");
+            koShatter.Setup(palette, shapes);
             hud = Create<HudView>("Hud");
             hud.Setup(palette, shapes);
             sfxPlayer = Create<SfxPlayer>("Sfx");
@@ -133,6 +152,9 @@ namespace Knockbox.Game
         void OnMatchBegan(MatchRunner r)
         {
             arenaView.Build(r.World.Arena, palette, shapes);
+            koShatter.BuildArena(r.World.Arena);
+            shattered[0] = shattered[1] = false;
+            countdownKey = -1;
             fighter0.ResetPose();
             fighter1.ResetPose();
             dust.Clear();
@@ -195,11 +217,16 @@ namespace Knockbox.Game
                 renderedRound = current.Match.Round;
                 fighter0.ResetPose();
                 fighter1.ResetPose();
+                koShatter.Clear();
+                shattered[0] = shattered[1] = false;
                 alpha = 1f;
             }
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
+            UpdateKnockout(current, world.Config);
+            UpdateCountdownSound(current, world.Config);
             dust.Tick(dt);
+            koShatter.Tick(dt);
             if (cameraRig != null)
                 cameraRig.Tick(dt);
             fx.Tick(dt, cameraRig != null ? (Vector2)cameraRig.transform.position : Vector2.zero);
@@ -207,11 +234,53 @@ namespace Knockbox.Game
             Vector2 body0 = fighter0.transform.localPosition;
             Vector2 body1 = fighter1.transform.localPosition;
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
-                world.Config.Match.RoundsToWin, world.Config.Combat.MaxHealth, dt);
+                world.Config.Match, world.Config.Combat.MaxHealth, dt);
             if (labels != null && labels.gameObject.activeSelf)
                 labels.Render(current, body0, body1, Footer(world));
             if (overlay.gameObject.activeSelf)
                 overlay.Render(current, world.Config, dt);
+        }
+
+        /// <summary>
+        /// KO 히트스탑(20틱)이 끝나면 진 쪽 몸을 조각내고, 이긴 쪽은 통통 튄다. 상태만 보고 정하므로 틱을 건너뛰어도 한 번만 일어난다.
+        /// </summary>
+        void UpdateKnockout(in SimState s, SimConfig config)
+        {
+            if (s.Match.Phase != MatchPhase.KO || s.Match.PhaseTick < config.Combat.KoHitstop)
+                return;
+            for (int k = 0; k < 2; k++)
+            {
+                var f = s.GetFighter(k);
+                if (f.Action != ActionState.KO || shattered[k])
+                    continue;
+                shattered[k] = true;
+                var view = Fighter(k);
+                var center = view.BodyCenter;
+                koShatter.Shatter(center, palette.FighterBody(k), new Vector2(f.Velocity.X, f.Velocity.Y));
+                if (koShatter.PhysicsEnabled)
+                    view.SetShattered(true);
+                fx.RingBurst(center, palette.FighterBody(k), 0.6f, 4f, 0.3f);
+                fx.Shards(center, Vector2.up, 360f, 10, palette.FighterBody(k), 11f, 0.22f, 0.7f);
+                dust.Burst(center, 4, 3f, 0f);
+                AddTrauma(0.5f);
+                sfxPlayer.Play(Sfx.WallSplat, 0.8f);
+            }
+            if (s.Match.RoundWinner >= 0)
+                Fighter(s.Match.RoundWinner).Celebrating = true;
+        }
+
+        /// <summary>카운트다운: READY가 뜰 때 짧은 신호음, GO가 뜰 때 높은 신호음.</summary>
+        void UpdateCountdownSound(in SimState s, SimConfig config)
+        {
+            int key = s.Match.Phase != MatchPhase.Countdown ? -1
+                : s.Match.PhaseTick >= config.Match.CountdownTicks - HudView.GoTicks ? 1 : 0;
+            if (key == countdownKey)
+                return;
+            countdownKey = key;
+            if (key == 0)
+                sfxPlayer.Play(Sfx.Countdown);
+            else if (key == 1)
+                sfxPlayer.Play(Sfx.Countdown, 1f, 1.5f);
         }
 
         string Footer(SimWorld world)
@@ -280,7 +349,15 @@ namespace Knockbox.Game
                     break;
                 case SimEventType.PadBounce:
                     dust.Burst(feet, 3, 1.5f, 0f);
-                    sfxPlayer.Play(Sfx.Jump);
+                    fx.RingBurst(feet, palette.bouncy, 0.3f, 1.4f, 0.18f);
+                    sfxPlayer.Play(Sfx.Pad);
+                    break;
+                case SimEventType.Spike:
+                    // 가시: 위험색 파편이 위로, 고리, 흔들림.
+                    fx.Shards(V(e.Position), Vector2.up, 70f, 7, palette.hazard, 9f, 0.18f, 0.4f);
+                    fx.RingBurst(V(e.Position), palette.hazard, 0.3f, 1.6f, 0.18f);
+                    AddTrauma(0.3f);
+                    sfxPlayer.Play(Sfx.Spike);
                     break;
                 case SimEventType.Dash:
                     dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 2, 1.6f, -e.Direction.X);
@@ -302,7 +379,7 @@ namespace Knockbox.Game
                     Fighter(grabber).Flash(2f * Frame);
                     fx.RingBurst(onBody, palette.flash, 0.2f, 1.0f, 0.12f);
                     AddTrauma(0.12f);
-                    sfxPlayer.Play(Sfx.Guard, 0.8f);
+                    sfxPlayer.Play(Sfx.Grab);
                     break;
                 }
                 case SimEventType.Throw:
@@ -310,8 +387,7 @@ namespace Knockbox.Game
                     dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 3, 2f, -e.Direction.X);
                     fx.Shards(onBody, V(e.Direction), 50f, 4, palette.FighterBody(1 - e.Fighter), 9f, 0.18f, 0.35f);
                     AddTrauma(0.22f);
-                    sfxPlayer.Play(Sfx.Dash);
-                    sfxPlayer.Play(Sfx.HitWeak, 0.7f);
+                    sfxPlayer.Play(Sfx.Throw);
                     break;
                 case SimEventType.GrabBreak:
                     // 잡기 풀기: 불꽃과 고리, 양쪽 외곽선 번쩍임.
@@ -390,7 +466,7 @@ namespace Knockbox.Game
                     break;
                 case SimEventType.KO:
                 {
-                    // 큰 폭발. 진 쪽이 조각나는 연출 물리는 CP8.
+                    // 큰 폭발. 히트스탑 20틱 뒤 진 쪽 몸이 조각난다(UpdateKnockout).
                     var center = Fighter(e.Fighter).BodyCenter;
                     fx.RingBurst(center, palette.flash, 0.5f, 4.5f, 0.35f);
                     fx.Shards(center, Vector2.up, 360f, 10, palette.FighterBody(e.Fighter), 12f, 0.26f, 0.6f);
@@ -398,7 +474,7 @@ namespace Knockbox.Game
                         fx.ScreenFlash(false);
                     AddTrauma(0.6f);
                     Punch(0.03f, 12f * Frame);
-                    sfxPlayer.Play(Sfx.HitStrong);
+                    sfxPlayer.Play(Sfx.KO);
                     break;
                 }
             }

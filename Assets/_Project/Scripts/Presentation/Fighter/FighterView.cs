@@ -81,6 +81,8 @@ namespace Knockbox.Presentation
         float spin;
         float wobbleTime;
         float trailTimer;
+        float celebrateTime;
+        bool shattered;
 
         public LimbRig Rig => rig;
         /// <summary>그린 무기 끝(모드 B). 활성 틱에는 마지막 판정 원 중심과 같다.</summary>
@@ -90,6 +92,20 @@ namespace Knockbox.Presentation
         public SpriteRenderer Body => body;
         /// <summary>몸 그림의 월드 중심(떨림·변형 포함).</summary>
         public Vector2 BodyCenter => body.transform.position;
+
+        /// <summary>KO 파편으로 깨진 동안 몸과 팔다리를 숨긴다.</summary>
+        public void SetShattered(bool value)
+        {
+            shattered = value;
+            pose.gameObject.SetActive(!value);
+            rig.gameObject.SetActive(!value);
+            weaponOutline.enabled = weaponFill.enabled = weaponVisible && !value;
+        }
+
+        public bool Shattered => shattered;
+
+        /// <summary>이긴 쪽이 통통 튀며 기뻐한다(KO 연출, 연출 전용 오프셋).</summary>
+        public bool Celebrating { get; set; }
 
         /// <summary>몸 전체 흰색 번쩍임(초).</summary>
         public void Flash(float duration) => flashLeft = Mathf.Max(flashLeft, duration);
@@ -159,6 +175,9 @@ namespace Knockbox.Presentation
             shake = 0f;
             spin = 0f;
             trailTimer = 0f;
+            celebrateTime = 0f;
+            Celebrating = false;
+            SetShattered(false);
             for (int i = 0; i < GhostCount; i++)
             {
                 ghostAge[i] = ghostLife[i] = GhostLife;
@@ -220,6 +239,11 @@ namespace Knockbox.Presentation
                     // 손이 붙는 순간 짧은 번쩍임(붙잡힌 쪽).
                     Flash(2f / 60f);
                     break;
+                case SimEventType.Spike:
+                    Flash(3f / 60f);
+                    shake = Mathf.Max(shake, 0.06f);
+                    Impulse(new Vec2(0f, 1f), 0.25f);
+                    break;
                 case SimEventType.Throw:
                     Impulse(e.Direction, 0.3f);
                     trailTimer = 0f;
@@ -263,7 +287,14 @@ namespace Knockbox.Presentation
             if (!frozen && current.Action == ActionState.Charge && dt > 0f)
                 tremble = 0.008f + 0.022f * ChargeProgress(current, config);
             var jitter = tremble > 0f ? new Vector2(random.Range(-1f, 1f), random.Range(-1f, 1f)) * tremble : Vector2.zero;
-            pose.localPosition = new Vector3(wallShift + jitter.x, VisualLift - BodySize * 0.5f + jitter.y, 0f);
+            // 이긴 쪽 기쁨: 제자리에서 통통 튄다.
+            float hop = 0f;
+            if (Celebrating)
+            {
+                celebrateTime += dt;
+                hop = Mathf.Abs(Mathf.Sin(celebrateTime * 9f)) * 0.45f;
+            }
+            pose.localPosition = new Vector3(wallShift + jitter.x, VisualLift - BodySize * 0.5f + jitter.y + hop, 0f);
             pose.localScale = new Vector3(scale.x, scale.y, 1f);
             pose.localRotation = Quaternion.Euler(0f, 0f, tilt + spin);
 
@@ -339,7 +370,7 @@ namespace Knockbox.Presentation
         void UpdateWeapon(in FighterState f, bool visible, bool tipFixed, Vector2 tip)
         {
             weaponVisible = visible;
-            weaponOutline.enabled = weaponFill.enabled = visible;
+            weaponOutline.enabled = weaponFill.enabled = visible && !shattered;
             if (!visible)
                 return;
             int facing = f.Facing >= 0 ? 1 : -1;

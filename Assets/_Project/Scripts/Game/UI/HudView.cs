@@ -5,8 +5,9 @@ using UnityEngine;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// HUD 뼈대(05-presentation.md 6절): 머리 위 체력 바(폭 1.2, 높이 0.12, 줄어든 부분은 흰색으로 0.4초 남음),
-    /// 화면 위 가운데 라운드 점수 칸(양쪽 RoundsToWin칸). 월드 공간 스프라이트라 카메라 캡처에도 찍힌다.
+    /// HUD(05-presentation.md 6절): 머리 위 체력 바(폭 1.2, 높이 0.12, 줄어든 부분은 흰색으로 0.4초 남음),
+    /// 화면 위 가운데 라운드 점수 칸(양쪽 RoundsToWin칸), 가운데 큰 문구(READY·GO·KO·DRAW·P1 WINS, 영문만 — D-016)와
+    /// MatchEnd의 안내 문구. 월드 공간 스프라이트와 TextMesh라 카메라 캡처에도 찍힌다. 문구는 바뀔 때만 새로 만든다.
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
@@ -19,6 +20,10 @@ namespace Knockbox.Game
         const float SlotGap = 0.14f;
         const float SlotY = 8.5f;
         const int MaxSlots = 9;
+        const float BannerY = 1.6f;
+        const float SubY = -0.6f;
+        /// <summary>카운트다운 끝의 이 틱 동안 GO(06-match-and-tools.md 1절: 앞 60틱 READY, 뒤 30틱 GO).</summary>
+        public const int GoTicks = 30;
 
         struct Bar
         {
@@ -34,6 +39,16 @@ namespace Knockbox.Game
         readonly SpriteRenderer[] slots0 = new SpriteRenderer[MaxSlots];
         readonly SpriteRenderer[] slots1 = new SpriteRenderer[MaxSlots];
         PaletteAsset palette;
+        TextMesh banner;
+        TextMesh bannerShadow;
+        TextMesh sub;
+        string shownBanner;
+        string shownSub;
+        float bannerAge;
+
+        /// <summary>지금 가운데 문구(없으면 빈 문자열). 테스트·캡처 확인용.</summary>
+        public string Banner => shownBanner ?? "";
+        public string SubText => shownSub ?? "";
 
         public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)
         {
@@ -46,6 +61,9 @@ namespace Knockbox.Game
                 bars[i].Shown = 1f;
                 bars[i].Trailing = 1f;
             }
+            bannerShadow = CreateText("BannerShadow", 128, 0.2f, palette.shadow, 10);
+            banner = CreateText("Banner", 128, 0.2f, palette.ink, 11);
+            sub = CreateText("Sub", 64, 0.1f, palette.ink, 11);
             for (int k = 0; k < MaxSlots; k++)
             {
                 slots0[k] = ShapeLibrary.CreateSliced(transform, $"Score0_{k}", shapes.RoundedBody, SortingLayers.UI, 0, palette.terrainLip);
@@ -55,8 +73,87 @@ namespace Knockbox.Game
             }
         }
 
-        public void Render(in SimState state, Vector2 body0, Vector2 body1, int roundsToWin, float maxHealth, float dt)
+        TextMesh CreateText(string objectName, int fontSize, float characterSize, Color color, int order)
         {
+            var go = new GameObject(objectName);
+            go.transform.SetParent(transform, false);
+            var text = go.AddComponent<TextMesh>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var mr = go.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = text.font.material;
+            mr.sortingLayerName = SortingLayers.UI;
+            mr.sortingOrder = order;
+            text.fontSize = fontSize;
+            text.characterSize = characterSize;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.fontStyle = FontStyle.Bold;
+            text.color = PaletteAsset.ForText(color);
+            text.text = "";
+            return text;
+        }
+
+        /// <summary>경기 단계에 따른 가운데 문구와 색.</summary>
+        void ChooseBanner(in SimState state, in MatchParams match, out string text, out Color color, out string subText)
+        {
+            var m = state.Match;
+            subText = "";
+            switch (m.Phase)
+            {
+                case MatchPhase.Countdown:
+                    bool go = m.PhaseTick >= match.CountdownTicks - GoTicks;
+                    text = go ? "GO" : "READY";
+                    color = go ? palette.hazard : palette.ink;
+                    subText = go ? "" : $"ROUND {m.Round}";
+                    return;
+                case MatchPhase.KO:
+                case MatchPhase.RoundEnd:
+                case MatchPhase.RoundTransition:
+                    text = m.RoundWinner < 0 ? "DRAW" : "KO";
+                    color = palette.hazard;
+                    return;
+                case MatchPhase.MatchEnd:
+                    int winner = m.Score0 >= m.Score1 ? 0 : 1;
+                    text = winner == 0 ? "P1 WINS" : "P2 WINS";
+                    color = palette.FighterShade(winner);
+                    subText = m.PhaseTick >= match.MatchEndMinTicks ? "PRESS ANY BUTTON" : "";
+                    return;
+                default:
+                    text = "";
+                    color = palette.ink;
+                    return;
+            }
+        }
+
+        void RenderBanner(in SimState state, in MatchParams match, float dt)
+        {
+            ChooseBanner(state, match, out string text, out Color color, out string subText);
+            if (!string.Equals(text, shownBanner))
+            {
+                shownBanner = text;
+                banner.text = text;
+                bannerShadow.text = text;
+                bannerAge = 0f;
+            }
+            if (!string.Equals(subText, shownSub))
+            {
+                shownSub = subText;
+                sub.text = subText;
+            }
+            banner.color = PaletteAsset.ForText(color);
+            bannerAge += dt;
+            // 새 문구가 뜰 때 크게 튀어나왔다가 자리 잡는다.
+            float pop = 1f + 0.45f * Mathf.Exp(-bannerAge * 14f);
+            banner.transform.localPosition = new Vector3(0f, BannerY, 0f);
+            bannerShadow.transform.localPosition = new Vector3(0.14f, BannerY - 0.14f, 0f);
+            banner.transform.localScale = bannerShadow.transform.localScale = new Vector3(pop, pop, 1f);
+            sub.transform.localPosition = new Vector3(0f, SubY, 0f);
+        }
+
+        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, float dt)
+        {
+            int roundsToWin = match.RoundsToWin;
+            RenderBanner(state, match, dt);
             RenderBar(ref bars[0], body0, Health(state.Fighter0, maxHealth), dt);
             RenderBar(ref bars[1], body1, Health(state.Fighter1, maxHealth), dt);
 
