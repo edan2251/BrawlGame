@@ -25,11 +25,13 @@ namespace Knockbox.Game
         public const int WalkPeriod = 60;
         public const uint RandomSeed = 0xD077u;
 
-        RandomInputGenerator random = new RandomInputGenerator(RandomSeed);
+        RandomInputGenerator random;
 
-        public DummyInputSource(DummyBehavior behavior = DummyBehavior.Idle)
+        /// <param name="seed">무작위 행동의 시드. 두 허수아비를 맞붙일 때 서로 다르게 준다.</param>
+        public DummyInputSource(DummyBehavior behavior = DummyBehavior.Idle, uint seed = RandomSeed)
         {
             Behavior = behavior;
+            random = new RandomInputGenerator(seed);
         }
 
         public DummyBehavior Behavior { get; set; }

@@ -108,13 +108,15 @@ namespace Knockbox.Simulation
             else
                 StepFighter(ref s.Fighter1, p2, 1, s.Tick, out scratch1);
 
+            // 몸 충돌 판정은 이동 직후(밀어내기 전) 스냅숏의 접촉과 법선으로 한다.
+            var contact = BodyContact.Measure(s.Fighter0, s.Fighter1, Config);
             FighterPush.Resolve(ref s.Fighter0, ref s.Fighter1, prev0, prev1, frozen0, frozen1, Config, Arena);
             if (!frozen0)
                 FighterMovement.ResolveContacts(ref s.Fighter0, s.Fighter1, scratch0, Config, Arena, 0, s.Tick, Events);
             if (!frozen1)
                 FighterMovement.ResolveContacts(ref s.Fighter1, s.Fighter0, scratch1, Config, Arena, 1, s.Tick, Events);
 
-            FighterCombat.ResolveInteractions(ref s.Fighter0, ref s.Fighter1, frozen0, frozen1, Config, s.Tick, Events);
+            FighterCombat.ResolveInteractions(ref s.Fighter0, ref s.Fighter1, frozen0, frozen1, contact, Config, s.Tick, Events);
             CheckKnockout(ref s);
         }
 

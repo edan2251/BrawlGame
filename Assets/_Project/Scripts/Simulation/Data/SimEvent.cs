@@ -28,6 +28,10 @@ namespace Knockbox.Simulation
         /// <summary>패링 구간이 열림.</summary>
         ParryWindow,
         MatchEnd,
+        /// <summary>모드 A 돌진 발사. Direction은 발사 방향, Strength는 속도.</summary>
+        LungeStart,
+        /// <summary>몸 충돌 판정에서 계산한 위력(F3 오버레이용). Fighter의 위력이 Strength.</summary>
+        PowerCheck,
     }
 
     /// <summary>

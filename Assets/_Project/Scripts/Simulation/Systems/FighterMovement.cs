@@ -146,6 +146,7 @@ namespace Knockbox.Simulation
 
         /// <summary>
         /// 전투 상태의 속도. 가드: 최대 속도 GuardMaxSpeed, 점프·대시 불가. 공격: 지상은 감속만, 공중은 조작 × 0.5.
+        /// 충전(모드 A): 최대 속도 3, 공중 낙하 최대 4. 돌진: 조작 없음, 공중에서 중력 × 0.3.
         /// 피격 경직: 조작 불가, 중력 정상, 공중 감속 0(날아가는 관성 유지). 그 밖의 경직: 조작 없이 감속.
         /// </summary>
         static void IntegrateCombatState(ref FighterState f, SimConfig config, int moveX, int moveY, bool jumpHeld)
@@ -170,6 +171,16 @@ namespace Knockbox.Simulation
                     if (f.Grounded)
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     ApplyGravity(ref f, m, false, 0, 0);
+                    break;
+                case ActionState.Charge:
+                    ApplyHorizontal(ref f, m, moveX, c.Charge.ChargeMoveMaxSpeed, 1f, 1f);
+                    ApplyGravity(ref f, m, jumpHeld, 0, 0);
+                    if (!f.Grounded && f.Velocity.Y < -c.Charge.ChargeFallMaxSpeed)
+                        f.Velocity.Y = -c.Charge.ChargeFallMaxSpeed;
+                    break;
+                case ActionState.Lunge:
+                    if (!f.Grounded)
+                        f.Velocity.Y -= m.RiseGravity * c.Charge.LungeGravityMultiplier * dt;
                     break;
                 default:
                     f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, (f.Grounded ? m.GroundDecel : m.AirDecel) * dt);
@@ -306,6 +317,10 @@ namespace Knockbox.Simulation
             {
                 bounced = Rebound(ref f, contacts, config, index, tick, events);
             }
+            else if (f.Action == ActionState.Lunge)
+            {
+                bounced = LungeBounce(ref f, contacts, config, index, tick, events);
+            }
 
             int ground = FighterState.NoBox;
             if (!bounced && f.Velocity.Y <= 0f)
@@ -351,6 +366,14 @@ namespace Knockbox.Simulation
             else
             {
                 f.TicksSinceWall = SimMath.Min(f.TicksSinceWall + 1, FighterState.TimerCap);
+            }
+
+            // 돌진은 속도가 12 미만이 되거나 30틱이 지나면 끝나고 이동 상태로 돌아간다.
+            if (f.Action == ActionState.Lunge)
+            {
+                ref readonly var charge = ref config.Combat.Charge;
+                if (f.Velocity.LengthSquared < charge.LungeEndSpeed * charge.LungeEndSpeed || f.ActionTick >= charge.LungeMaxTicks)
+                    f.RestartAction(ActionState.Airborne);
             }
 
             if (!f.InMovementState)
@@ -435,6 +458,60 @@ namespace Knockbox.Simulation
             {
                 events.Add(new SimEvent(tick, SimEventType.BounceRebound, index, point, normal, strongest));
             }
+            return true;
+        }
+
+        /// <summary>
+        /// 돌진 중 지형에 부딪힘: 법선 기준 반사 × 0.6, 최대 2회. 그 뒤로 부딪히면 돌진이 끝난다.
+        /// 바닥을 미끄러지듯 스치는 접촉(법선 속도 BounceMinSpeed 미만)은 튕김으로 세지 않는다. 튕겼으면 true.
+        /// </summary>
+        static bool LungeBounce(ref FighterState f, in MoveContacts contacts, SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            float half = config.HalfBody;
+            float wall = contacts.HitWall != 0 ? contacts.WallImpactSpeed : 0f;
+            float floor = contacts.Landed ? contacts.ImpactSpeed : 0f;
+            float ceiling = contacts.HitCeiling ? contacts.CeilingImpactSpeed : 0f;
+            float strongest = SimMath.Max(wall, SimMath.Max(floor, ceiling));
+            if (strongest < c.BounceMinSpeed)
+                return false;
+            if (f.LungeBounces >= c.Charge.LungeMaxBounces)
+            {
+                f.RestartAction(ActionState.Airborne);
+                return false;
+            }
+
+            var v = f.Velocity;
+            if (contacts.HitWall != 0)
+                v.X = -contacts.HitWall * wall;
+            if (contacts.Landed)
+                v.Y = floor;
+            else if (contacts.HitCeiling)
+                v.Y = -ceiling;
+            f.Velocity = v * c.Charge.LungeBounceRestitution;
+            f.LungeBounces++;
+            f.Grounded = false;
+            f.GroundBox = FighterState.NoBox;
+            if (contacts.HitWall != 0)
+                f.Facing = (sbyte)-contacts.HitWall;
+
+            Vec2 normal, point;
+            if (wall >= floor && wall >= ceiling)
+            {
+                normal = new Vec2(-contacts.HitWall, 0f);
+                point = new Vec2(f.Position.X + contacts.HitWall * half, f.Position.Y);
+            }
+            else if (floor >= ceiling)
+            {
+                normal = new Vec2(0f, 1f);
+                point = new Vec2(f.Position.X, f.Position.Y - half);
+            }
+            else
+            {
+                normal = new Vec2(0f, -1f);
+                point = new Vec2(f.Position.X, f.Position.Y + half);
+            }
+            events.Add(new SimEvent(tick, SimEventType.BounceRebound, index, point, normal, strongest));
             return true;
         }
 

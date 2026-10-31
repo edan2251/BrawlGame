@@ -3,12 +3,124 @@ using System;
 namespace Knockbox.Simulation
 {
     /// <summary>
-    /// 공격 버튼이 무엇을 하는가(03-combat.md 1절). CP4는 테스트용 공격 하나만 있다.
-    /// 모드 A(돌진)와 B(휘두르기)는 CP5·CP6에서 추가한다.
+    /// 공격 버튼이 무엇을 하는가(03-combat.md 1절).
+    /// Test: 테스트용 공격(CP4). Charge: 모드 A 돌진 충돌(CP5). 모드 B(휘두르기)는 CP6에서 추가한다.
     /// </summary>
     public enum CombatMode : byte
     {
         Test,
+        Charge,
+    }
+
+    /// <summary>모드 A: 돌진 충돌(03-combat.md 4절). 위력 = max(0, 속도·법선) × 공격성 가중치.</summary>
+    [Serializable]
+    public struct ChargeModeParams
+    {
+        /// <summary>충전 중 지상(과 공중) 최대 이동 속도.</summary>
+        public float ChargeMoveMaxSpeed;
+        /// <summary>충전 중 공중 최대 낙하 속도(살짝 떠 있음).</summary>
+        public float ChargeFallMaxSpeed;
+        /// <summary>이보다 짧게 누르고 떼면 최소 돌진.</summary>
+        public int MinChargeTicks;
+        public int FullChargeTicks;
+        /// <summary>최대 충전 뒤 이만큼 더 누르고 있으면 자동 발사.</summary>
+        public int FullChargeHoldTicks;
+        public float LungeMinSpeed;
+        public float LungeMaxSpeed;
+        public float LungeGravityMultiplier;
+        /// <summary>속도가 이보다 작아지면 돌진이 끝난다.</summary>
+        public float LungeEndSpeed;
+        public int LungeMaxTicks;
+        public float LungeBounceRestitution;
+        public int LungeMaxBounces;
+        public float LungeAggression;
+        public float DashAggression;
+        /// <summary>위력이 이 이상이어야 피해를 준다.</summary>
+        public float PowerThreshold;
+        /// <summary>둘 다 기준 이상이고 위력 차이가 이보다 작으면 클래시.</summary>
+        public float ClashPowerMargin;
+        /// <summary>같은 두 파이터 사이의 몸 충돌 판정 간격.</summary>
+        public int ContactCooldownTicks;
+        /// <summary>몸이 이 거리 안이면 닿은 것으로 본다(밀어내기로 딱 붙은 상태 포함).</summary>
+        public float ContactSlop;
+        public float DamagePerPower;
+        public int MinDamage;
+        public int MaxDamage;
+        public float KnockbackPerPower;
+        public float MinKnockback;
+        /// <summary>이긴 쪽 속도 배율(살짝 튕겨 나옴).</summary>
+        public float WinnerVelocityScale;
+        /// <summary>패링당한 돌진의 반사 배율.</summary>
+        public float ParryReflectScale;
+        /// <summary>클래시 반동 속도 = max(ClashSpeed, 큰 위력 × 이 값).</summary>
+        public float ClashSpeedPerPower;
+
+        public static ChargeModeParams Default => new ChargeModeParams
+        {
+            ChargeMoveMaxSpeed = 3f,
+            ChargeFallMaxSpeed = 4f,
+            MinChargeTicks = 4,
+            FullChargeTicks = 36,
+            FullChargeHoldTicks = 24,
+            LungeMinSpeed = 18f,
+            LungeMaxSpeed = 34f,
+            LungeGravityMultiplier = 0.3f,
+            LungeEndSpeed = 12f,
+            LungeMaxTicks = 30,
+            LungeBounceRestitution = 0.6f,
+            LungeMaxBounces = 2,
+            LungeAggression = 1f,
+            DashAggression = 0.6f,
+            PowerThreshold = 6f,
+            ClashPowerMargin = 4f,
+            ContactCooldownTicks = 10,
+            ContactSlop = 0.05f,
+            DamagePerPower = 0.6f,
+            MinDamage = 4,
+            MaxDamage = 24,
+            KnockbackPerPower = 0.9f,
+            MinKnockback = 10f,
+            WinnerVelocityScale = -0.25f,
+            ParryReflectScale = 0.8f,
+            ClashSpeedPerPower = 0.35f,
+        };
+
+        /// <summary>충전 틱 → 돌진 속도(18 → 34 선형, MinChargeTicks 미만은 최소).</summary>
+        public readonly float LungeSpeed(int chargeTicks)
+        {
+            float ratio = chargeTicks < MinChargeTicks ? 0f : SimMath.Min(chargeTicks, FullChargeTicks) / (float)FullChargeTicks;
+            return LungeMinSpeed + (LungeMaxSpeed - LungeMinSpeed) * ratio;
+        }
+
+        public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
+        {
+            v.Value(nameof(ChargeMoveMaxSpeed), ChargeMoveMaxSpeed);
+            v.Value(nameof(ChargeFallMaxSpeed), ChargeFallMaxSpeed);
+            v.Value(nameof(MinChargeTicks), MinChargeTicks);
+            v.Value(nameof(FullChargeTicks), FullChargeTicks);
+            v.Value(nameof(FullChargeHoldTicks), FullChargeHoldTicks);
+            v.Value(nameof(LungeMinSpeed), LungeMinSpeed);
+            v.Value(nameof(LungeMaxSpeed), LungeMaxSpeed);
+            v.Value(nameof(LungeGravityMultiplier), LungeGravityMultiplier);
+            v.Value(nameof(LungeEndSpeed), LungeEndSpeed);
+            v.Value(nameof(LungeMaxTicks), LungeMaxTicks);
+            v.Value(nameof(LungeBounceRestitution), LungeBounceRestitution);
+            v.Value(nameof(LungeMaxBounces), LungeMaxBounces);
+            v.Value(nameof(LungeAggression), LungeAggression);
+            v.Value(nameof(DashAggression), DashAggression);
+            v.Value(nameof(PowerThreshold), PowerThreshold);
+            v.Value(nameof(ClashPowerMargin), ClashPowerMargin);
+            v.Value(nameof(ContactCooldownTicks), ContactCooldownTicks);
+            v.Value(nameof(ContactSlop), ContactSlop);
+            v.Value(nameof(DamagePerPower), DamagePerPower);
+            v.Value(nameof(MinDamage), MinDamage);
+            v.Value(nameof(MaxDamage), MaxDamage);
+            v.Value(nameof(KnockbackPerPower), KnockbackPerPower);
+            v.Value(nameof(MinKnockback), MinKnockback);
+            v.Value(nameof(WinnerVelocityScale), WinnerVelocityScale);
+            v.Value(nameof(ParryReflectScale), ParryReflectScale);
+            v.Value(nameof(ClashSpeedPerPower), ClashSpeedPerPower);
+        }
     }
 
     /// <summary>공격 판정 원 하나. 위치는 파이터 중심 기준이고 x는 바라보는 방향이다.</summary>
@@ -157,6 +269,7 @@ namespace Knockbox.Simulation
         public float AttackAirControlMultiplier;
 
         public AttackDef TestAttack;
+        public ChargeModeParams Charge;
 
         public static CombatParams Default => new CombatParams
         {
@@ -201,6 +314,7 @@ namespace Knockbox.Simulation
             AttackAirControlMultiplier = 0.5f,
 
             TestAttack = AttackDef.TestJab,
+            Charge = ChargeModeParams.Default,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -240,6 +354,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(AttackAirControlMultiplier), AttackAirControlMultiplier);
             v.Begin(nameof(TestAttack));
             TestAttack.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Charge));
+            Charge.Visit(ref v);
             v.End();
         }
     }

@@ -23,6 +23,10 @@ namespace Knockbox.Simulation
         /// <summary>클래시 반동.</summary>
         Recoil,
         KO,
+        /// <summary>모드 A: 공격 버튼을 누르고 있는 동안 충전. 행동 틱이 충전 틱이다.</summary>
+        Charge,
+        /// <summary>모드 A: 충전을 풀어 날아가는 돌진.</summary>
+        Lunge,
     }
 
     /// <summary>
@@ -93,6 +97,10 @@ namespace Knockbox.Simulation
         public int TicksSinceGuardPress;
         /// <summary>히트스탑 동안 새로 누른 버튼. 히트스탑이 끝난 첫 틱에 눌림으로 처리한다.</summary>
         public InputButtons PendingPresses;
+        /// <summary>이번 돌진이 지형에 튕긴 횟수.</summary>
+        public int LungeBounces;
+        /// <summary>남은 몸 충돌 판정 대기 틱(같은 두 파이터 사이 판정은 10틱에 한 번). 두 파이터가 같은 값을 갖는다.</summary>
+        public int ContactCooldown;
 
         public const int NoAttack = -1;
 
@@ -157,6 +165,8 @@ namespace Knockbox.Simulation
             v.Value(nameof(ParryTicks), ParryTicks);
             v.Value(nameof(TicksSinceGuardPress), TicksSinceGuardPress);
             v.Value(nameof(PendingPresses), (int)PendingPresses);
+            v.Value(nameof(LungeBounces), LungeBounces);
+            v.Value(nameof(ContactCooldown), ContactCooldown);
         }
     }
 }
