@@ -34,6 +34,11 @@ namespace Knockbox.EditorTools
         const int SamplesPerFrame = SampleRate / Fps;
         const int Candidates = 20;
         const int MaxFightTicks = 3600;
+        /// <summary>미리보기 장: 이 프레임마다(7.5fps) 384×216 칸 하나, 5 × 5 칸(약 3.3초)을 1920×1080 한 장에.</summary>
+        const int SheetStep = 8;
+        const int SheetColumns = 5;
+        const int ThumbWidth = Width / SheetColumns;
+        const int ThumbHeight = Height / SheetColumns;
         /// <summary>다음 라운드 카운트다운(READY, ROUND 2, 점수 칸)을 이만큼 보여 주고 끝낸다.</summary>
         const int TailTicks = 40;
 
@@ -214,6 +219,9 @@ namespace Knockbox.EditorTools
 
             var rt = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             var frameTexture = new Texture2D(Width, Height, TextureFormat.RGBA32, false);
+            var thumbRt = new RenderTexture(ThumbWidth, ThumbHeight, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var sheet = new Texture2D(Width, Height, TextureFormat.RGB24, false);
+            Directory.CreateDirectory(Path.Combine(Folder, "sheets"));
             var index = new StringBuilder();
             var jobs = Jobs();
             if (limit > 0 && jobs.Count > limit)
@@ -290,6 +298,8 @@ namespace Knockbox.EditorTools
                     int midFrame = chosen.FightStartFrame + chosen.FightingTicks / 2;
                     int koStill = Mathf.Min(chosen.KoFrame + 30, chosen.Frames);
                     var chunk = new NativeArray<float>(SamplesPerFrame * 2, Allocator.Persistent);
+                    int thumbs = 0, sheets = 0;
+                    ClearSheet(sheet);
                     using (var encoder = new MediaEncoder(videoPath, videoAttributes, audioAttributes))
                     {
                         runner.Begin(config, arena, SimState.CreateRound(config, arena, chosen.Seed, MatchPhase.Countdown));
@@ -304,6 +314,17 @@ namespace Knockbox.EditorTools
                             encoder.AddFrame(frameTexture);
                             NativeArray<float>.Copy(audio, frame * SamplesPerFrame * 2, chunk, 0, chunk.Length);
                             encoder.AddSamples(chunk);
+                            if (frame % SheetStep == 0)
+                            {
+                                AddThumb(rt, thumbRt, sheet, thumbs++);
+                                if (thumbs == SheetColumns * SheetColumns || frame + SheetStep > chosen.Frames)
+                                {
+                                    sheet.Apply();
+                                    File.WriteAllBytes(Path.Combine(Folder, "sheets", $"{job.Name}_{++sheets:00}.png"), sheet.EncodeToPNG());
+                                    thumbs = 0;
+                                    ClearSheet(sheet);
+                                }
+                            }
                             if (frame == midFrame)
                                 File.WriteAllBytes(basePath + "_mid.png", frameTexture.EncodeToPNG());
                             else if (frame == koStill)
@@ -332,13 +353,16 @@ namespace Knockbox.EditorTools
             {
                 rt.Release();
                 Object.Destroy(rt);
+                thumbRt.Release();
+                Object.Destroy(thumbRt);
+                Object.Destroy(sheet);
                 Object.Destroy(frameTexture);
                 AudioListener.volume = listenerVolume;
                 presenter.SetFighterLabels(true);
             }
             index.AppendLine();
             index.AppendLine("- 봇은 사람처럼 거리를 재거나 속이지 않는다. 규칙과 손맛이 실제 싸움에서 어떻게 보이는지 보는 용도.");
-            index.AppendLine("- `_mid.png`는 라운드 중간, `_ko.png`는 KO 0.5초 뒤 장면.");
+            index.AppendLine("- `_mid.png`는 라운드 중간, `_ko.png`는 KO 0.5초 뒤 장면. `sheets/`는 영상 전체를 0.13초 간격 25칸(약 3.3초)씩 모은 미리보기.");
             File.WriteAllText(Path.Combine(Folder, "index.md"), index.ToString(), new UTF8Encoding(false));
             string summary = $"[Knockbox] 봇 영상 {jobs.Count - failures}/{jobs.Count}개 저장: {Path.GetFullPath(Folder)} ({(System.DateTime.Now - started).TotalMinutes:F1}분)";
             if (failures > 0)
@@ -369,6 +393,27 @@ namespace Knockbox.EditorTools
                 camera.targetTexture = previousTarget;
                 RenderTexture.active = previousActive;
             }
+        }
+
+        /// <summary>방금 그린 1080p 화면을 미리보기 장의 n번째 칸(왼쪽 위부터)에 줄여 넣는다.</summary>
+        static void AddThumb(RenderTexture source, RenderTexture thumb, Texture2D sheet, int n)
+        {
+            var previous = RenderTexture.active;
+            Graphics.Blit(source, thumb);
+            RenderTexture.active = thumb;
+            int x = n % SheetColumns * ThumbWidth;
+            int y = Height - (n / SheetColumns + 1) * ThumbHeight;
+            sheet.ReadPixels(new Rect(0, 0, ThumbWidth, ThumbHeight), x, y);
+            RenderTexture.active = previous;
+        }
+
+        static void ClearSheet(Texture2D sheet)
+        {
+            var pixels = sheet.GetPixels32();
+            var background = new Color32(24, 26, 38, 255);
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = background;
+            sheet.SetPixels32(pixels);
         }
 
         /// <summary>기록한 효과음을 48 kHz 스테레오로 섞는다(음높이는 선형 보간 재표본화, 볼륨은 PlayOneShot 볼륨, 0.8 위는 부드럽게 제한).</summary>
