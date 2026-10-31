@@ -64,9 +64,14 @@ namespace Knockbox.Game
             }
             UpdateLabel(label0, "P1", state.Fighter0, ref shownKey0);
             UpdateLabel(label1, "P2", state.Fighter1, ref shownKey1);
-            Place(label0, fighter0);
-            Place(label1, fighter1);
+            // 가까이 붙으면 오른쪽 파이터의 글자를 한 줄 위로 올려 겹치지 않게 한다.
+            bool close = Mathf.Abs(fighter0.x - fighter1.x) < StackDistance && Mathf.Abs(fighter0.y - fighter1.y) < 1f;
+            Place(label0, fighter0, close && fighter0.x > fighter1.x ? LineHeight : 0f);
+            Place(label1, fighter1, close && fighter1.x >= fighter0.x ? LineHeight : 0f);
         }
+
+        const float StackDistance = 3.2f;
+        const float LineHeight = 0.42f;
 
         static void UpdateLabel(TextMesh label, string name, in FighterState f, ref int shownKey)
         {
@@ -82,10 +87,10 @@ namespace Knockbox.Game
             label.text = text;
         }
 
-        static void Place(TextMesh label, Vector3 position)
+        static void Place(TextMesh label, Vector3 position, float raise)
         {
             // 화면 가장자리에서 잘리지 않게 가로 위치만 안쪽으로 당긴다. 체력 바 위에 둔다.
-            label.transform.localPosition = new Vector3(Mathf.Clamp(position.x, -14.5f, 14.5f), position.y + 1.3f, 0f);
+            label.transform.localPosition = new Vector3(Mathf.Clamp(position.x, -14.5f, 14.5f), position.y + 1.3f + raise, 0f);
         }
     }
 }

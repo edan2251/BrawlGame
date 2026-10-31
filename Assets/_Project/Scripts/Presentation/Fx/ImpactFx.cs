@@ -74,6 +74,7 @@ namespace Knockbox.Presentation
         int nextShard, nextRing, nextRay, nextCrack;
         float flashAge = 1f;
         bool flashInvert;
+        bool flashShown;
 
         public int ActiveCount { get; private set; }
 
@@ -249,6 +250,7 @@ namespace Knockbox.Presentation
         {
             flashAge = 0f;
             flashInvert = invert;
+            flashShown = false;
             flash.enabled = true;
         }
 
@@ -352,8 +354,10 @@ namespace Knockbox.Presentation
                     active++;
             }
 
-            if (flash.enabled)
+            // 시간이 흐르지 않은 프레임(일시정지, 캡처 직전)에는 번쩍임을 진행하지 않는다.
+            if (flash.enabled && (dt > 0f || !flashShown))
             {
+                flashShown = true;
                 // 60Hz 기준 두 프레임: 색 반전 느낌이면 잉크 → 흰색, 아니면 흰색 한 프레임.
                 float frames = flashInvert ? 2f : 1f;
                 if (flashAge >= frames * FlashFrame - 1e-4f)

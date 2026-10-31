@@ -38,6 +38,7 @@ namespace Knockbox.Game
         readonly SimEvent[] queue = new SimEvent[EventQueueCapacity];
         int queued;
         double lastSimTime;
+        int renderedRound;
 
         // 디버그 글자 아래줄: 바뀔 때만 새로 만든다.
         string footer;
@@ -137,6 +138,7 @@ namespace Knockbox.Game
             fx.Clear();
             if (cameraRig != null)
                 cameraRig.ResetEffects();
+            renderedRound = r.World.State.Match.Round;
             queued = 0;
             lastSimTime = SimTime();
         }
@@ -185,6 +187,14 @@ namespace Knockbox.Game
             var previous = runner.PreviousState;
             var current = world.State;
             float alpha = runner.RenderAlpha;
+            if (current.Match.Round != renderedRound)
+            {
+                // 새 라운드(또는 새 경기): 시작 위치로 순간 이동했으므로 보간하지 않고 발을 새로 디딘다.
+                renderedRound = current.Match.Round;
+                fighter0.ResetPose();
+                fighter1.ResetPose();
+                alpha = 1f;
+            }
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
             dust.Tick(dt);
