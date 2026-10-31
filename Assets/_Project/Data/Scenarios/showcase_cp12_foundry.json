@@ -1,0 +1,16 @@
+{
+  "name": "showcase_cp12_foundry",
+  "arena": "Foundry",
+  "mode": "Charge",
+  "ticks": 50,
+  "p1": [
+    { "from": 0, "to": 30, "hold": ["Right"] },
+    { "at": 8, "press": ["Jump"], "holdFor": 12 }
+  ],
+  "p2": [
+    { "from": 0, "to": 30, "hold": ["Left"] }
+  ],
+  "captures": [
+    { "tick": 45, "name": "overview" }
+  ]
+}

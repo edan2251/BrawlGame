@@ -439,10 +439,27 @@ MonoBehaviour:
   grabEnabled: 1
   arenaFiles:
   - {fileID: 4900000, guid: 6e5e55105e542c54b86d1392e896a49d, type: 3}
+  - {fileID: 4900000, guid: 82e80efaef4633c419a4e258b0ecc8f8, type: 3}
+  - {fileID: 4900000, guid: 03b87e969e5a0ed41b176cc3b669a620, type: 3}
+  - {fileID: 4900000, guid: ef3cf1fcfa3d63c4da9a9c7afba68902, type: 3}
+  - {fileID: 4900000, guid: 18090887631de554b851d3bea4d7ef7e, type: 3}
   - {fileID: 4900000, guid: e0fd09015d77ddc4da74104009896ba1, type: 3}
+  - {fileID: 4900000, guid: 67c8df3b37074014c855eea5f2164ff9, type: 3}
   - {fileID: 4900000, guid: e5ff03fb447f936449090f4eadd7167d, type: 3}
+  - {fileID: 4900000, guid: d07b2caab472ced458461ed74cb46f47, type: 3}
+  arenaMetaFiles:
+  - {fileID: 4900000, guid: 8f99199c325d8424194432d6969f31f1, type: 3}
+  - {fileID: 4900000, guid: 9e9c5bc2b56c03e49b3505088be6ace1, type: 3}
+  - {fileID: 4900000, guid: bcbb5723e221f1941b0fd317cf88da82, type: 3}
+  - {fileID: 4900000, guid: 8734635d574e14e4abbacb6504b586f7, type: 3}
+  - {fileID: 4900000, guid: 8d0072060bca1bd4a8d401bf0e34a3e5, type: 3}
+  - {fileID: 4900000, guid: 3e0f9add114180045ba3f0a75cb95dba, type: 3}
+  - {fileID: 4900000, guid: c6ca9366bde17b8449d8dd102f37d257, type: 3}
+  - {fileID: 4900000, guid: 2e11041fdf7ce5b4589bdb088d5b5568, type: 3}
+  - {fileID: 4900000, guid: 50025e9d41d3b8947ba4775239b41e70, type: 3}
   arenaName: Box
   seed: 1
+  randomizeSeed: 0
   inputDelayTicks: 0
   startOnAwake: 0
   skipCountdown: 0

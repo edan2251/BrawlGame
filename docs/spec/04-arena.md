@@ -163,3 +163,8 @@ name: Box
 - 같은 시드면 같은 맵 순서, 6라운드 안에 중복 없음, SyncTest 통과.
 - 모드 A Smart 봇으로 맵마다 라운드 평균 10~30초.
 
+### 구현 (CP12)
+
+- 크기 36 × 20, 카메라는 세로 전체·좌우 벽 0.5 이상(S-107). 격자 `Data/Arenas/<이름>.txt` + 짝 파일 `<이름>.json` `{ "theme": "A", "light": [0, 25], "rotation": true, "props": [] }`(S-108).
+- 맵: A Crossing·Foundry, B Gallery·Pillars, C Terrace·Vault(S-111). 순환은 `MatchState.Rotation`(S-109). F2와 Main 씬 설정은 S-110.
+

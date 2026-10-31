@@ -20,6 +20,7 @@ namespace Knockbox.EditorTools
         const string PendingKey = "Knockbox.ScenarioCapture.Pending";
         const string LabelKey = "Knockbox.ScenarioCapture.Label";
         const string ResolutionModeKey = "Knockbox.ScenarioCapture.Resolutions";
+        const string PrefixKey = "Knockbox.ScenarioCapture.Prefix";
         const string ProgressPath = "docs/progress/PROGRESS.md";
         /// <summary>CP3-4: 여러 해상도에서 레이아웃과 HUD를 확인할 시나리오.</summary>
         const string ResolutionScenario = "showcase_cp3_presentation";
@@ -42,7 +43,15 @@ namespace Knockbox.EditorTools
         [MenuItem("Knockbox/Run Scenario Captures (Resolutions)")]
         public static void RunResolutions() => Run(CurrentCheckpointLabel(), true);
 
-        public static void Run(string label, bool resolutions)
+        /// <summary>현재 CP의 showcase_cpN_ 시나리오만 찍는다.</summary>
+        [MenuItem("Knockbox/Run Scenario Captures (Current CP)")]
+        public static void RunCurrent()
+        {
+            string label = CurrentCheckpointLabel();
+            Run(label, false, "showcase_" + label.ToLowerInvariant() + "_");
+        }
+
+        public static void Run(string label, bool resolutions, string prefix = "showcase_")
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -54,6 +63,7 @@ namespace Knockbox.EditorTools
             EditorSceneManager.OpenScene(ProjectSetup.SandboxScenePath, OpenSceneMode.Single);
             SessionState.SetString(LabelKey, label);
             SessionState.SetBool(ResolutionModeKey, resolutions);
+            SessionState.SetString(PrefixKey, prefix);
             SessionState.SetBool(PendingKey, true);
             EditorApplication.isPlaying = true;
         }
@@ -67,14 +77,14 @@ namespace Knockbox.EditorTools
             return match.Success ? match.Groups[1].Value : "adhoc";
         }
 
-        public static List<ScenarioDef> LoadShowcases()
+        public static List<ScenarioDef> LoadShowcases(string prefix = "showcase_")
         {
             var list = new List<ScenarioDef>();
             var files = ScenarioJson.ListFiles();
             System.Array.Sort(files, System.StringComparer.Ordinal);
             foreach (string path in files)
             {
-                if (Path.GetFileName(path).StartsWith("showcase_", System.StringComparison.Ordinal))
+                if (Path.GetFileName(path).StartsWith(prefix, System.StringComparison.Ordinal))
                     list.Add(ScenarioJson.LoadFile(path));
             }
             return list;
@@ -101,7 +111,7 @@ namespace Knockbox.EditorTools
                 player.StartCoroutine(RunResolutionCaptures(player, label, camera));
                 return;
             }
-            var scenarios = LoadShowcases();
+            var scenarios = LoadShowcases(SessionState.GetString(PrefixKey, "showcase_"));
             player.StartCoroutine(player.RunCaptures(scenarios, label, camera, saved =>
             {
                 Debug.Log($"[Knockbox] 시나리오 캡처 {saved.Count}장 저장: {ScenarioPlayer.CaptureFolder(label)}\n" + string.Join("\n", saved));
