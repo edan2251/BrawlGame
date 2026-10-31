@@ -431,6 +431,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Knockbox.Game::Knockbox.Game.MatchRunner
   movementTuning: {fileID: 11400000, guid: 751081705e6226444a225c2dd641e04f, type: 2}
+  combatTuning: {fileID: 11400000, guid: e8c588e3c815b434b8e3625d02ee981d, type: 2}
+  mode: 0
   arenaFiles:
   - {fileID: 4900000, guid: 6e5e55105e542c54b86d1392e896a49d, type: 3}
   - {fileID: 4900000, guid: e0fd09015d77ddc4da74104009896ba1, type: 3}

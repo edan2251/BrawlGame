@@ -38,6 +38,16 @@ namespace Knockbox.Presentation
             }
         }
 
+        public void Clear()
+        {
+            for (int i = 0; i < Capacity; i++)
+            {
+                puffs[i].Age = Life;
+                renderers[i].enabled = false;
+            }
+            ActiveCount = 0;
+        }
+
         /// <summary>count개(2~4)를 바닥을 따라 옆으로 흩뿌린다. direction은 주로 퍼질 방향(0이면 양쪽).</summary>
         public void Burst(Vector2 position, int count, float spread, float direction)
         {

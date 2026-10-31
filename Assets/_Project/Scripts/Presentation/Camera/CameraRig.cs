@@ -8,6 +8,7 @@ namespace Knockbox.Presentation
     /// 남는 부분은 카메라 배경색(bgBase)으로 레터박스가 된다.
     /// 흔들림: 트라우마 방식. 오프셋 = 최대 진폭 0.35 × 트라우마² × 노이즈, 트라우마는 시간에 따라 줄어든다.
     /// 흔들림 줄이기(F7)를 켜면 30%로 줄인다.
+    /// 확대(Punch): 강한 명중·벽꽝 순간 직교 크기를 잠깐 줄여(예: 1.5%, 6프레임) 화면을 당긴다.
     /// </summary>
     [RequireComponent(typeof(Camera))]
     public sealed class CameraRig : MonoBehaviour
@@ -23,6 +24,8 @@ namespace Knockbox.Presentation
         Vector3 basePosition;
         float trauma;
         float noiseTime;
+        float zoomAmount;
+        float zoomLeft;
 
         /// <summary>흔들림 줄이기(F7). 켜면 흔들림 30%, 화면 전체 번쩍임과 색 반전 끔(CP4).</summary>
         public bool ReduceMotion { get; set; }
@@ -37,12 +40,29 @@ namespace Knockbox.Presentation
 
         public void AddTrauma(float amount) => trauma = Mathf.Clamp01(trauma + amount);
 
+        /// <summary>duration초 동안 화면을 amount 비율만큼 확대한다. 겹치면 큰 쪽.</summary>
+        public void Punch(float amount, float duration)
+        {
+            zoomAmount = zoomLeft > 0f ? Mathf.Max(zoomAmount, amount) : amount;
+            zoomLeft = Mathf.Max(zoomLeft, duration);
+        }
+
+        public float Zoom => zoomLeft > 0f ? zoomAmount : 0f;
+
+        /// <summary>흔들림과 확대를 멈춘다(라운드·시나리오 시작).</summary>
+        public void ResetEffects()
+        {
+            trauma = 0f;
+            zoomLeft = 0f;
+        }
+
         /// <summary>연출 시간으로 진행한다(멈추면 흔들림도 멈춘다).</summary>
         public void Tick(float dt)
         {
             if (cam == null)
                 Awake();
             Frame();
+            zoomLeft = Mathf.Max(0f, zoomLeft - dt);
             noiseTime += dt;
             trauma = Mathf.Max(0f, trauma - TraumaDecay * dt);
             float amount = MaxShake * trauma * trauma * (ReduceMotion ? ReducedShakeScale : 1f);
@@ -56,7 +76,7 @@ namespace Knockbox.Presentation
         {
             float aspect = cam.aspect;
             float sizeForWidth = ArenaHalfWidth / Mathf.Max(aspect, 0.01f);
-            cam.orthographicSize = Mathf.Max(ArenaHalfHeight, sizeForWidth);
+            cam.orthographicSize = Mathf.Max(ArenaHalfHeight, sizeForWidth) * (1f - Zoom);
         }
     }
 }

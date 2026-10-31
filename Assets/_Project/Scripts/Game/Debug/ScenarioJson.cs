@@ -43,6 +43,7 @@ namespace Knockbox.Game
                 Arena = GetString(root, "arena", "Box"),
                 Mode = GetString(root, "mode", ""),
                 Grab = GetBool(root, "grab", true),
+                Overlay = GetBool(root, "overlay", false),
                 Ticks = GetInt(root, "ticks", -1),
                 Seed = (uint)GetInt(root, "seed", 1),
             };
@@ -61,7 +62,31 @@ namespace Knockbox.Game
             def.P2 = ReadInputs(root, "p2");
             def.Captures = ReadCaptures(root);
             def.Expects = ReadExpects(root);
+            def.Tuning = ReadTuning(root);
+            // 모드 이름과 튜닝 경로가 맞는지 읽을 때 확인한다.
+            ScenarioConfig.Create(def);
             return def;
+        }
+
+        static ScenarioTuning[] ReadTuning(Dictionary<string, object> root)
+        {
+            if (!root.TryGetValue("tuning", out object value) || value == null)
+                return new ScenarioTuning[0];
+            var obj = AsObject(value, "tuning");
+            var result = new ScenarioTuning[obj.Count];
+            int i = 0;
+            foreach (var pair in obj)
+            {
+                var t = new ScenarioTuning { Path = pair.Key };
+                switch (pair.Value)
+                {
+                    case double d: t.Number = d; break;
+                    case bool b: t.IsBool = true; t.Flag = b; break;
+                    default: throw new FormatException($"tuning.{pair.Key}: 숫자나 참/거짓이 필요함");
+                }
+                result[i++] = t;
+            }
+            return result;
         }
 
         static ScenarioInput[] ReadInputs(Dictionary<string, object> root, string key)

@@ -28,6 +28,8 @@ namespace Knockbox.Game
         readonly InputDelayQueue delay2 = new InputDelayQueue();
         SyncTest<SimWorld> syncTest;
         double lastRealtime;
+        /// <summary>StartNewMatch로 튜닝 에셋에서 만든 경기만 라운드 사이에 튜닝을 다시 읽는다(시나리오 덮어쓰기 보존).</summary>
+        bool configFromTuning;
 
         public SimWorld World { get; private set; }
         public SimState PreviousState { get; private set; }
@@ -117,6 +119,7 @@ namespace Knockbox.Game
                 Player2Input = GamepadInputSource.Available(0) ? new GamepadInputSource(0) : new KeyboardInputSource(KeyboardLayout.Right);
             }
             Begin(config, arena, SimState.CreateRound(config, arena, seed, phase));
+            configFromTuning = true;
         }
 
         public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, mode);
@@ -143,6 +146,7 @@ namespace Knockbox.Game
         {
             World = new SimWorld(config, arena, initial);
             PreviousState = initial;
+            configFromTuning = false;
             delay1.Reset(inputDelayTicks);
             delay2.Reset(inputDelayTicks);
             clock.Reset();
@@ -243,6 +247,8 @@ namespace Knockbox.Game
         /// </summary>
         void ApplyTuningAtRoundTransition()
         {
+            if (!configFromTuning)
+                return;
             var config = CreateConfig();
             if (config.ComputeChecksum() == World.Config.ComputeChecksum())
                 return;

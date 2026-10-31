@@ -50,6 +50,10 @@ namespace Knockbox.Presentation
         bool planted;
         float runPhase;
         float idleTime;
+        bool handOverride;
+        bool armsInFront;
+        Vector2 overrideFront;
+        Vector2 overrideBack;
 
         /// <summary>IK 목표점(발 중심).</summary>
         public Vector2 FootPosition(int side) => feet[side];
@@ -84,7 +88,27 @@ namespace Knockbox.Presentation
         }
 
         /// <summary>순간 이동(라운드 시작, 시나리오 시작) 뒤에는 발을 새로 디딘다.</summary>
-        public void ResetPose() => planted = false;
+        public void ResetPose()
+        {
+            planted = false;
+            handOverride = false;
+        }
+
+        /// <summary>
+        /// 이번 프레임의 손 목표를 직접 정한다(공격, 가드). front는 바라보는 쪽 팔.
+        /// bothInFront면 두 팔을 모두 몸 앞에 그린다(가드 때 팔을 교차).
+        /// </summary>
+        public void SetHands(Vector2 front, Vector2 back, bool bothInFront)
+        {
+            handOverride = true;
+            overrideFront = front;
+            overrideBack = back;
+            armsInFront = bothInFront;
+        }
+
+        public void ClearHands() => handOverride = false;
+
+        public Vector2 Hand(int side) => hands[side];
 
         /// <param name="hips">왼쪽(0)·오른쪽(1) 엉덩이 월드 위치.</param>
         /// <param name="shoulders">왼쪽(0)·오른쪽(1) 어깨 월드 위치.</param>
@@ -125,7 +149,7 @@ namespace Knockbox.Presentation
                 drawnKnees[side] = knee;
                 Draw(legs[side], hip, knee, foot, LegThickness, legsBehind ? SortingLayers.LimbBack : layer);
                 var elbow = TwoBoneIK.Solve(shoulder, hands[side], ArmUpper, ArmLower, side == 0 ? -1f : 1f, out var hand);
-                Draw(arms[side], shoulder, elbow, hand, ArmThickness, layer);
+                Draw(arms[side], shoulder, elbow, hand, ArmThickness, handOverride && armsInFront ? SortingLayers.LimbFront : layer);
             }
         }
 
@@ -237,6 +261,12 @@ namespace Knockbox.Presentation
             float speed = Mathf.Abs(f.Velocity.X);
             runPhase += speed * dt * 2.2f;
             int front = facing > 0 ? 1 : 0;
+            if (handOverride)
+            {
+                hands[front] = overrideFront;
+                hands[1 - front] = overrideBack;
+                return;
+            }
             for (int side = 0; side < 2; side++)
             {
                 Vector2 shoulder = side == 0 ? shoulder0 : shoulder1;

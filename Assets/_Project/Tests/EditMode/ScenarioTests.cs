@@ -23,9 +23,23 @@ namespace Knockbox.Tests.EditMode
         public void Scenario_ExpectsPass(string name)
         {
             var def = ScenarioJson.LoadByName(name);
-            var result = ScenarioRun.Run(def, SimConfig.CreateDefault(), ArenaFiles.LoadByName(def.Arena));
+            var result = ScenarioRun.Run(def, ScenarioConfig.Create(def), ArenaFiles.LoadByName(def.Arena));
             Assert.AreEqual(def.Ticks, result.TicksRun);
             Assert.IsTrue(result.Passed, $"{name} 실패 {result.Failures.Count}건:\n" + string.Join("\n", result.Failures));
+        }
+
+        [Test]
+        public void TuningOverride_ChangesConfig()
+        {
+            const string json = @"{ ""ticks"": 10, ""tuning"": {
+                ""Combat.MaxHealth"": 30, ""Combat.TestAttack.KnockbackStrength"": 20,
+                ""Match.RoundsToWin"": 2, ""Movement.DashJumpCancelEnabled"": false } }";
+            var config = ScenarioConfig.Create(ScenarioJson.Parse(json));
+            Assert.AreEqual(30, config.Combat.MaxHealth);
+            Assert.AreEqual(20f, config.Combat.TestAttack.KnockbackStrength);
+            Assert.AreEqual(2, config.Match.RoundsToWin);
+            Assert.IsFalse(config.Movement.DashJumpCancelEnabled);
+            Assert.AreEqual(MovementParams.Default.MaxRunSpeed, config.Movement.MaxRunSpeed, "덮어쓰지 않은 값은 그대로");
         }
 
         [Test]
@@ -74,6 +88,9 @@ namespace Knockbox.Tests.EditMode
         [TestCase(@"{ ""ticks"": 10, ""expect"": [ { ""tick"": 1, ""field"": ""hp.max"", ""min"": 0 } ] }", "hp.max")]
         [TestCase(@"{ ""ticks"": 10, ""p1"": [ { ""from"": 0, ""at"": 3, ""hold"": [""Left""] } ] }", "하나만")]
         [TestCase(@"{ ""ticks"": 0 }", "ticks")]
+        [TestCase(@"{ ""ticks"": 10, ""mode"": ""Kick"" }", "Kick")]
+        [TestCase(@"{ ""ticks"": 10, ""tuning"": { ""Combat.NoSuchField"": 1 } }", "NoSuchField")]
+        [TestCase(@"{ ""ticks"": 10, ""tuning"": { ""Combat.MaxHealth"": 1.5 } }", "정수")]
         [TestCase(@"{ ""ticks"": 10, }", "JSON")]
         public void InvalidScenario_ReportsReadableError(string json, string fragment)
         {

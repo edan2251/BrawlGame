@@ -25,6 +25,7 @@ namespace Knockbox.EditorTools
 
         public const string TuningFolder = "Assets/_Project/Data/Tuning";
         public const string MovementTuningPath = TuningFolder + "/MovementTuning.asset";
+        public const string CombatTuningPath = TuningFolder + "/CombatTuning.asset";
         public const string ArtFolder = "Assets/_Project/Art";
         public const string PalettePath = ArtFolder + "/Palette.asset";
         public const string ArenasFolder = "Assets/_Project/Data/Arenas";
@@ -51,6 +52,7 @@ namespace Knockbox.EditorTools
         public static void CreateMissingTuningAssets()
         {
             CreateAssetIfMissing<MovementTuning>(MovementTuningPath);
+            CreateAssetIfMissing<CombatTuning>(CombatTuningPath);
             CreateAssetIfMissing<PaletteAsset>(PalettePath);
         }
 
@@ -160,6 +162,8 @@ namespace Knockbox.EditorTools
                 runnerSo.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }
+
+            changed |= FillReference(runner, "combatTuning", AssetDatabase.LoadAssetAtPath<CombatTuning>(CombatTuningPath));
 
             var presenter = runner.GetComponent<MatchPresenter>();
             if (presenter == null)

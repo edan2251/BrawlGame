@@ -4,8 +4,8 @@ using UnityEngine;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// 디버그 글자: 왼쪽 위에 틱과 경기 단계, 파이터 위에 행동 상태. 캡처에도 찍히도록 월드 공간 TextMesh로 그린다.
-    /// F3 판정 오버레이(CP4)가 생기면 그쪽으로 옮긴다.
+    /// 디버그 글자: 왼쪽 위에 틱과 경기 단계, 왼쪽 아래에 맵·모드·P2 입력원, 파이터 위에 행동 상태와 남은 경직·히트스탑.
+    /// 캡처에도 찍히도록 월드 공간 TextMesh로 그린다. 판정 원과 몸 상자는 F3 HitboxOverlay가 그린다.
     /// </summary>
     public sealed class DebugStateLabels : MonoBehaviour
     {
@@ -45,35 +45,41 @@ namespace Knockbox.Game
         }
 
         int shownTick = -1;
-        ActionState shown0 = (ActionState)255;
-        ActionState shown1 = (ActionState)255;
-        string shownArena;
+        int shownKey0 = -1;
+        int shownKey1 = -1;
+        string shownFooter;
 
-        /// <summary>값이 바뀔 때만 글자를 새로 만든다(디버그 글자라도 매 프레임 할당은 피한다).</summary>
-        public void Render(in SimState state, Vector3 fighter0, Vector3 fighter1, string arena)
+        /// <summary>값이 바뀔 때만 글자를 새로 만든다(디버그 글자라도 매 프레임 할당은 피한다). footer는 참조가 바뀔 때만.</summary>
+        public void Render(in SimState state, Vector3 fighter0, Vector3 fighter1, string footerText)
         {
             if (state.Tick != shownTick)
             {
                 shownTick = state.Tick;
-                header.text = $"tick {state.Tick}  {state.Match.Phase}";
+                header.text = $"tick {state.Tick}  {state.Match.Phase}  round {state.Match.Round}";
             }
-            if (!ReferenceEquals(arena, shownArena))
+            if (!ReferenceEquals(footerText, shownFooter))
             {
-                shownArena = arena;
-                footer.text = $"{arena} / mode -";
+                shownFooter = footerText;
+                footer.text = footerText;
             }
-            if (state.Fighter0.Action != shown0)
-            {
-                shown0 = state.Fighter0.Action;
-                label0.text = $"P1 {shown0}";
-            }
-            if (state.Fighter1.Action != shown1)
-            {
-                shown1 = state.Fighter1.Action;
-                label1.text = $"P2 {shown1}";
-            }
+            UpdateLabel(label0, "P1", state.Fighter0, ref shownKey0);
+            UpdateLabel(label1, "P2", state.Fighter1, ref shownKey1);
             Place(label0, fighter0);
             Place(label1, fighter1);
+        }
+
+        static void UpdateLabel(TextMesh label, string name, in FighterState f, ref int shownKey)
+        {
+            int key = (int)f.Action | (f.StunTicks << 8) | (f.HitstopTicks << 20);
+            if (key == shownKey)
+                return;
+            shownKey = key;
+            string text = $"{name} {f.Action}";
+            if (f.StunTicks > 0)
+                text += $" {f.StunTicks}";
+            if (f.HitstopTicks > 0)
+                text += $" hs{f.HitstopTicks}";
+            label.text = text;
         }
 
         static void Place(TextMesh label, Vector3 position)

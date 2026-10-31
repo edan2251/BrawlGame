@@ -15,3 +15,9 @@ MonoBehaviour:
   jump: {fileID: 8300000, guid: e6b5d96df9b26fe4db2585ec86778d66, type: 3}
   land: {fileID: 8300000, guid: 83180b3ada707ba49814e625f11b1ecf, type: 3}
   dash: {fileID: 8300000, guid: e158438219f0c0740a214a37b4d4788a, type: 3}
+  hitWeak: {fileID: 8300000, guid: 06dabb3927480da4ab4a3165bb605885, type: 3}
+  hitStrong: {fileID: 8300000, guid: 5edd5573b5463ff409f93866792d0b09, type: 3}
+  clash: {fileID: 8300000, guid: 5f7be8fef22c9284bbd4b20e8ea31f02, type: 3}
+  parry: {fileID: 8300000, guid: dbdb8acc69678ea4b8d1bd626236996f, type: 3}
+  guard: {fileID: 8300000, guid: 261d8e53112cc3e4c85412c2518d2e38, type: 3}
+  wallSplat: {fileID: 8300000, guid: af4258bbd70b7a2458ff34d61fc60fc4, type: 3}

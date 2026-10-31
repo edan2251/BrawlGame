@@ -207,7 +207,7 @@ namespace Knockbox.Tests.PlayMode
                     yield return null;
                 Assert.IsTrue(player.Finished, def.Name);
                 Assert.AreEqual(0, player.FailureCount, def.Name);
-                var headless = ScenarioRun.Run(def, SimConfig.CreateDefault(), ArenaFiles.LoadByName(def.Arena));
+                var headless = ScenarioRun.Run(def, ScenarioConfig.Create(def), ArenaFiles.LoadByName(def.Arena));
                 Assert.AreEqual(headless.FinalChecksum, runner.World.ComputeChecksum(), $"{def.Name}: 연출을 켠 실행과 시뮬레이션만의 실행이 다름");
                 played++;
             }

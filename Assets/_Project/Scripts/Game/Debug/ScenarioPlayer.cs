@@ -52,13 +52,16 @@ namespace Knockbox.Game
         {
             Current = def;
             FailureCount = 0;
-            var config = SimConfigFactory.Create(runner.Tuning);
+            var config = ScenarioConfig.Create(def, runner.Tuning, runner.CombatTuning);
             var arena = runner.ResolveArena(def.Arena);
             runner.InputDelayTicks = 0;
             runner.Begin(config, arena, ScenarioInputs.CreateInitialState(def, config, arena));
             runner.Player1Input = new FrameArrayInputSource(ScenarioInputs.Build(def.P1, def.Ticks));
             runner.Player2Input = new FrameArrayInputSource(ScenarioInputs.Build(def.P2, def.Ticks));
             runner.StopAtTick = def.Ticks;
+            var presenter = runner.GetComponent<MatchPresenter>();
+            if (presenter != null)
+                presenter.SetOverlay(def.Overlay);
             runner.Ticked -= OnTicked;
             runner.Ticked += OnTicked;
             Evaluate(runner.World.State);

@@ -78,10 +78,80 @@ def dash(rng):
     return [s * 1.4 for s in out]
 
 
+def noise_burst(rng, duration, decay, amount):
+    n = int(duration * RATE)
+    return lowpass([(rng.random() * 2.0 - 1.0) * envelope(i / RATE, 0.001, decay) for i in range(n)], amount)
+
+
+def bells(rng, duration, partials, decay):
+    """비조화 배음의 합(금속성). partials 는 (주파수, 세기) 목록."""
+    n = int(duration * RATE)
+    phases = [rng.random() * 2.0 * math.pi for _ in partials]
+    out = []
+    for i in range(n):
+        t = i / RATE
+        value = sum(a * math.sin(phases[j] + 2.0 * math.pi * f * t) for j, (f, a) in enumerate(partials))
+        out.append(value * envelope(t, 0.001, decay))
+    return out
+
+
+def mix(*layers):
+    n = max(len(layer) for _, layer in layers)
+    out = [0.0] * n
+    for gain, layer in layers:
+        for i, x in enumerate(layer):
+            out[i] += gain * x
+    return out
+
+
+def hit_weak(rng):
+    thump = sweep(0.12, 240.0, 90.0, rng, attack=0.001, decay=0.03)
+    snap = noise_burst(rng, 0.12, 0.012, 0.55)
+    return mix((0.8, thump), (0.7, snap))
+
+
+def hit_strong(rng):
+    thump = sweep(0.24, 170.0, 42.0, rng, attack=0.001, decay=0.06)
+    crunch = noise_burst(rng, 0.24, 0.035, 0.3)
+    snap = noise_burst(rng, 0.05, 0.006, 0.8)
+    return mix((0.9, thump), (0.6, crunch), (0.5, snap))
+
+
+def clash(rng):
+    ring = bells(rng, 0.38, [(1250.0, 1.0), (1873.0, 0.7), (2631.0, 0.55), (3417.0, 0.35)], 0.09)
+    click = noise_burst(rng, 0.05, 0.004, 0.9)
+    return mix((0.7, ring), (0.6, click))
+
+
+def parry(rng):
+    ting = bells(rng, 0.42, [(1975.0, 1.0), (3950.0, 0.35), (5925.0, 0.12)], 0.13)
+    click = noise_burst(rng, 0.03, 0.003, 0.9)
+    return mix((0.8, ting), (0.3, click))
+
+
+def guard(rng):
+    block = sweep(0.12, 320.0, 170.0, rng, noise=0.15, attack=0.001, decay=0.025, shape="square")
+    thud = noise_burst(rng, 0.12, 0.02, 0.2)
+    return mix((0.6, block), (0.7, thud))
+
+
+def wall_splat(rng):
+    boom = sweep(0.4, 120.0, 38.0, rng, attack=0.001, decay=0.1)
+    rubble = noise_burst(rng, 0.4, 0.09, 0.12)
+    crack = noise_burst(rng, 0.06, 0.008, 0.85)
+    return mix((1.0, boom), (0.7, rubble), (0.55, crack))
+
+
 SOUNDS = {
     "jump": (jump, 101),
     "land": (land, 102),
     "dash": (dash, 103),
+    "hitWeak": (hit_weak, 104),
+    "hitStrong": (hit_strong, 105),
+    "clash": (clash, 106),
+    "parry": (parry, 107),
+    "guard": (guard, 108),
+    "wallSplat": (wall_splat, 109),
 }
 
 

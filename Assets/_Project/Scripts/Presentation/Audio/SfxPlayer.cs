@@ -7,6 +7,12 @@ namespace Knockbox.Presentation
         Jump,
         Land,
         Dash,
+        HitWeak,
+        HitStrong,
+        Clash,
+        Parry,
+        Guard,
+        WallSplat,
     }
 
     /// <summary>

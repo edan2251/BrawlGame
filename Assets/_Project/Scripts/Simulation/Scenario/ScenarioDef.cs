@@ -9,6 +9,8 @@ namespace Knockbox.Simulation
         public string Arena = "Box";
         public string Mode = "";
         public bool Grab = true;
+        /// <summary>캡처할 때 F3 판정 오버레이를 켠다(연출 전용, 시뮬레이션과 무관).</summary>
+        public bool Overlay;
         public int Ticks;
         public uint Seed = 1;
         public bool HasSpawn;
@@ -18,6 +20,17 @@ namespace Knockbox.Simulation
         public ScenarioInput[] P2 = new ScenarioInput[0];
         public ScenarioCapture[] Captures = new ScenarioCapture[0];
         public ScenarioExpect[] Expects = new ScenarioExpect[0];
+        /// <summary>튜닝 덮어쓰기("Combat.MaxHealth": 30 같은 경로와 값). 적용은 Game 계층(ScenarioConfig)이 한다.</summary>
+        public ScenarioTuning[] Tuning = new ScenarioTuning[0];
+    }
+
+    /// <summary>튜닝 값 하나의 덮어쓰기. Path는 "Movement.", "Match.", "Combat."으로 시작하는 필드 경로.</summary>
+    public struct ScenarioTuning
+    {
+        public string Path;
+        public double Number;
+        public bool IsBool;
+        public bool Flag;
     }
 
     /// <summary>방향 입력의 비트 표현. 같은 틱에 좌우가 함께 눌리면 서로 상쇄한다.</summary>

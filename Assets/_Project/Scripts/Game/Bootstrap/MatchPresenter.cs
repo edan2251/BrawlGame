@@ -8,13 +8,14 @@ namespace Knockbox.Game
     /// MatchRunner의 상태와 이벤트를 연출 계층에 넘긴다. 연출은 상태를 읽기만 하고 시뮬레이션에 쓰지 않는다.
     /// 연출 시간은 시뮬레이션 시간((틱 + 보간 비율) / 60)으로 진행한다. 멈추면 연출도 멈추고,
     /// 캡처처럼 한 틱씩 진행해도 실제 플레이와 같은 모습이 나온다.
+    /// 타격 연출(05-presentation.md 4절)은 여러 연출을 같은 순간에 겹친다: 번쩍임, 떨림, 파편, 고리, 흔들림, 확대, 효과음.
     /// </summary>
     [RequireComponent(typeof(MatchRunner))]
     public sealed class MatchPresenter : MonoBehaviour
     {
         const int EventQueueCapacity = 256;
         const float MaxFrameDt = 0.1f;
-        const float MaxHealth = 100f;
+        const float Frame = 1f / 60f;
 
         [SerializeField] PaletteAsset palette;
         [SerializeField] ShapeLibrary shapes;
@@ -27,14 +28,23 @@ namespace Knockbox.Game
         FighterView fighter0;
         FighterView fighter1;
         DustPool dust;
+        ImpactFx fx;
         HudView hud;
         SfxPlayer sfxPlayer;
         CameraRig cameraRig;
         DebugStateLabels labels;
+        HitboxOverlay overlay;
 
         readonly SimEvent[] queue = new SimEvent[EventQueueCapacity];
         int queued;
         double lastSimTime;
+
+        // 디버그 글자 아래줄: 바뀔 때만 새로 만든다.
+        string footer;
+        string footerArena;
+        CombatMode footerMode;
+        IInputSource footerP2;
+        DummyBehavior footerDummy;
 
         public PaletteAsset Palette
         {
@@ -44,8 +54,10 @@ namespace Knockbox.Game
 
         public FighterView Fighter(int index) => index == 0 ? fighter0 : fighter1;
         public DustPool Dust => dust;
+        public ImpactFx Fx => fx;
         public CameraRig CameraRig => cameraRig;
         public SfxPlayer SfxPlayer => sfxPlayer;
+        public bool OverlayVisible => overlay != null && overlay.gameObject.activeSelf;
 
         /// <summary>마지막 LateUpdate에서 쓴 연출 dt(초).</summary>
         public float LastDt { get; private set; }
@@ -66,6 +78,8 @@ namespace Knockbox.Game
             fighter1 = CreateFighter(1);
             dust = Create<DustPool>("Dust");
             dust.Setup(palette, shapes);
+            fx = Create<ImpactFx>("Impact Fx");
+            fx.Setup(palette, shapes);
             hud = Create<HudView>("Hud");
             hud.Setup(palette, shapes);
             sfxPlayer = Create<SfxPlayer>("Sfx");
@@ -75,6 +89,9 @@ namespace Knockbox.Game
                 labels = Create<DebugStateLabels>("Debug Labels");
                 labels.Setup(palette.ink);
             }
+            overlay = Create<HitboxOverlay>("Hitbox Overlay");
+            overlay.Setup(palette, shapes);
+            overlay.gameObject.SetActive(false);
 
             var cam = Camera.main;
             if (cam != null)
@@ -116,6 +133,10 @@ namespace Knockbox.Game
             arenaView.Build(r.World.Arena, palette, shapes);
             fighter0.ResetPose();
             fighter1.ResetPose();
+            dust.Clear();
+            fx.Clear();
+            if (cameraRig != null)
+                cameraRig.ResetEffects();
             queued = 0;
             lastSimTime = SimTime();
         }
@@ -135,6 +156,13 @@ namespace Knockbox.Game
         {
             if (labels != null)
                 labels.gameObject.SetActive(visible);
+        }
+
+        /// <summary>F3 판정 오버레이.</summary>
+        public void SetOverlay(bool visible)
+        {
+            if (overlay != null)
+                overlay.gameObject.SetActive(visible);
         }
 
         void LateUpdate() => RenderFrame();
@@ -157,20 +185,52 @@ namespace Knockbox.Game
             var previous = runner.PreviousState;
             var current = world.State;
             float alpha = runner.RenderAlpha;
-            float half = world.Config.HalfBody;
-            float maxRun = world.Config.Movement.MaxRunSpeed;
-            fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, half, maxRun);
-            fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, half, maxRun);
+            fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
+            fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
             dust.Tick(dt);
             if (cameraRig != null)
                 cameraRig.Tick(dt);
+            fx.Tick(dt, cameraRig != null ? (Vector2)cameraRig.transform.position : Vector2.zero);
 
             Vector2 body0 = fighter0.transform.localPosition;
             Vector2 body1 = fighter1.transform.localPosition;
-            hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift), world.Config.Match.RoundsToWin, MaxHealth, dt);
+            hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
+                world.Config.Match.RoundsToWin, world.Config.Combat.MaxHealth, dt);
             if (labels != null && labels.gameObject.activeSelf)
-                labels.Render(current, body0, body1, world.Arena.Name);
+                labels.Render(current, body0, body1, Footer(world));
+            if (overlay.gameObject.activeSelf)
+                overlay.Render(current, world.Config);
         }
+
+        string Footer(SimWorld world)
+        {
+            var p2 = runner.Player2Input;
+            var dummy = p2 is DummyInputSource d ? d.Behavior : DummyBehavior.Idle;
+            if (footer == null || !ReferenceEquals(world.Arena.Name, footerArena) || world.Config.Mode != footerMode
+                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy)
+            {
+                footerArena = world.Arena.Name;
+                footerMode = world.Config.Mode;
+                footerP2 = p2;
+                footerDummy = dummy;
+                footer = $"{footerArena} / mode {footerMode} / P2 {InputSourceName(p2)}";
+            }
+            return footer;
+        }
+
+        public static string InputSourceName(IInputSource source)
+        {
+            switch (source)
+            {
+                case KeyboardInputSource _: return "keyboard";
+                case GamepadInputSource _: return "gamepad";
+                case DummyInputSource d: return "dummy " + d.Behavior;
+                case FrameArrayInputSource _: return "scenario";
+                default: return source == null ? "none" : "idle";
+            }
+        }
+
+        static Vector2 V(Vec2 v) => new Vector2(v.X, v.Y);
 
         void Consume(in SimEvent e)
         {
@@ -181,6 +241,9 @@ namespace Knockbox.Game
 
             float half = runner.World.Config.HalfBody;
             var feet = new Vector2(e.Position.X, e.Position.Y - half);
+            // 몸 그림은 충돌 상자보다 VisualLift만큼 위에 있으므로 몸에 생기는 연출은 그만큼 올린다.
+            var onBody = V(e.Position) + new Vector2(0f, FighterView.VisualLift);
+            bool reduceMotion = cameraRig != null && cameraRig.ReduceMotion;
             switch (e.Type)
             {
                 case SimEventType.Land:
@@ -210,7 +273,95 @@ namespace Knockbox.Game
                     dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 2, 1.6f, -e.Direction.X);
                     sfxPlayer.Play(Sfx.Dash);
                     break;
+
+                case SimEventType.Hit:
+                {
+                    // 맞은 쪽 4프레임·때린 쪽 3프레임 번쩍임, 공격자 색 파편 6~10개, 흰 고리, 데미지 비례 흔들림, 15 이상이면 확대.
+                    int attacker = 1 - e.Fighter;
+                    float damage = e.Strength;
+                    Fighter(attacker).Flash(3f * Frame);
+                    fx.Shards(onBody, V(e.Direction), 75f, Mathf.Clamp(6 + Mathf.RoundToInt(damage / 4f), 6, 10), palette.FighterBody(attacker), 8f + damage * 0.35f, 0.24f);
+                    fx.RingBurst(onBody, palette.flash, 0.3f, 1.5f + damage * 0.04f);
+                    AddTrauma(0.2f + damage * 0.016f);
+                    if (damage >= 15f)
+                        Punch(0.015f, 6f * Frame);
+                    sfxPlayer.Play(damage >= 15f ? Sfx.HitStrong : Sfx.HitWeak);
+                    break;
+                }
+                case SimEventType.GuardHit:
+                    fx.RingBurst(onBody, palette.ink, 0.25f, 0.9f, 0.15f);
+                    fx.Shards(onBody, V(e.Direction), 60f, 3, palette.shadow, 6f, 0.14f, 0.3f);
+                    AddTrauma(0.12f);
+                    sfxPlayer.Play(Sfx.Guard);
+                    break;
+                case SimEventType.Parry:
+                {
+                    // 패링한 쪽 색의 고리 폭발, 짧은 화면 색 반전(흔들림 줄이기에서는 끔), 높은 "팅".
+                    var center = Fighter(e.Fighter).BodyCenter;
+                    var color = palette.FighterBody(e.Fighter);
+                    fx.RingBurst(center, color, 0.6f, 3.2f, 0.28f);
+                    fx.RingBurst(center, palette.flash, 0.3f, 2.0f, 0.18f);
+                    Fighter(e.Fighter).FlashOutline(4f * Frame);
+                    if (!reduceMotion)
+                        fx.ScreenFlash(true);
+                    AddTrauma(0.25f);
+                    sfxPlayer.Play(Sfx.Parry);
+                    break;
+                }
+                case SimEventType.Clash:
+                    // 접점의 별 모양 폭발과 불꽃, 양쪽 외곽선 번쩍임, 중간 흔들림, 금속성 소리.
+                    fx.Star(onBody, 8, 1.1f);
+                    fx.Sparks(onBody, 12, 15f);
+                    fx.RingBurst(onBody, palette.spark, 0.2f, 1.2f, 0.15f);
+                    fighter0.FlashOutline(4f * Frame);
+                    fighter1.FlashOutline(4f * Frame);
+                    AddTrauma(0.3f);
+                    sfxPlayer.Play(Sfx.Clash);
+                    break;
+                case SimEventType.WallSplat:
+                {
+                    // 금 간 자국, 먼지 폭발, 강한 흔들림, 확대, 묵직한 충돌음, 작은 지형 파편.
+                    var point = V(e.Position);
+                    var normal = V(e.Direction);
+                    fx.Crack(point, normal);
+                    dust.Burst(point, 4, 2.6f, Mathf.Abs(normal.x) > 0.5f ? normal.x : 0f);
+                    fx.Shards(point, normal, 110f, 6, palette.ink, 7f, 0.15f, 0.55f);
+                    fx.RingBurst(point, palette.flash, 0.3f, 1.8f, 0.2f);
+                    AddTrauma(0.5f);
+                    Punch(0.02f, 8f * Frame);
+                    sfxPlayer.Play(Sfx.WallSplat);
+                    break;
+                }
+                case SimEventType.BounceRebound:
+                    dust.Burst(V(e.Position), 2, 1.2f, Mathf.Abs(e.Direction.X) > 0.5f ? e.Direction.X : 0f);
+                    sfxPlayer.Play(Sfx.Land, 0.5f);
+                    break;
+                case SimEventType.KO:
+                {
+                    // 큰 폭발. 진 쪽이 조각나는 연출 물리는 CP8.
+                    var center = Fighter(e.Fighter).BodyCenter;
+                    fx.RingBurst(center, palette.flash, 0.5f, 4.5f, 0.35f);
+                    fx.Shards(center, Vector2.up, 360f, 10, palette.FighterBody(e.Fighter), 12f, 0.26f, 0.6f);
+                    if (!reduceMotion)
+                        fx.ScreenFlash(false);
+                    AddTrauma(0.6f);
+                    Punch(0.03f, 12f * Frame);
+                    sfxPlayer.Play(Sfx.HitStrong);
+                    break;
+                }
             }
+        }
+
+        void AddTrauma(float amount)
+        {
+            if (cameraRig != null)
+                cameraRig.AddTrauma(amount);
+        }
+
+        void Punch(float amount, float duration)
+        {
+            if (cameraRig != null)
+                cameraRig.Punch(amount, duration);
         }
     }
 }

@@ -7,7 +7,6 @@ namespace Knockbox.Game
     /// <summary>
     /// HUD 뼈대(05-presentation.md 6절): 머리 위 체력 바(폭 1.2, 높이 0.12, 줄어든 부분은 흰색으로 0.4초 남음),
     /// 화면 위 가운데 라운드 점수 칸(양쪽 RoundsToWin칸). 월드 공간 스프라이트라 카메라 캡처에도 찍힌다.
-    /// 체력은 CP4에서 상태에 생긴다. 그 전까지는 가득 찬 바를 그린다.
     /// </summary>
     public sealed class HudView : MonoBehaviour
     {
@@ -78,8 +77,7 @@ namespace Knockbox.Game
             }
         }
 
-        /// <summary>CP4에서 FighterState에 체력이 생기면 여기서 읽는다.</summary>
-        static float Health(in FighterState f, float maxHealth) => 1f;
+        static float Health(in FighterState f, float maxHealth) => maxHealth > 0f ? f.Health / maxHealth : 0f;
 
         void RenderBar(ref Bar bar, Vector2 body, float fraction, float dt)
         {
