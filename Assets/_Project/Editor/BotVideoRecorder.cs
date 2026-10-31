@@ -363,7 +363,9 @@ namespace Knockbox.EditorTools
             index.AppendLine();
             index.AppendLine("- 봇은 사람처럼 거리를 재거나 속이지 않는다. 규칙과 손맛이 실제 싸움에서 어떻게 보이는지 보는 용도.");
             index.AppendLine("- `_mid.png`는 라운드 중간, `_ko.png`는 KO 0.5초 뒤 장면. `sheets/`는 영상 전체를 0.13초 간격 25칸(약 3.3초)씩 모은 미리보기.");
-            File.WriteAllText(Path.Combine(Folder, "index.md"), index.ToString(), new UTF8Encoding(false));
+            // 한 편만 찍는 시험(First Only)은 16편 목록을 덮어쓰지 않는다.
+            if (limit == 0)
+                File.WriteAllText(Path.Combine(Folder, "index.md"), index.ToString(), new UTF8Encoding(false));
             string summary = $"[Knockbox] 봇 영상 {jobs.Count - failures}/{jobs.Count}개 저장: {Path.GetFullPath(Folder)} ({(System.DateTime.Now - started).TotalMinutes:F1}분)";
             if (failures > 0)
                 Debug.LogError(summary + $", 실패·불일치 {failures}");
