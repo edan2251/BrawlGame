@@ -9,8 +9,12 @@ namespace Knockbox.Simulation
         /// <summary>착지 직전의 아래 방향 속력.</summary>
         public float ImpactSpeed;
         public bool HitCeiling;
+        /// <summary>천장에 닿기 직전의 위 방향 속력.</summary>
+        public float CeilingImpactSpeed;
         /// <summary>이번 틱에 가로로 막힌 쪽. -1 왼쪽, 1 오른쪽, 0 없음.</summary>
         public int HitWall;
+        /// <summary>벽에 닿기 직전의 가로 속력.</summary>
+        public float WallImpactSpeed;
         public bool OutOfBounds;
     }
 
@@ -33,6 +37,8 @@ namespace Knockbox.Simulation
             float sx = dx / steps;
             float sy = dy / steps;
             float fallSpeed = -velocity.Y;
+            float riseSpeed = velocity.Y;
+            float sideSpeed = SimMath.Abs(velocity.X);
 
             for (int i = 0; i < steps; i++)
             {
@@ -42,6 +48,7 @@ namespace Knockbox.Simulation
                     if (ResolveX(ref position, sx > 0f ? 1 : -1, half, arena))
                     {
                         contacts.HitWall = sx > 0f ? 1 : -1;
+                        contacts.WallImpactSpeed = sideSpeed;
                         velocity.X = 0f;
                         sx = 0f;
                     }
@@ -65,6 +72,7 @@ namespace Knockbox.Simulation
                     if (ResolveUp(ref position, half, arena))
                     {
                         contacts.HitCeiling = true;
+                        contacts.CeilingImpactSpeed = riseSpeed;
                         velocity.Y = 0f;
                         sy = 0f;
                     }

@@ -12,6 +12,8 @@ namespace Knockbox.Game
     public sealed class MatchRunner : MonoBehaviour
     {
         [SerializeField] MovementTuning movementTuning;
+        [SerializeField] CombatTuning combatTuning;
+        [SerializeField] CombatMode mode = CombatMode.Test;
         [SerializeField] TextAsset[] arenaFiles;
         [SerializeField] string arenaName = "Box";
         [SerializeField] uint seed = 1;
@@ -73,6 +75,19 @@ namespace Knockbox.Game
             set => movementTuning = value;
         }
 
+        public CombatTuning CombatTuning
+        {
+            get => combatTuning;
+            set => combatTuning = value;
+        }
+
+        /// <summary>다음 StartNewMatch부터 적용된다.</summary>
+        public CombatMode Mode
+        {
+            get => mode;
+            set => mode = value;
+        }
+
         public int InputDelayTicks
         {
             get => inputDelayTicks;
@@ -93,7 +108,7 @@ namespace Knockbox.Game
         /// <summary>튜닝을 다시 읽어 새 경기를 시작한다.</summary>
         public void StartNewMatch()
         {
-            var config = SimConfigFactory.Create(movementTuning);
+            var config = CreateConfig();
             var arena = ResolveArena(arenaName);
             var phase = skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
             if (useLocalDevices)
@@ -103,6 +118,8 @@ namespace Knockbox.Game
             }
             Begin(config, arena, SimState.CreateRound(config, arena, seed, phase));
         }
+
+        public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, mode);
 
         /// <summary>등록된 맵 텍스트에서 찾고, 에디터에서는 없으면 디스크에서 읽는다.</summary>
         public ArenaDef ResolveArena(string name)
@@ -201,18 +218,40 @@ namespace Knockbox.Game
                 World.Step(p1, p2);
             }
             TicksRun++;
+            bool roundTransition = false;
             for (int i = 0; i < World.Events.Count; i++)
             {
                 ref readonly var e = ref World.Events[i];
                 if (e.Type == SimEventType.OutOfBounds)
                     Debug.LogWarning($"[Knockbox] 경기장 밖으로 나가 되돌림(버그 신호): {e}");
+                else if (e.Type == SimEventType.RoundTransition)
+                    roundTransition = true;
             }
             if (World.Events.Dropped > 0)
                 Debug.LogWarning($"[Knockbox] 이벤트 버퍼가 넘쳐 {World.Events.Dropped}개를 버림(틱 {World.State.Tick})");
             Ticked?.Invoke(this);
+            if (roundTransition)
+                ApplyTuningAtRoundTransition();
 
             if (StopAtTick > 0 && World.State.Tick >= StopAtTick)
                 Running = false;
+        }
+
+        /// <summary>
+        /// RoundTransition 훅: 튜닝을 다시 읽어 다음 라운드부터 반영한다(06-match-and-tools.md 1절).
+        /// 바뀐 것이 없으면 그대로 둔다. 바뀌면 입력 기록과 SyncTest는 이 지점 이전과 설정이 달라진다.
+        /// </summary>
+        void ApplyTuningAtRoundTransition()
+        {
+            var config = CreateConfig();
+            if (config.ComputeChecksum() == World.Config.ComputeChecksum())
+                return;
+            World.ReplaceConfig(config);
+            Debug.Log("[Knockbox] 다음 라운드부터 바뀐 튜닝을 적용함");
+            if (Recording != null)
+                Debug.LogWarning("[Knockbox] 기록 도중 설정이 바뀌어 이 입력 기록은 재생 결과가 달라질 수 있음");
+            if (syncTest != null)
+                syncTest = new SyncTest<SimWorld>(World, syncTest.RollbackTicks);
         }
     }
 }

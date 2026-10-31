@@ -6,16 +6,16 @@ using NUnit.Framework;
 namespace Knockbox.Tests.EditMode
 {
     /// <summary>
-    /// CP2-11: P1과 P2를 바꾸고 x를 뒤집은 경기의 결과가 뒤집어서 일치한다(오차 1e-4).
+    /// CP2-11: P1과 P2를 바꾸고 x를 뒤집은 경기의 결과가 뒤집어서 일치한다(오차 1e-4). CP4부터 전투 필드도 비교한다.
     /// CP2-12: 이동이 들어간 상태로 세 맵에서 결정론·SyncTest.
     /// </summary>
     public class SymmetryTests
     {
         const float Tolerance = 1e-4f;
 
-        static InputFrame Mirror(InputFrame f) => new InputFrame(-f.MoveX, f.MoveY, f.Buttons);
+        internal static InputFrame Mirror(InputFrame f) => new InputFrame(-f.MoveX, f.MoveY, f.Buttons);
 
-        static void AssertMirrored(in FighterState a, in FighterState b, int tick, string who)
+        internal static void AssertMirrored(in FighterState a, in FighterState b, int tick, string who)
         {
             string at = $"틱 {tick} {who}";
             Assert.AreEqual(a.Position.X, -b.Position.X, Tolerance, at + " pos.x");
@@ -28,6 +28,14 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(a.WallSide, -b.WallSide, at + " wallSide");
             Assert.AreEqual(a.AirJumpsLeft, b.AirJumpsLeft, at + " airJumps");
             Assert.AreEqual(a.DashCharges, b.DashCharges, at + " dashCharges");
+            Assert.AreEqual(a.ActionTick, b.ActionTick, at + " actionTick");
+            Assert.AreEqual(a.Health, b.Health, at + " hp");
+            Assert.AreEqual(a.HitstopTicks, b.HitstopTicks, at + " hitstop");
+            Assert.AreEqual(a.StunTicks, b.StunTicks, at + " stun");
+            Assert.AreEqual(a.ComboHits, b.ComboHits, at + " combo");
+            Assert.AreEqual(a.AttackId, b.AttackId, at + " attack");
+            Assert.AreEqual(a.AttackHasHit, b.AttackHasHit, at + " attackHasHit");
+            Assert.AreEqual(a.ParryTicks, b.ParryTicks, at + " parry");
         }
 
         [TestCase(11u)]

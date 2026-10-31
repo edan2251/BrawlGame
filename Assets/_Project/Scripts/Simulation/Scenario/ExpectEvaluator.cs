@@ -8,7 +8,7 @@ namespace Knockbox.Simulation
     /// </summary>
     public static class ExpectEvaluator
     {
-        public const string SupportedFields = "tick, phase, pos.x, pos.y, vel.x, vel.y, facing, action, actionTick, grounded, wallSide, airJumps, dashCharges";
+        public const string SupportedFields = "tick, phase, round, score, roundWinner, pos.x, pos.y, vel.x, vel.y, facing, action, actionTick, grounded, wallSide, airJumps, dashCharges, hp, hitstop, stun, combo, parry";
         public const float EqualsTolerance = 1e-4f;
 
         enum Kind { Number, Bool, Text }
@@ -75,6 +75,9 @@ namespace Knockbox.Simulation
             {
                 case "tick": number = s.Tick; return true;
                 case "phase": kind = Kind.Text; text = s.Match.Phase.ToString(); return true;
+                case "round": number = s.Match.Round; return true;
+                case "score": number = s.Match.GetScore(fighter); return true;
+                case "roundWinner": number = s.Match.RoundWinner; return true;
                 case "pos.x": number = f.Position.X; return true;
                 case "pos.y": number = f.Position.Y; return true;
                 case "vel.x": number = f.Velocity.X; return true;
@@ -86,6 +89,11 @@ namespace Knockbox.Simulation
                 case "wallSide": number = f.WallSide; return true;
                 case "airJumps": number = f.AirJumpsLeft; return true;
                 case "dashCharges": number = f.DashCharges; return true;
+                case "hp": number = f.Health; return true;
+                case "hitstop": number = f.HitstopTicks; return true;
+                case "stun": number = f.StunTicks; return true;
+                case "combo": number = f.ComboHits; return true;
+                case "parry": number = f.ParryTicks; return true;
                 default: return false;
             }
         }

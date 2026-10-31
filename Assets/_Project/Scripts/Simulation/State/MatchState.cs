@@ -2,7 +2,10 @@ using System;
 
 namespace Knockbox.Simulation
 {
-    /// <summary>경기 흐름(06-match-and-tools.md 1절). CP1은 Countdown → Fighting만 동작한다.</summary>
+    /// <summary>
+    /// 경기 흐름(06-match-and-tools.md 1절).
+    /// Countdown → Fighting → KO → RoundEnd(1틱) → RoundTransition(1틱, 훅) → Countdown, 또는 RoundEnd → MatchEnd.
+    /// </summary>
     public enum MatchPhase : byte
     {
         Countdown,
@@ -23,6 +26,10 @@ namespace Knockbox.Simulation
         public int Round;
         public int Score0;
         public int Score1;
+        /// <summary>마지막 KO의 승자. 0, 1, 또는 무승부·미정이면 -1.</summary>
+        public int RoundWinner;
+
+        public readonly int GetScore(int fighter) => fighter == 0 ? Score0 : Score1;
 
         public void SetPhase(MatchPhase phase)
         {
@@ -37,6 +44,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(Round), Round);
             v.Value(nameof(Score0), Score0);
             v.Value(nameof(Score1), Score1);
+            v.Value(nameof(RoundWinner), RoundWinner);
         }
     }
 }

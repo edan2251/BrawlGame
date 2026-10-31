@@ -2,7 +2,10 @@ using System;
 
 namespace Knockbox.Simulation
 {
-    /// <summary>파이터의 행동 상태. 전투 상태는 CP4에서 늘어난다.</summary>
+    /// <summary>
+    /// 파이터의 행동 상태. Idle~Dash는 이동 규칙이 정하는 상태(조작 가능), 나머지는 전투 상태다.
+    /// 경직 계열(Hitstun, GuardStun, Stagger, Recoil)은 StunTicks가 끝날 때까지 조작할 수 없다.
+    /// </summary>
     public enum ActionState : byte
     {
         Idle,
@@ -10,6 +13,16 @@ namespace Knockbox.Simulation
         Airborne,
         WallSlide,
         Dash,
+        Attack,
+        /// <summary>가드 버튼을 누르고 있음. 누른 순간부터 ParryTicks 동안은 패링 구간.</summary>
+        Guard,
+        Hitstun,
+        GuardStun,
+        /// <summary>패링당해 비틀거림.</summary>
+        Stagger,
+        /// <summary>클래시 반동.</summary>
+        Recoil,
+        KO,
     }
 
     /// <summary>
@@ -63,10 +76,45 @@ namespace Knockbox.Simulation
         public int DropThroughTicks;
         public int DropThroughBox;
 
+        public int Health;
+        /// <summary>남은 히트스탑 틱. 0보다 크면 이 파이터는 위치, 속도, 행동 타이머가 멈춘다.</summary>
+        public int HitstopTicks;
+        /// <summary>경직 계열 상태의 남은 틱.</summary>
+        public int StunTicks;
+        /// <summary>지금 이어지는 연속 명중 횟수. 피격 경직이 풀리면 0.</summary>
+        public int ComboHits;
+        /// <summary>진행 중인 공격 번호(SimConfig.GetAttack). 공격 중이 아니면 NoAttack.</summary>
+        public int AttackId;
+        /// <summary>이번 공격이 이미 상대에게 닿았다(한 번 휘두를 때 같은 상대는 한 번만).</summary>
+        public bool AttackHasHit;
+        /// <summary>남은 패링 구간 틱.</summary>
+        public int ParryTicks;
+        /// <summary>마지막으로 가드 버튼을 누른 뒤 지난 틱(패링 재사용 제한).</summary>
+        public int TicksSinceGuardPress;
+        /// <summary>히트스탑 동안 새로 누른 버튼. 히트스탑이 끝난 첫 틱에 눌림으로 처리한다.</summary>
+        public InputButtons PendingPresses;
+
+        public const int NoAttack = -1;
+
+        /// <summary>이동 규칙이 행동을 정하는 상태(조작 가능).</summary>
+        public readonly bool InMovementState => Action <= ActionState.Dash;
+
+        public readonly bool IsStunned =>
+            Action == ActionState.Hitstun || Action == ActionState.GuardStun || Action == ActionState.Stagger || Action == ActionState.Recoil;
+
+        public readonly bool IsGuarding => Action == ActionState.Guard || Action == ActionState.GuardStun;
+
         public void SetAction(ActionState action)
         {
             if (Action == action)
                 return;
+            Action = action;
+            ActionTick = 0;
+        }
+
+        /// <summary>같은 상태라도 처음부터 다시 시작한다(연속 피격 등).</summary>
+        public void RestartAction(ActionState action)
+        {
             Action = action;
             ActionTick = 0;
         }
@@ -100,6 +148,15 @@ namespace Knockbox.Simulation
             v.Value(nameof(WallJumpLockDirection), (int)WallJumpLockDirection);
             v.Value(nameof(DropThroughTicks), DropThroughTicks);
             v.Value(nameof(DropThroughBox), DropThroughBox);
+            v.Value(nameof(Health), Health);
+            v.Value(nameof(HitstopTicks), HitstopTicks);
+            v.Value(nameof(StunTicks), StunTicks);
+            v.Value(nameof(ComboHits), ComboHits);
+            v.Value(nameof(AttackId), AttackId);
+            v.Value(nameof(AttackHasHit), AttackHasHit);
+            v.Value(nameof(ParryTicks), ParryTicks);
+            v.Value(nameof(TicksSinceGuardPress), TicksSinceGuardPress);
+            v.Value(nameof(PendingPresses), (int)PendingPresses);
         }
     }
 }

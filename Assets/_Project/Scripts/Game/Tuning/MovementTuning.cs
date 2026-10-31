@@ -23,7 +23,13 @@ namespace Knockbox.Game
     public static class SimConfigFactory
     {
         /// <summary>튜닝 에셋이 없으면 명세 초기값으로 만든다.</summary>
-        public static SimConfig Create(MovementTuning tuning) =>
-            tuning == null ? SimConfig.CreateDefault() : new SimConfig(tuning.Movement, tuning.Match);
+        public static SimConfig Create(MovementTuning tuning) => Create(tuning, null, CombatMode.Test);
+
+        public static SimConfig Create(MovementTuning movement, CombatTuning combat, CombatMode mode) =>
+            new SimConfig(
+                movement != null ? movement.Movement : MovementParams.Default,
+                movement != null ? movement.Match : MatchParams.Default,
+                combat != null ? combat.Combat : CombatParams.Default,
+                mode);
     }
 }

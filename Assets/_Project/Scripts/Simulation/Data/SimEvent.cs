@@ -23,11 +23,19 @@ namespace Knockbox.Simulation
         PadBounce,
         /// <summary>경기장 밖으로 나가 되돌려짐. 벽으로 닫힌 경기장에서는 일어나면 안 되는 버그 신호.</summary>
         OutOfBounds,
+        /// <summary>공격 시작(연출이 팔을 내지르는 시점). Strength는 공격 번호.</summary>
+        AttackStart,
+        /// <summary>패링 구간이 열림.</summary>
+        ParryWindow,
+        MatchEnd,
     }
 
     /// <summary>
     /// 연출이 소비하는 사건. 상태에는 포함하지 않는다.
     /// 롤백 대비로 (Tick, Type, Fighter)로 식별할 수 있다.
+    /// 전투 이벤트의 Fighter는 맞은 쪽(Hit, GuardHit, WallSplat, BounceRebound, KO) 또는 패링한 쪽(Parry)이고,
+    /// 클래시는 NoFighter다. Position은 접촉점, Direction은 넉백 방향 또는 지형 법선, Strength는 데미지나 속도.
+    /// RoundEnd·MatchEnd의 Fighter는 이긴 쪽(무승부면 NoFighter).
     /// </summary>
     public struct SimEvent
     {

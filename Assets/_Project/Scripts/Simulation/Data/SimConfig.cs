@@ -148,12 +148,15 @@ namespace Knockbox.Simulation
         public int CountdownTicks;
         public int KoTicks;
         public int RoundsToWin;
+        /// <summary>MatchEnd에 들어온 뒤 이만큼 지나야 버튼으로 새 경기를 시작한다(연타로 결과 화면을 넘기지 않게).</summary>
+        public int MatchEndMinTicks;
 
         public static MatchParams Default => new MatchParams
         {
             CountdownTicks = 90,
             KoTicks = 60,
             RoundsToWin = 5,
+            MatchEndMinTicks = 60,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -161,6 +164,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(CountdownTicks), CountdownTicks);
             v.Value(nameof(KoTicks), KoTicks);
             v.Value(nameof(RoundsToWin), RoundsToWin);
+            v.Value(nameof(MatchEndMinTicks), MatchEndMinTicks);
         }
     }
 
@@ -174,16 +178,38 @@ namespace Knockbox.Simulation
 
         public readonly MovementParams Movement;
         public readonly MatchParams Match;
+        public readonly CombatParams Combat;
+        public readonly CombatMode Mode;
         public readonly float HalfBody;
 
         public SimConfig(in MovementParams movement, in MatchParams match)
+            : this(movement, match, CombatParams.Default, CombatMode.Test)
+        {
+        }
+
+        public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, CombatMode mode)
         {
             Movement = movement;
             Match = match;
+            Combat = combat;
+            Combat.TestAttack = Prepare(combat.TestAttack);
+            Mode = mode;
             HalfBody = movement.BodySize * 0.5f;
         }
 
         public static SimConfig CreateDefault() => new SimConfig(MovementParams.Default, MatchParams.Default);
+
+        /// <summary>공격 번호 → 데이터. CP4는 0번(테스트 공격)만 있다.</summary>
+        public ref readonly AttackDef GetAttack(int id) => ref Combat.TestAttack;
+
+        /// <summary>넉백 방향을 정규화하고 판정 원 개수를 0~3으로 맞춘다.</summary>
+        static AttackDef Prepare(AttackDef attack)
+        {
+            attack.KnockbackDirection = SimMath.Normalize(attack.KnockbackDirection);
+            attack.CircleCount = SimMath.Clamp(attack.CircleCount, 0, AttackDef.MaxCircles);
+            attack.ActiveTicks = SimMath.Max(attack.ActiveTicks, 1);
+            return attack;
+        }
 
         /// <summary>입력 기록에 넣어 재생 시 같은 설정인지 확인하는 데 쓴다.</summary>
         public uint ComputeChecksum()
@@ -201,6 +227,10 @@ namespace Knockbox.Simulation
             v.Begin(nameof(Match));
             Match.Visit(ref v);
             v.End();
+            v.Begin(nameof(Combat));
+            Combat.Visit(ref v);
+            v.End();
+            v.Value(nameof(Mode), (int)Mode);
         }
     }
 }

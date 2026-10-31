@@ -20,6 +20,18 @@ namespace Knockbox.Simulation
         public static float Floor(float x) => MathF.Floor(x);
         public static float Ceiling(float x) => MathF.Ceiling(x);
 
+        /// <summary>가장 가까운 정수. 0.5는 위로 올린다(음수에서도 같은 규칙: -2.5 → -2).</summary>
+        public static int RoundToInt(float x) => (int)MathF.Floor(x + 0.5f);
+
+        /// <summary>정수 지수 거듭제곱. 곱셈만 쓰므로 순서가 정해져 있다.</summary>
+        public static float Pow(float x, int exponent)
+        {
+            float result = 1f;
+            for (int i = 0; i < exponent; i++)
+                result *= x;
+            return result;
+        }
+
         public static float Clamp(float x, float min, float max) => x < min ? min : x > max ? max : x;
         public static int Clamp(int x, int min, int max) => x < min ? min : x > max ? max : x;
 

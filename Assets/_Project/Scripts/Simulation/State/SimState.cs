@@ -62,8 +62,33 @@ namespace Knockbox.Simulation
                 Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1),
             };
             state.Match.Round = 1;
+            state.Match.RoundWinner = -1;
             state.Match.SetPhase(startPhase);
             return state;
+        }
+
+        /// <summary>
+        /// 다음 라운드: 파이터를 맵의 시작 위치로 되돌리고 체력과 상태를 초기화한다.
+        /// 점수, 틱, 난수 상태는 그대로 둔다. Countdown에서 시작한다.
+        /// </summary>
+        public static void StartNextRound(ref SimState state, SimConfig config, ArenaDef arena)
+        {
+            var center0 = SpawnCenter(config, arena, 0);
+            var center1 = SpawnCenter(config, arena, 1);
+            state.Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1);
+            state.Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1);
+            state.Match.Round++;
+            state.Match.RoundWinner = -1;
+            state.Match.SetPhase(MatchPhase.Countdown);
+        }
+
+        /// <summary>MatchEnd 뒤 새 경기: 점수를 지우고 1라운드 Countdown부터.</summary>
+        public static void StartNewMatch(ref SimState state, SimConfig config, ArenaDef arena)
+        {
+            state.Match.Score0 = 0;
+            state.Match.Score1 = 0;
+            state.Match.Round = 0;
+            StartNextRound(ref state, config, arena);
         }
 
         static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing)
@@ -77,6 +102,9 @@ namespace Knockbox.Simulation
                 DashCharges = m.DashCharges,
                 TicksSinceWall = FighterState.TimerCap,
                 DropThroughBox = FighterState.NoBox,
+                Health = config.Combat.MaxHealth,
+                AttackId = FighterState.NoAttack,
+                TicksSinceGuardPress = FighterState.TimerCap,
             };
             f.GroundBox = TerrainCollision.ProbeGround(center, config.HalfBody, arena, m.GroundProbeDistance, FighterState.NoBox);
             f.Grounded = f.GroundBox != FighterState.NoBox;

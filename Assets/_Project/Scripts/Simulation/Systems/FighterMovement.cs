@@ -15,13 +15,15 @@ namespace Knockbox.Simulation
     /// Integrate: 입력 → 속도 → 지형 충돌 이동. 두 파이터 모두 같은 이전 상태에서 따로 계산한다.
     /// (그 사이에 FighterPush가 몸 겹침을 푼다.)
     /// ResolveContacts: 접지·벽 접촉 판정, 착지·튕김 처리, 착지 틱의 버퍼 점프, 행동 상태와 이벤트.
+    /// 전투 상태(공격, 가드, 경직)에서는 이동 규칙 대신 IntegrateCombatState가 속도를 정하고,
+    /// 피격 경직 중 지형에 부딪히면 벽꽝·튕김(03-combat.md 3절)을 처리한다.
     /// </summary>
     public static class FighterMovement
     {
-        public static void Integrate(ref FighterState f, in InputFrame input, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events, out MovementScratch scratch)
+        /// <param name="pressed">이번 틱에 새로 눌린 버튼(히트스탑 동안 눌러 둔 버튼 포함). FighterCombat.BeginTick이 계산한다.</param>
+        public static void Integrate(ref FighterState f, in InputFrame input, InputButtons pressed, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events, out MovementScratch scratch)
         {
             ref readonly var m = ref config.Movement;
-            var pressed = InputFrame.Pressed(input.Buttons, f.PrevButtons);
             bool jumpHeld = input.Held(InputButtons.Jump);
             int moveX = input.MoveX;
             int moveY = input.MoveY;
@@ -48,6 +50,13 @@ namespace Knockbox.Simulation
 
             scratch.MoveX = moveX;
             scratch.MoveY = moveY;
+
+            if (!f.InMovementState)
+            {
+                IntegrateCombatState(ref f, config, moveX, moveY, jumpHeld);
+                TerrainCollision.Move(ref f.Position, ref f.Velocity, config.HalfBody, arena, m.SubstepMaxDistance, f.DropThroughBox, ref scratch.Contacts);
+                return;
+            }
 
             bool dashing = f.Action == ActionState.Dash && f.DashTicksLeft > 0;
 
@@ -91,7 +100,7 @@ namespace Knockbox.Simulation
             else
             {
                 bool apex = !f.Grounded && SimMath.Abs(f.Velocity.Y) < m.ApexSpeedThreshold && jumpHeld;
-                ApplyHorizontal(ref f, m, moveX, apex);
+                ApplyHorizontal(ref f, m, moveX, m.MaxRunSpeed, apex ? m.ApexAirAccelMultiplier : 1f, 1f);
                 ResolveJumpRequest(ref f, m, arena, moveY, index, tick, events);
                 ApplyGravity(ref f, m, jumpHeld, moveX, moveY);
             }
@@ -105,33 +114,68 @@ namespace Knockbox.Simulation
             }
         }
 
-        static void ApplyHorizontal(ref FighterState f, in MovementParams m, int moveX, bool apex)
+        /// <summary>좌우 입력으로 maxSpeed까지 가속하거나 감속한다. 배율은 정점(1.2)과 공격 중 공중 조작(0.5)에 쓴다.</summary>
+        static void ApplyHorizontal(ref FighterState f, in MovementParams m, int moveX, float maxSpeed, float accelMultiplier, float decelMultiplier)
         {
             const float dt = SimConfig.Dt;
             float vx = f.Velocity.X;
+            float decel = (f.Grounded ? m.GroundDecel : m.AirDecel) * decelMultiplier;
             if (moveX != 0)
             {
                 int velocitySign = SimMath.Sign(vx);
-                if (velocitySign == moveX && SimMath.Abs(vx) > m.MaxRunSpeed)
+                if (velocitySign == moveX && SimMath.Abs(vx) > maxSpeed)
                 {
                     // 최대 속도를 넘는 관성(대시 뒤, 대시 점프)은 같은 방향 입력이면 감속률로만 줄인다.
-                    vx = SimMath.MoveTowards(vx, moveX * m.MaxRunSpeed, (f.Grounded ? m.GroundDecel : m.AirDecel) * dt);
+                    vx = SimMath.MoveTowards(vx, moveX * maxSpeed, decel * dt);
                 }
                 else
                 {
                     float accel = f.Grounded ? m.GroundAccel : m.AirAccel;
-                    if (apex)
-                        accel *= m.ApexAirAccelMultiplier;
+                    accel *= accelMultiplier;
                     if (velocitySign != 0 && velocitySign != moveX)
                         accel *= m.TurnAccelMultiplier;
-                    vx = SimMath.MoveTowards(vx, moveX * m.MaxRunSpeed, accel * dt);
+                    vx = SimMath.MoveTowards(vx, moveX * maxSpeed, accel * dt);
                 }
             }
             else
             {
-                vx = SimMath.MoveTowards(vx, 0f, (f.Grounded ? m.GroundDecel : m.AirDecel) * dt);
+                vx = SimMath.MoveTowards(vx, 0f, decel * dt);
             }
             f.Velocity.X = vx;
+        }
+
+        /// <summary>
+        /// 전투 상태의 속도. 가드: 최대 속도 GuardMaxSpeed, 점프·대시 불가. 공격: 지상은 감속만, 공중은 조작 × 0.5.
+        /// 피격 경직: 조작 불가, 중력 정상, 공중 감속 0(날아가는 관성 유지). 그 밖의 경직: 조작 없이 감속.
+        /// </summary>
+        static void IntegrateCombatState(ref FighterState f, SimConfig config, int moveX, int moveY, bool jumpHeld)
+        {
+            const float dt = SimConfig.Dt;
+            ref readonly var m = ref config.Movement;
+            ref readonly var c = ref config.Combat;
+            switch (f.Action)
+            {
+                case ActionState.Guard:
+                    ApplyHorizontal(ref f, m, moveX, c.GuardMaxSpeed, 1f, 1f);
+                    ApplyGravity(ref f, m, false, 0, 0);
+                    break;
+                case ActionState.Attack:
+                    if (f.Grounded)
+                        f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
+                    else
+                        ApplyHorizontal(ref f, m, moveX, m.MaxRunSpeed, c.AttackAirControlMultiplier, c.AttackAirControlMultiplier);
+                    ApplyGravity(ref f, m, jumpHeld, 0, moveY);
+                    break;
+                case ActionState.Hitstun:
+                    if (f.Grounded)
+                        f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
+                    ApplyGravity(ref f, m, false, 0, 0);
+                    break;
+                default:
+                    f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, (f.Grounded ? m.GroundDecel : m.AirDecel) * dt);
+                    ApplyGravity(ref f, m, false, 0, 0);
+                    break;
+            }
         }
 
         /// <summary>점프 버퍼가 있으면 우선순위대로 처리한다: 발판 하강 → 땅·코요테 점프 → 벽 점프 → 공중 점프.</summary>
@@ -258,6 +302,10 @@ namespace Knockbox.Simulation
                 bounced = true;
                 events.Add(new SimEvent(tick, SimEventType.PadBounce, index, f.Position, new Vec2(0f, 1f), m.BouncePadSpeed));
             }
+            else if (f.Action == ActionState.Hitstun)
+            {
+                bounced = Rebound(ref f, contacts, config, index, tick, events);
+            }
 
             int ground = FighterState.NoBox;
             if (!bounced && f.Velocity.Y <= 0f)
@@ -285,7 +333,7 @@ namespace Knockbox.Simulation
                 f.JumpCutEligible = false;
 
                 // 착지 직전에 누른 점프(버퍼)는 착지한 틱에 실행한다.
-                if (!scratch.WasGrounded && f.JumpBuffer > 0 && !dashing && !TryDropThrough(ref f, m, arena, scratch.MoveY))
+                if (!scratch.WasGrounded && f.JumpBuffer > 0 && !dashing && f.InMovementState && !TryDropThrough(ref f, m, arena, scratch.MoveY))
                     GroundJump(ref f, m, index, tick, events);
             }
             else
@@ -304,6 +352,9 @@ namespace Knockbox.Simulation
             {
                 f.TicksSinceWall = SimMath.Min(f.TicksSinceWall + 1, FighterState.TimerCap);
             }
+
+            if (!f.InMovementState)
+                return;
 
             if (dashing)
             {
@@ -328,6 +379,65 @@ namespace Knockbox.Simulation
                 f.Facing = (sbyte)scratch.MoveX;
         }
 
+        /// <summary>
+        /// 피격 경직 중 지형에 부딪힘. 법선 속도가 WallSplatSpeed(14) 이상이면 벽꽝(데미지, 반사 × 0.45, 경직 +18, 히트스탑 6),
+        /// BounceMinSpeed 이상이면 튕김(반사 × 0.35). 튕겼으면 true.
+        /// 지형 이동이 부딪힌 축의 속도를 0으로 만들었으므로 부딪히기 직전 값으로 되돌려 반사한다.
+        /// </summary>
+        static bool Rebound(ref FighterState f, in MoveContacts contacts, SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            float half = config.HalfBody;
+            float wall = contacts.HitWall != 0 ? contacts.WallImpactSpeed : 0f;
+            float floor = contacts.Landed ? contacts.ImpactSpeed : 0f;
+            float ceiling = contacts.HitCeiling ? contacts.CeilingImpactSpeed : 0f;
+            float strongest = SimMath.Max(wall, SimMath.Max(floor, ceiling));
+            if (strongest < c.BounceMinSpeed)
+                return false;
+
+            var v = f.Velocity;
+            if (contacts.HitWall != 0)
+                v.X = -contacts.HitWall * wall;
+            if (contacts.Landed)
+                v.Y = floor;
+            else if (contacts.HitCeiling)
+                v.Y = -ceiling;
+
+            Vec2 normal, point;
+            if (wall >= floor && wall >= ceiling)
+            {
+                normal = new Vec2(-contacts.HitWall, 0f);
+                point = new Vec2(f.Position.X + contacts.HitWall * half, f.Position.Y);
+            }
+            else if (floor >= ceiling)
+            {
+                normal = new Vec2(0f, 1f);
+                point = new Vec2(f.Position.X, f.Position.Y - half);
+            }
+            else
+            {
+                normal = new Vec2(0f, -1f);
+                point = new Vec2(f.Position.X, f.Position.Y + half);
+            }
+
+            bool splat = strongest >= c.WallSplatSpeed;
+            f.Velocity = v * (splat ? c.WallSplatRestitution : c.BounceRestitution);
+            f.Grounded = false;
+            f.GroundBox = FighterState.NoBox;
+            if (splat)
+            {
+                f.Health = SimMath.Max(0, f.Health - c.WallSplatDamage);
+                f.StunTicks += c.WallSplatHitstun;
+                f.HitstopTicks = SimMath.Max(f.HitstopTicks, c.WallSplatHitstop);
+                events.Add(new SimEvent(tick, SimEventType.WallSplat, index, point, normal, strongest));
+            }
+            else
+            {
+                events.Add(new SimEvent(tick, SimEventType.BounceRebound, index, point, normal, strongest));
+            }
+            return true;
+        }
+
         /// <summary>상대 머리 위(단방향 발판처럼)에 서 있는지.</summary>
         public static bool StandsOn(Vec2 self, Vec2 other, SimConfig config)
         {
@@ -342,12 +452,18 @@ namespace Knockbox.Simulation
     /// <summary>
     /// 파이터끼리의 몸 충돌(02-movement.md 7절). 겹치면 수평으로 절반씩 밀어낸다. 속도는 바꾸지 않는다.
     /// 직전 틱에 완전히 위에 있었고 내려오는 중이면 상대 머리 위에 세운다.
+    /// 히트스탑으로 멈춘 쪽은 움직이지 않고, 움직이는 쪽이 겹침을 모두 떠맡는다.
     /// 두 파이터를 같은 규칙으로 동시에 다루며, 번호로 우선순위를 정하지 않는다.
     /// </summary>
     public static class FighterPush
     {
         public static void Resolve(ref FighterState a, ref FighterState b, in FighterState prevA, in FighterState prevB, SimConfig config, ArenaDef arena)
+            => Resolve(ref a, ref b, prevA, prevB, false, false, config, arena);
+
+        public static void Resolve(ref FighterState a, ref FighterState b, in FighterState prevA, in FighterState prevB, bool frozenA, bool frozenB, SimConfig config, ArenaDef arena)
         {
+            if (frozenA && frozenB)
+                return;
             float size = config.Movement.BodySize;
             float half = config.HalfBody;
             float dx = b.Position.X - a.Position.X;
@@ -356,8 +472,8 @@ namespace Knockbox.Simulation
             if (SimMath.Abs(dx) >= size - eps || SimMath.Abs(dy) >= size - eps)
                 return;
 
-            bool aWasAbove = prevA.Position.Y - prevB.Position.Y >= size - eps && a.Velocity.Y <= 0f;
-            bool bWasAbove = prevB.Position.Y - prevA.Position.Y >= size - eps && b.Velocity.Y <= 0f;
+            bool aWasAbove = !frozenA && prevA.Position.Y - prevB.Position.Y >= size - eps && a.Velocity.Y <= 0f;
+            bool bWasAbove = !frozenB && prevB.Position.Y - prevA.Position.Y >= size - eps && b.Velocity.Y <= 0f;
             if (aWasAbove)
             {
                 a.Position.Y = b.Position.Y + size;
@@ -376,11 +492,17 @@ namespace Knockbox.Simulation
                 direction = SimMath.Sign(prevB.Position.X - prevA.Position.X);
             if (direction == 0)
                 return;
-            float push = (size - SimMath.Abs(dx)) * 0.5f;
-            a.Position.X -= direction * push;
-            b.Position.X += direction * push;
-            TerrainCollision.ResolveX(ref a.Position, -direction, half, arena);
-            TerrainCollision.ResolveX(ref b.Position, direction, half, arena);
+            float overlap = size - SimMath.Abs(dx);
+            if (!frozenA)
+            {
+                a.Position.X -= direction * (overlap * (frozenB ? 1f : 0.5f));
+                TerrainCollision.ResolveX(ref a.Position, -direction, half, arena);
+            }
+            if (!frozenB)
+            {
+                b.Position.X += direction * (overlap * (frozenA ? 1f : 0.5f));
+                TerrainCollision.ResolveX(ref b.Position, direction, half, arena);
+            }
         }
     }
 }

@@ -118,6 +118,12 @@ namespace Knockbox.Tests.EditMode
                 if (new SimConfig(MovementParams.Default, m).ComputeChecksum() == baseChecksum)
                     missing.AppendLine(path);
             }
+            foreach (var (path, mutate) in Leaves(typeof(CombatParams), "Combat."))
+            {
+                var c = (CombatParams)mutate(CombatParams.Default);
+                if (new SimConfig(MovementParams.Default, MatchParams.Default, c, CombatMode.Test).ComputeChecksum() == baseChecksum)
+                    missing.AppendLine(path);
+            }
             Assert.AreEqual(string.Empty, missing.ToString(), "설정 체크섬에 빠진 필드");
         }
 
