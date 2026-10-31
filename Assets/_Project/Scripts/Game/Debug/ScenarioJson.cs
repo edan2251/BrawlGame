@@ -243,7 +243,7 @@ namespace Knockbox.Game
         }
 
         /// <summary>"A", "B", "C"(대소문자 무관) → 0, 1, 2. 비어 있으면 -1(맵이 정함).</summary>
-        static int ParseTheme(string value)
+        internal static int ParseTheme(string value)
         {
             if (string.IsNullOrEmpty(value))
                 return -1;

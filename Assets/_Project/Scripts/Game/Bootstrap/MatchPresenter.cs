@@ -170,22 +170,20 @@ namespace Knockbox.Game
             return view;
         }
 
-        /// <summary>
-        /// 시나리오가 정한 테마(0 A 민트, 1 B 사이언, 2 C 슬레이트). -1이면 맵이 정한다.
-        /// 맵 형식 v2(CP12) 전에는 v1 맵 이름으로 정한다: Box A, Towers B, Pit C.
-        /// </summary>
+        /// <summary>시나리오가 정한 테마(0 A 민트, 1 B 사이언, 2 C 슬레이트). -1이면 맵 짝 파일이 정한다.</summary>
         public int ThemeOverride { get; set; } = -1;
 
         public int ThemeIndex(ArenaDef arena)
         {
-            if (ThemeOverride >= 0)
-                return Mathf.Min(ThemeOverride, palette.ThemeCount - 1);
-            switch (arena.Name)
-            {
-                case "Towers": return 1;
-                case "Pit": return 2;
-                default: return 0;
-            }
+            int theme = ThemeOverride >= 0 ? ThemeOverride : runner.GetMeta(arena.Name).Theme;
+            return Mathf.Clamp(theme, 0, palette.ThemeCount - 1);
+        }
+
+        /// <summary>주 광원 위치: 맵 짝 파일, 없으면 기본값.</summary>
+        public Vector2 LightPosition(ArenaDef arena)
+        {
+            var meta = runner.GetMeta(arena.Name);
+            return meta.HasLight ? meta.Light : BackgroundView.DefaultLight(arena);
         }
 
         public ArenaTheme CurrentTheme { get; private set; }
@@ -197,7 +195,7 @@ namespace Knockbox.Game
         {
             builtArena = arena;
             CurrentTheme = palette.Theme(ThemeIndex(arena));
-            background.Build(arena, CurrentTheme, palette, shapes, BackgroundView.DefaultLight(arena));
+            background.Build(arena, CurrentTheme, palette, shapes, LightPosition(arena));
             background.ResetMotes();
             arenaView.Build(arena, CurrentTheme, palette, shapes);
             koShatter.BuildArena(arena);

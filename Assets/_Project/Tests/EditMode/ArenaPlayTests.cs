@@ -211,6 +211,18 @@ namespace Knockbox.Tests.EditMode
         [TestCase("Towers", 1)]
         [TestCase("Pit", 0)]
         [TestCase("Pit", 1)]
+        [TestCase("Crossing", 0)]
+        [TestCase("Crossing", 1)]
+        [TestCase("Foundry", 0)]
+        [TestCase("Foundry", 1)]
+        [TestCase("Gallery", 0)]
+        [TestCase("Gallery", 1)]
+        [TestCase("Pillars", 0)]
+        [TestCase("Pillars", 1)]
+        [TestCase("Terrace", 0)]
+        [TestCase("Terrace", 1)]
+        [TestCase("Vault", 0)]
+        [TestCase("Vault", 1)]
         public void EveryPlatform_ReachableFromSpawn(string map, int fighter)
         {
             var arena = ArenaFiles.LoadByName(map);

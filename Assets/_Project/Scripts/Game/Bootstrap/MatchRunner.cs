@@ -20,8 +20,13 @@ namespace Knockbox.Game
         [Tooltip("잡기 켜기/끄기(F4). 다음 StartNewMatch부터 적용")]
         [SerializeField] bool grabEnabled = true;
         [SerializeField] TextAsset[] arenaFiles;
-        [SerializeField] string arenaName = "Box";
+        [Tooltip("맵 짝 파일(<이름>.json): 테마, 광원, 순환 포함 여부")]
+        [SerializeField] TextAsset[] arenaMetaFiles;
+        [Tooltip("Rotation이면 라운드마다 맵 교체(순환 맵 전부), 맵 이름이면 그 맵에 고정(F2)")]
+        [SerializeField] string arenaName = RotationName;
         [SerializeField] uint seed = 1;
+        [Tooltip("켜면 StartNewMatch마다 시드를 새로 뽑는다(맵 순서가 경기마다 달라짐)")]
+        [SerializeField] bool randomizeSeed;
         [SerializeField, Range(0, InputDelayQueue.MaxDelay)] int inputDelayTicks;
         [SerializeField] bool startOnAwake = true;
         [SerializeField] bool skipCountdown;
@@ -70,10 +75,19 @@ namespace Knockbox.Game
         /// </summary>
         public float RenderAlpha => Running ? clock.Alpha : 1f;
 
+        /// <summary>arenaName이 이 값이면 순환 맵 전부를 라운드마다 바꿔 가며 쓴다(04-arena.md 6절).</summary>
+        public const string RotationName = "Rotation";
+
         public string ArenaName
         {
             get => arenaName;
             set => arenaName = value;
+        }
+
+        public uint Seed
+        {
+            get => seed;
+            set => seed = value;
         }
 
         public MovementTuning Tuning
@@ -118,8 +132,11 @@ namespace Knockbox.Game
                 Debug.LogWarning("[Knockbox] 기록과 같은 튜닝 설정을 찾지 못해 재생 결과가 다를 수 있음");
                 config = SimConfigFactory.Create(movementTuning, combatTuning, recordedMode, grabEnabled);
             }
-            var arena = ResolveArena(recording.Arena);
-            if (arena.ComputeChecksum() != recording.ArenaChecksum)
+            string[] names = recording.ArenaNames;
+            var arenas = new ArenaDef[names.Length];
+            for (int i = 0; i < names.Length; i++)
+                arenas[i] = ResolveArena(names[i]);
+            if (InputRecording.ComputeArenaChecksum(arenas) != recording.ArenaChecksum)
                 Debug.LogWarning("[Knockbox] 기록과 맵이 달라 재생 결과가 다를 수 있음");
             var p1 = new InputFrame[recording.Count];
             var p2 = new InputFrame[recording.Count];
@@ -128,7 +145,7 @@ namespace Knockbox.Game
                 p1[i] = recording.GetP1(i);
                 p2[i] = recording.GetP2(i);
             }
-            Begin(config, arena, SimState.CreateRound(config, arena, recording.Seed, recording.Spawn0, recording.Spawn1, recording.StartPhase));
+            Begin(config, arenas, recording.BuildState(config, arenas));
             // 기록된 입력은 이미 지연을 거친 값이다.
             delay1.Reset(0);
             delay2.Reset(0);
@@ -191,15 +208,112 @@ namespace Knockbox.Game
         public void StartNewMatch()
         {
             var config = CreateConfig();
-            var arena = ResolveArena(arenaName);
+            var arenas = ResolveArenas(arenaName);
             var phase = skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
+            if (randomizeSeed)
+                seed = (uint)Environment.TickCount | 1u;
             if (useLocalDevices)
             {
                 Player1Input = new KeyboardInputSource(KeyboardLayout.Left);
                 Player2Input = GamepadInputSource.Available(0) ? new GamepadInputSource(0) : new KeyboardInputSource(KeyboardLayout.Right);
             }
-            Begin(config, arena, SimState.CreateRound(config, arena, seed, phase));
+            Begin(config, arenas, SimState.CreateMatch(config, arenas, seed, phase));
             configFromTuning = true;
+        }
+
+        /// <summary>RotationName이면 순환 맵 전부(이름순), 아니면 그 맵 하나.</summary>
+        public ArenaDef[] ResolveArenas(string name)
+        {
+            if (name != RotationName)
+                return new[] { ResolveArena(name) };
+            string[] names = RotationNames();
+            if (names.Length == 0)
+                throw new InvalidOperationException("순환에 들어간 맵이 없음(짝 파일의 \"rotation\": true)");
+            var arenas = new ArenaDef[names.Length];
+            for (int i = 0; i < names.Length; i++)
+                arenas[i] = ResolveArena(names[i]);
+            return arenas;
+        }
+
+        /// <summary>짝 파일에서 "rotation": true인 맵 이름(이름순).</summary>
+        public string[] RotationNames()
+        {
+            var names = new System.Collections.Generic.List<string>();
+            foreach (string name in MetaNames())
+            {
+                if (GetMeta(name).Rotation)
+                    names.Add(name);
+            }
+            names.Sort(StringComparer.Ordinal);
+            return names.ToArray();
+        }
+
+        /// <summary>F2 순환: Rotation → 순환 맵 → 나머지 맵(v1 테스트 고정 자료).</summary>
+        public string[] ArenaChoices()
+        {
+            var choices = new System.Collections.Generic.List<string> { RotationName };
+            choices.AddRange(RotationNames());
+            var rest = new System.Collections.Generic.List<string>();
+            if (arenaFiles != null)
+            {
+                foreach (var file in arenaFiles)
+                {
+                    if (file != null && !choices.Contains(file.name))
+                        rest.Add(file.name);
+                }
+            }
+            rest.Sort(StringComparer.Ordinal);
+            choices.AddRange(rest);
+            return choices.ToArray();
+        }
+
+        readonly System.Collections.Generic.Dictionary<string, ArenaMeta> metaCache = new System.Collections.Generic.Dictionary<string, ArenaMeta>();
+
+        /// <summary>맵 짝 파일. 없으면 ArenaMeta.Default.</summary>
+        public ArenaMeta GetMeta(string name)
+        {
+            if (metaCache.TryGetValue(name, out var cached))
+                return cached;
+            ArenaMeta meta = null;
+            if (arenaMetaFiles != null)
+            {
+                foreach (var file in arenaMetaFiles)
+                {
+                    if (file != null && file.name == name)
+                        meta = ArenaMeta.Parse(file.text, name + ".json");
+                }
+            }
+#if UNITY_EDITOR
+            if (meta == null)
+            {
+                string path = System.IO.Path.Combine(ArenaFiles.Folder, name + ".json");
+                if (System.IO.File.Exists(path))
+                    meta = ArenaMeta.Parse(System.IO.File.ReadAllText(path), name + ".json");
+            }
+#endif
+            meta ??= ArenaMeta.Default;
+            metaCache[name] = meta;
+            return meta;
+        }
+
+        System.Collections.Generic.IEnumerable<string> MetaNames()
+        {
+            var seen = new System.Collections.Generic.HashSet<string>();
+            if (arenaMetaFiles != null)
+            {
+                foreach (var file in arenaMetaFiles)
+                {
+                    if (file != null && seen.Add(file.name))
+                        yield return file.name;
+                }
+            }
+#if UNITY_EDITOR
+            foreach (string name in ArenaFiles.ListMetaNames())
+            {
+                if (seen.Add(name))
+                    yield return name;
+            }
+#endif
         }
 
         public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, mode, grabEnabled);
@@ -222,9 +336,11 @@ namespace Knockbox.Game
 #endif
         }
 
-        public void Begin(SimConfig config, ArenaDef arena, in SimState initial)
+        public void Begin(SimConfig config, ArenaDef arena, in SimState initial) => Begin(config, new[] { arena }, initial);
+
+        public void Begin(SimConfig config, ArenaDef[] arenas, in SimState initial)
         {
-            World = new SimWorld(config, arena, initial);
+            World = new SimWorld(config, arenas, initial);
             PreviousState = initial;
             configFromTuning = false;
             Playback = null;
@@ -253,7 +369,10 @@ namespace Knockbox.Game
                 return;
             var s = World.State;
             // 기록은 현재 상태를 시작점으로 삼을 수 없으므로(라운드 생성 값만 저장) 라운드 시작 직후에만 의미가 있다.
-            Recording = InputRecording.Begin(World.Config, World.Arena, s.Rng.State, s.Fighter0.Position, s.Fighter1.Position, s.Match.Phase, mode);
+            var arenas = new ArenaDef[World.ArenaCount];
+            for (int i = 0; i < arenas.Length; i++)
+                arenas[i] = World.GetArena(i);
+            Recording = InputRecording.Begin(World.Config, arenas, s.Match.Rotation, s.Rng.State, s.Fighter0.Position, s.Fighter1.Position, s.Match.Phase, mode);
             if (Recording.InitialChecksum != World.ComputeChecksum())
             {
                 Debug.LogWarning("[Knockbox] 입력 기록은 라운드 시작 상태에서만 시작할 수 있음");

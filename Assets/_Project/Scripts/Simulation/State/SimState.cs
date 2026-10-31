@@ -51,6 +51,20 @@ namespace Knockbox.Simulation
         public static SimState CreateRound(SimConfig config, ArenaDef arena, uint seed, MatchPhase startPhase) =>
             CreateRound(config, arena, seed, SpawnCenter(config, arena, 0), SpawnCenter(config, arena, 1), startPhase);
 
+        /// <summary>
+        /// 맵 순환 경기(04-arena.md 6절): 시드로 맵 순서를 섞고 첫 맵의 시작 위치로 1라운드를 만든다.
+        /// 맵 배열은 SimWorld에 같은 순서로 넘긴다.
+        /// </summary>
+        public static SimState CreateMatch(SimConfig config, ArenaDef[] arenas, uint seed, MatchPhase startPhase)
+        {
+            var rotation = ArenaRotation.Create(seed, arenas.Length);
+            var state = CreateRound(config, arenas[rotation.Current], seed, startPhase);
+            // 맵 하나면 순환 상태를 비워 둔다(CreateRound와 같은 상태).
+            if (arenas.Length > 1)
+                state.Match.Rotation = rotation;
+            return state;
+        }
+
         /// <summary>시작 위치(파이터 중심)를 직접 정한다.</summary>
         public static SimState CreateRound(SimConfig config, ArenaDef arena, uint seed, Vec2 center0, Vec2 center1, MatchPhase startPhase)
         {

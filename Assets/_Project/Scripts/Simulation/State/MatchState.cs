@@ -28,6 +28,8 @@ namespace Knockbox.Simulation
         public int Score1;
         /// <summary>마지막 KO의 승자. 0, 1, 또는 무승부·미정이면 -1.</summary>
         public int RoundWinner;
+        /// <summary>라운드마다 맵 교체(CP12). 롤백 대상이라 상태에 둔다.</summary>
+        public ArenaRotation Rotation;
 
         public readonly int GetScore(int fighter) => fighter == 0 ? Score0 : Score1;
 
@@ -45,6 +47,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(Score0), Score0);
             v.Value(nameof(Score1), Score1);
             v.Value(nameof(RoundWinner), RoundWinner);
+            v.Begin(nameof(Rotation));
+            Rotation.Visit(ref v);
+            v.End();
         }
     }
 }

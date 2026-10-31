@@ -148,13 +148,19 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(0, v.Count, v.First);
         }
 
-        /// <summary>CP10-2: 모드 A × 잡기 2 × 맵 3 × 시드 6 × 2분.</summary>
+        /// <summary>CP10-2: 모드 A × 잡기 2 × 맵 3 × 시드 6 × 2분. CP12: 맵 v2 6개(잡기 켬).</summary>
         [TestCase(false, "Box")]
         [TestCase(false, "Towers")]
         [TestCase(false, "Pit")]
         [TestCase(true, "Box")]
         [TestCase(true, "Towers")]
         [TestCase(true, "Pit")]
+        [TestCase(true, "Crossing")]
+        [TestCase(true, "Foundry")]
+        [TestCase(true, "Gallery")]
+        [TestCase(true, "Pillars")]
+        [TestCase(true, "Terrace")]
+        [TestCase(true, "Vault")]
         public void ChargeBotMatches_HaveNoInvariantViolations(bool grab, string map)
         {
             var v = new Violations();

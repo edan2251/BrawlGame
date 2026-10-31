@@ -21,7 +21,6 @@ namespace Knockbox.Game
         CameraRig cameraRig;
         readonly DummyInputSource dummy = new DummyInputSource();
         BotInputSource bot;
-        static readonly string[] Arenas = { "Box", "Towers", "Pit" };
         /// <summary>빌드의 F1 순환: 모드 A와 동결된 모드 B만(테스트 공격 모드는 에디터 전용, CP10).</summary>
         static readonly CombatMode[] BuildModes = { CombatMode.Charge, CombatMode.Swing };
 
@@ -63,8 +62,10 @@ namespace Knockbox.Game
                 presenter.Help.Visible = !presenter.Help.Visible;
             if (k.f2Key.wasPressedThisFrame)
             {
-                int index = System.Array.IndexOf(Arenas, runner.ArenaName);
-                runner.ArenaName = Arenas[(index + 1) % Arenas.Length];
+                // 맵 순환(Rotation) → 맵 하나에 고정 → ... (04-arena.md 6절: F2는 디버그용 맵 고정)
+                string[] arenas = runner.ArenaChoices();
+                int index = System.Array.IndexOf(arenas, runner.ArenaName);
+                runner.ArenaName = arenas[(index + 1) % arenas.Length];
                 RestartKeepingDummy();
                 Debug.Log($"[Knockbox] 맵: {runner.ArenaName}");
             }

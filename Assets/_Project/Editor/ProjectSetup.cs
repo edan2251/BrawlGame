@@ -127,14 +127,14 @@ namespace Knockbox.EditorTools
             }
         }
 
-        /// <summary>Data/Arenas의 맵 텍스트를 이름순으로.</summary>
-        static TextAsset[] LoadArenaFiles()
+        /// <summary>Data/Arenas의 맵 텍스트(.txt) 또는 짝 파일(.json)을 이름순으로.</summary>
+        static TextAsset[] LoadArenaFiles(string extension = ".txt")
         {
             var list = new List<TextAsset>();
             foreach (string guid in AssetDatabase.FindAssets("t:TextAsset", new[] { ArenasFolder }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (path.EndsWith(".txt"))
+                if (path.EndsWith(extension))
                     list.Add(AssetDatabase.LoadAssetAtPath<TextAsset>(path));
             }
             list.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
@@ -187,18 +187,20 @@ namespace Knockbox.EditorTools
             }
 
             var runnerSo = new SerializedObject(runner);
-            var arenas = runnerSo.FindProperty("arenaFiles");
-            var arenaFiles = LoadArenaFiles();
-            bool arenasDiffer = arenas.arraySize != arenaFiles.Length;
-            for (int i = 0; !arenasDiffer && i < arenaFiles.Length; i++)
-                arenasDiffer = arenas.GetArrayElementAtIndex(i).objectReferenceValue != arenaFiles[i];
-            if (arenasDiffer)
+            changed |= FillArray(runnerSo, "arenaFiles", LoadArenaFiles(".txt"));
+            changed |= FillArray(runnerSo, "arenaMetaFiles", LoadArenaFiles(".json"));
+            // 직접 플레이하는 Main 씬은 라운드마다 맵 교체(CP12), 경기마다 다른 순서.
+            if (localPlay)
             {
-                arenas.arraySize = arenaFiles.Length;
-                for (int i = 0; i < arenaFiles.Length; i++)
-                    arenas.GetArrayElementAtIndex(i).objectReferenceValue = arenaFiles[i];
-                runnerSo.ApplyModifiedPropertiesWithoutUndo();
-                changed = true;
+                var name = runnerSo.FindProperty("arenaName");
+                var randomize = runnerSo.FindProperty("randomizeSeed");
+                if (name.stringValue != MatchRunner.RotationName || !randomize.boolValue)
+                {
+                    name.stringValue = MatchRunner.RotationName;
+                    randomize.boolValue = true;
+                    runnerSo.ApplyModifiedPropertiesWithoutUndo();
+                    changed = true;
+                }
             }
 
             changed |= FillReference(runner, "combatTuning", AssetDatabase.LoadAssetAtPath<CombatTuning>(CombatTuningPath));
@@ -250,6 +252,22 @@ namespace Knockbox.EditorTools
                 EditorSceneManager.SaveScene(scene);
                 Debug.Log($"[Knockbox] 씬 오브젝트 추가: {scenePath}");
             }
+        }
+
+        /// <summary>배열 속성을 목록과 똑같이 맞춘다. 바꿨으면 true.</summary>
+        static bool FillArray(SerializedObject so, string property, Object[] values)
+        {
+            var array = so.FindProperty(property);
+            bool differ = array.arraySize != values.Length;
+            for (int i = 0; !differ && i < values.Length; i++)
+                differ = array.GetArrayElementAtIndex(i).objectReferenceValue != values[i];
+            if (!differ)
+                return false;
+            array.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+                array.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return true;
         }
 
         /// <summary>비어 있는 참조만 채운다. 바꿨으면 true.</summary>

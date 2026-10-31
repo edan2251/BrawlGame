@@ -17,15 +17,33 @@ namespace Knockbox.Simulation
     public sealed class SimWorld : ISimStepper
     {
         public SimState State;
-        public readonly ArenaDef Arena;
+        readonly ArenaDef[] arenas;
 
         public SimWorld(SimConfig config, ArenaDef arena, in SimState initial, int eventCapacity = SimEventBuffer.DefaultCapacity)
+            : this(config, new[] { arena }, initial, eventCapacity)
         {
+        }
+
+        /// <param name="arenas">맵 순환 목록(CP12). 지금 맵은 State.Match.Rotation이 고른다.</param>
+        public SimWorld(SimConfig config, ArenaDef[] arenas, in SimState initial, int eventCapacity = SimEventBuffer.DefaultCapacity)
+        {
+            if (arenas == null || arenas.Length == 0 || Array.IndexOf(arenas, null) >= 0)
+                throw new ArgumentException("맵이 하나 이상 있어야 함", nameof(arenas));
+            int count = initial.Match.Rotation.Count;
+            if (count > 1 && count != arenas.Length)
+                throw new ArgumentException($"맵 순환 상태({count}개)와 맵 목록({arenas.Length}개)이 다름", nameof(arenas));
             Config = config;
-            Arena = arena;
+            this.arenas = arenas;
             State = initial;
             Events = new SimEventBuffer(eventCapacity);
         }
+
+        /// <summary>지금 라운드의 맵. 라운드가 바뀌면(RoundTransition → Countdown) 다른 맵일 수 있다.</summary>
+        public ArenaDef Arena => arenas[State.Match.Rotation.Current];
+
+        public int ArenaCount => arenas.Length;
+
+        public ArenaDef GetArena(int index) => arenas[index];
 
         /// <summary>라운드 동안 바뀌지 않는다. RoundTransition 단계에서만 ReplaceConfig로 바꿀 수 있다.</summary>
         public SimConfig Config { get; private set; }
@@ -74,12 +92,16 @@ namespace Knockbox.Simulation
                     AfterRoundEnd(ref s);
                     break;
                 case MatchPhase.RoundTransition:
+                    s.Match.Rotation.Advance();
                     SimState.StartNextRound(ref s, Config, Arena);
                     break;
                 case MatchPhase.MatchEnd:
                     var pressed = InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons) | InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons);
                     if (s.Match.PhaseTick >= Config.Match.MatchEndMinTicks && pressed != InputButtons.None)
+                    {
+                        s.Match.Rotation.Advance();
                         SimState.StartNewMatch(ref s, Config, Arena);
+                    }
                     break;
             }
 

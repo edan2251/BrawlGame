@@ -30,11 +30,16 @@ namespace Knockbox.Game
             }
         }
 
-        public static string[] ListNames()
+        public static string[] ListNames() => List("*.txt");
+
+        /// <summary>짝 파일(<이름>.json)이 있는 맵 이름.</summary>
+        public static string[] ListMetaNames() => List("*.json");
+
+        static string[] List(string pattern)
         {
             if (!Directory.Exists(Folder))
                 return new string[0];
-            string[] files = Directory.GetFiles(Folder, "*.txt", SearchOption.TopDirectoryOnly);
+            string[] files = Directory.GetFiles(Folder, pattern, SearchOption.TopDirectoryOnly);
             for (int i = 0; i < files.Length; i++)
                 files[i] = Path.GetFileNameWithoutExtension(files[i]);
             Array.Sort(files, StringComparer.Ordinal);
