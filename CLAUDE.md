@@ -8,6 +8,8 @@
 
 CR-001(2026-10-31) 이후: 전투는 **모드 A(돌진 충돌) + 잡기**로 확정됐고(D-017, 모드 B는 동결 D-018), 화면은 Rounds를 따라가며(D-020, `docs/spec/08-visual-direction.md`), 게임 결과에 영향을 주는 인터랙티브 구조물을 시뮬레이션 안의 결정론 물리로 더한다(D-025, `docs/spec/09-props-physics.md`).
 
+CR-002 이후: 맵을 Rounds 측정값 기준으로 먼저 새로 만들고(D-032, 테두리 벽 대신 경계 튕김 D-033), 구조물 물리를 세 단계(CP14~CP16)로 개발하며 마지막 단계에서 쌓인 상자와 부분적으로 무너지는 기둥을 만든다(D-031). 계획된 질문 지점은 CP17의 끝이다.
+
 모든 판단의 기준이 되는 세 가지 축:
 
 1. ROUNDS·Square Brawl처럼 탄력 있고 물리적인 움직임
@@ -34,12 +36,12 @@ CR-001(2026-10-31) 이후: 전투는 **모드 A(돌진 충돌) + 잡기**로 확
 | `docs/spec/01-architecture.md` | 시뮬레이션/연출 분리, 결정론 규칙, 폴더 구조 | 코드 작성 전 반드시 |
 | `docs/spec/02-movement.md` | 이동 명세와 초기 수치 | CP2 |
 | `docs/spec/03-combat.md` | 전투 공통 규칙과 세 가지 방식 | CP4~CP7 |
-| `docs/spec/04-arena.md` | 맵 데이터, 지형 종류, 맵 3종 | CP2, CP8 |
+| `docs/spec/04-arena.md` | 맵 데이터, 지형 종류, 맵 v2 원칙, 경계 튕김 | CP2, CP8, CP12, CP13 |
 | `docs/spec/05-presentation.md` | 아트 디렉션, 팔다리 IK, 타격 연출, 사운드 | CP3 이후 계속 |
 | `docs/spec/06-match-and-tools.md` | 라운드 흐름, 입력 배치, UI, 디버그 도구, 시나리오 | CP1, CP4, CP8 |
-| `docs/spec/07-online-draft.md` | 온라인 롤백 초안 (착수 전 질문 필요) | CP16 |
+| `docs/spec/07-online-draft.md` | 온라인 롤백 초안 (착수 전 질문 필요) | CP18 |
 | `docs/spec/08-visual-direction.md` | Rounds 추종 화면 방향, 색 토큰, 조명·그림자, 후처리, HUD (05의 일부 대체) | CP11 이후 계속 |
-| `docs/spec/09-props-physics.md` | 인터랙티브 구조물의 결정론 물리 | CP13, CP14 |
+| `docs/spec/09-props-physics.md` | 인터랙티브 구조물의 결정론 물리, 쌓인 상자 | CP13(종류 선언), CP14~CP16 |
 | `docs/requests/` | 사용자 변경 요청(CR). 명세와 체크포인트를 바꾸는 근거 | 새 CR이 오면 먼저 |
 | `docs/DECISIONS.md` | 확정 결정, 자체 결정, 대기 질문 | 결정을 내리거나 질문할 때 |
 | `docs/REFERENCES.md` | 레퍼런스 활용 방식과 라이선스 | 외부 코드를 참고할 때 |
