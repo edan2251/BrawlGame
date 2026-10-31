@@ -61,7 +61,11 @@ namespace Knockbox.Game
             runner.StopAtTick = def.Ticks;
             var presenter = runner.GetComponent<MatchPresenter>();
             if (presenter != null)
+            {
                 presenter.SetOverlay(def.Overlay);
+                if (presenter.Help != null)
+                    presenter.Help.Visible = def.Help;
+            }
             runner.Ticked -= OnTicked;
             runner.Ticked += OnTicked;
             Evaluate(runner.World.State);

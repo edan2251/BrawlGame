@@ -44,6 +44,7 @@ namespace Knockbox.Game
                 Mode = GetString(root, "mode", ""),
                 Grab = GetBool(root, "grab", true),
                 Overlay = GetBool(root, "overlay", false),
+                Help = GetBool(root, "help", false),
                 Ticks = GetInt(root, "ticks", -1),
                 Seed = (uint)GetInt(root, "seed", 1),
             };

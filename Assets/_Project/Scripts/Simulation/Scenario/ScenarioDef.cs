@@ -11,6 +11,8 @@ namespace Knockbox.Simulation
         public bool Grab = true;
         /// <summary>캡처할 때 F3 판정 오버레이를 켠다(연출 전용, 시뮬레이션과 무관).</summary>
         public bool Overlay;
+        /// <summary>캡처할 때 `~` 단축키 도움말을 연다(연출 전용).</summary>
+        public bool Help;
         public int Ticks;
         public uint Seed = 1;
         public bool HasSpawn;

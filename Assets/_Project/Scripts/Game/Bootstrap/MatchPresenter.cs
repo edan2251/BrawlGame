@@ -113,7 +113,7 @@ namespace Knockbox.Game
             if (showDebugLabels)
             {
                 labels = Create<DebugStateLabels>("Debug Labels");
-                labels.Setup(palette.ink);
+                labels.Setup(palette.ink, palette.shadow);
             }
             overlay = Create<HitboxOverlay>("Hitbox Overlay");
             overlay.Setup(palette, shapes);
