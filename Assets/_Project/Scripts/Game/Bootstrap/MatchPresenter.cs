@@ -136,6 +136,7 @@ namespace Knockbox.Game
             fighter1.ResetPose();
             dust.Clear();
             fx.Clear();
+            overlay.ClearPower();
             if (cameraRig != null)
                 cameraRig.ResetEffects();
             renderedRound = r.World.State.Match.Round;

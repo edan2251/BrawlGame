@@ -30,6 +30,17 @@ namespace Knockbox.Game
         readonly float[] powerLeft = new float[2];
         PaletteAsset palette;
 
+        /// <summary>새 경기·시나리오를 시작할 때 남은 위력 숫자를 지운다.</summary>
+        public void ClearPower()
+        {
+            for (int k = 0; k < 2; k++)
+            {
+                powerLeft[k] = 0f;
+                if (powerLabels[k] != null)
+                    powerLabels[k].gameObject.SetActive(false);
+            }
+        }
+
         /// <summary>몸 충돌 판정에서 계산한 위력을 잠깐 띄운다(PowerCheck 이벤트).</summary>
         public void ShowPower(int fighter, float power)
         {

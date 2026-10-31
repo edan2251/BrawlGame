@@ -10,6 +10,8 @@ namespace Knockbox.Presentation
     /// 찡그린 눈, 공격 단계에 맞춘 주먹 팔, 가드 때 몸 앞에 교차한 팔, 패링 구간의 밝은 외곽선.
     /// 모드 A: 충전은 납작해지며 떨리고 단계마다 외곽선이 밝아지며 눈이 가늘어진다. 돌진은 위력에 비례하는 잔상을 남기고,
     /// 위력 6 이상이면 hazard 외곽선, 팔을 진행 방향으로 뻗는다.
+    /// 모드 B: 앞손이 연출 전용 무기를 쥔다. 활성 틱에는 손잡이를 첫 판정 원, 무기 끝을 마지막 판정 원 중심에 맞춰
+    /// 무기 끝의 궤적이 시뮬레이션 판정과 일치한다. 시작·후딜은 휴식 자세와 첫·끝 키프레임 사이를 보간한다.
     /// 시간은 시뮬레이션 시간으로 받는다(dt). 그래서 캡처와 실제 플레이가 같은 모습이 된다.
     /// </summary>
     public sealed class FighterView : MonoBehaviour
@@ -36,6 +38,11 @@ namespace Knockbox.Presentation
         const float TrailLifePerPower = 0.011f;
         /// <summary>충전 2·3단계가 시작되는 충전 틱 비율.</summary>
         const float ChargeStage2 = 1f / 3f;
+        const float WeaponOutline = 0.17f;
+        const float WeaponFill = 0.09f;
+        /// <summary>휴식 자세 무기 길이(손잡이 뒤 0.12 포함 전 길이는 손 → 끝 + 0.12).</summary>
+        const float WeaponRestLength = 0.72f;
+        const float WeaponHandle = 0.12f;
         /// <summary>피격 경직 중 회전 속도(도/초)를 속력에 곱하는 값.</summary>
         const float SpinPerSpeed = 38f;
 
@@ -50,6 +57,10 @@ namespace Knockbox.Presentation
         readonly float[] ghostAge = new float[GhostCount];
         readonly float[] ghostLife = new float[GhostCount];
         LimbRig rig;
+        SpriteRenderer weaponOutline;
+        SpriteRenderer weaponFill;
+        Vector2 weaponTip;
+        bool weaponVisible;
 
         Vector2 scale = Vector2.one;
         Vector2 scaleVelocity;
@@ -71,6 +82,9 @@ namespace Knockbox.Presentation
         float trailTimer;
 
         public LimbRig Rig => rig;
+        /// <summary>그린 무기 끝(모드 B). 활성 틱에는 마지막 판정 원 중심과 같다.</summary>
+        public Vector2 WeaponTip => weaponTip;
+        public bool WeaponVisible => weaponVisible;
         public Vector2 BodyScale => scale;
         public SpriteRenderer Body => body;
         /// <summary>몸 그림의 월드 중심(떨림·변형 포함).</summary>
@@ -125,6 +139,10 @@ namespace Knockbox.Presentation
             rig = new GameObject("Limbs").AddComponent<LimbRig>();
             rig.transform.SetParent(transform, false);
             rig.Setup(shapes, palette.ink);
+
+            weaponOutline = ShapeLibrary.CreateSliced(transform, "WeaponOutline", shapes.LimbCapsule, SortingLayers.Weapon, 0, palette.ink);
+            weaponFill = ShapeLibrary.CreateSliced(transform, "WeaponFill", shapes.LimbCapsule, SortingLayers.Weapon, 1, palette.FighterShade(fighter));
+            weaponOutline.enabled = weaponFill.enabled = false;
         }
 
         /// <summary>순간 이동 뒤(라운드·시나리오 시작) 변형과 발 위치를 처음 상태로.</summary>
@@ -248,8 +266,95 @@ namespace Knockbox.Presentation
             Vector2 hip1 = pose.TransformPoint(new Vector3(0.17f, 0.04f, 0f));
             Vector2 shoulder0 = pose.TransformPoint(new Vector3(-0.46f, 0.5f, 0f));
             Vector2 shoulder1 = pose.TransformPoint(new Vector3(0.46f, 0.5f, 0f));
-            UpdateHandPose(current, position, shoulder0, shoulder1, alpha, config);
+            bool swing = config.Mode == CombatMode.Swing && current.Action != ActionState.KO;
+            Vector2 grip = default, tip = default;
+            bool tipFixed = swing && SwingWeaponPose(current, position, alpha, config, out grip, out tip);
+            if (tipFixed)
+                rig.SetHands(grip, (current.Facing >= 0 ? shoulder0 : shoulder1) + new Vector2(-current.Facing * 0.2f, -0.25f), LimbRig.ArmLayers.Natural);
+            else
+                UpdateHandPose(current, position, shoulder0, shoulder1, alpha, config);
             rig.UpdateRig(hip0, hip1, shoulder0, shoulder1, position, current, arena, config.HalfBody, dt);
+            UpdateWeapon(current, swing, tipFixed, tip);
+        }
+
+        /// <summary>
+        /// 모드 B 공격 중 무기 자세(손잡이 = 첫 판정 원, 끝 = 마지막 판정 원). 공격 중이 아니면 false.
+        /// 틱 진행도 t는 직전 틱(ActionTick - 1)과 현재 틱 사이를 보간 비율로 잇는다(alpha = 1이면 현재 틱과 정확히 같다).
+        /// </summary>
+        bool SwingWeaponPose(in FighterState f, Vector2 position, float alpha, SimConfig config, out Vector2 grip, out Vector2 tip)
+        {
+            grip = tip = default;
+            if (f.Action != ActionState.Attack || f.AttackId == FighterState.NoAttack)
+                return false;
+            ref readonly var attack = ref config.GetAttack(f.AttackId);
+            int facing = f.Facing >= 0 ? 1 : -1;
+            float t = Mathf.Max(0f, f.ActionTick - 1 + alpha);
+            int firstActive = attack.StartupTicks;
+            int lastActive = attack.StartupTicks + attack.ActiveTicks - 1;
+            var c0 = attack.Circle0;
+            var c2 = attack.Circle2;
+            Vector2 restGrip = new Vector2(0.62f, -0.05f);
+            Vector2 restTip = restGrip + WeaponRestDirection * WeaponRestLength;
+            Vector2 localGrip, localTip;
+            if (t < firstActive)
+            {
+                // 시작: 휴식 자세에서 첫 키프레임으로 들어 올린다(뒤로 젖힘).
+                float k = Smooth(t / firstActive);
+                localGrip = Vector2.Lerp(restGrip, V(c0.Start), k);
+                localTip = Vector2.Lerp(restTip, V(c2.Start), k);
+            }
+            else if (t <= lastActive)
+            {
+                float k = attack.ActiveTicks > 1 ? (t - firstActive) / (attack.ActiveTicks - 1) : 0f;
+                localGrip = V(c0.At(k));
+                localTip = V(c2.At(k));
+            }
+            else
+            {
+                // 후딜: 마지막 키프레임에서 휴식 자세로 돌아온다.
+                float k = Smooth((t - lastActive) / Mathf.Max(attack.RecoveryTicks, 1));
+                localGrip = Vector2.Lerp(V(c0.End), restGrip, k);
+                localTip = Vector2.Lerp(V(c2.End), restTip, k);
+            }
+            grip = position + new Vector2(localGrip.x * facing, localGrip.y);
+            tip = position + new Vector2(localTip.x * facing, localTip.y);
+            return true;
+        }
+
+        static Vector2 V(Vec2 v) => new Vector2(v.X, v.Y);
+
+        /// <summary>휴식 자세의 무기 방향(앞 위로 세워 든다. 아래로 늘어뜨리면 바닥을 뚫는다).</summary>
+        static readonly Vector2 WeaponRestDirection = new Vector2(0.35f, 0.94f).normalized;
+
+        /// <summary>무기를 그린 손에서 끝까지 그린다. 공격 중이 아니면 손에서 앞 위로 세워 든다(가드 중에는 거의 수직).</summary>
+        void UpdateWeapon(in FighterState f, bool visible, bool tipFixed, Vector2 tip)
+        {
+            weaponVisible = visible;
+            weaponOutline.enabled = weaponFill.enabled = visible;
+            if (!visible)
+                return;
+            int facing = f.Facing >= 0 ? 1 : -1;
+            Vector2 hand = rig.DrawnHand(facing > 0 ? 1 : 0);
+            if (!tipFixed)
+            {
+                var up = f.IsGuarding ? new Vector2(facing * 0.12f, 1f).normalized : new Vector2(WeaponRestDirection.x * facing, WeaponRestDirection.y);
+                tip = hand + up * WeaponRestLength;
+            }
+            weaponTip = tip;
+            Vector2 d = tip - hand;
+            float length = d.magnitude;
+            Vector2 dir = length > 1e-4f ? d / length : new Vector2(facing, 0f);
+            Vector2 butt = hand - dir * WeaponHandle;
+            PlaceStick(weaponOutline, butt, tip, WeaponOutline);
+            PlaceStick(weaponFill, butt + dir * 0.03f, tip - dir * 0.03f, WeaponFill);
+        }
+
+        static void PlaceStick(SpriteRenderer sr, Vector2 a, Vector2 b, float thickness)
+        {
+            Vector2 d = b - a;
+            sr.transform.position = new Vector3((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, 0f);
+            sr.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
+            sr.size = new Vector2(d.magnitude + thickness, thickness);
         }
 
         static float ChargeProgress(in FighterState f, SimConfig config) =>
@@ -324,7 +429,8 @@ namespace Knockbox.Presentation
             }
             ref readonly var attack = ref config.GetAttack(f.AttackId);
             var c = attack.Circle0;
-            float t = f.ActionTick + alpha;
+            // 직전 틱과 현재 틱 사이(alpha = 1이면 현재 틱).
+            float t = Mathf.Max(0f, f.ActionTick - 1 + alpha);
             var rest = front + new Vector2(facing * 0.16f, -0.38f);
             var wind = front + new Vector2(-facing * 0.14f, -0.14f);
             int last = attack.StartupTicks + attack.ActiveTicks;

@@ -54,6 +54,7 @@ namespace Knockbox.Presentation
         readonly Vector2[] drawnFeet = new Vector2[2];
         readonly Vector2[] drawnKnees = new Vector2[2];
         readonly Vector2[] hands = new Vector2[2];
+        readonly Vector2[] drawnHands = new Vector2[2];
         readonly Vector2[] swingFrom = new Vector2[2];
         readonly Vector2[] swingTo = new Vector2[2];
         readonly float[] swingT = { -1f, -1f };
@@ -118,6 +119,9 @@ namespace Knockbox.Presentation
 
         public Vector2 Hand(int side) => hands[side];
 
+        /// <summary>실제로 그린 손 중심(팔 길이가 모자라면 목표와 다르다). 무기 손잡이 위치로 쓴다.</summary>
+        public Vector2 DrawnHand(int side) => drawnHands[side];
+
         /// <param name="hips">왼쪽(0)·오른쪽(1) 엉덩이 월드 위치.</param>
         /// <param name="shoulders">왼쪽(0)·오른쪽(1) 어깨 월드 위치.</param>
         public void UpdateRig(Vector2 hip0, Vector2 hip1, Vector2 shoulder0, Vector2 shoulder1, Vector2 center, in FighterState f, ArenaDef arena, float halfBody, float dt)
@@ -157,6 +161,7 @@ namespace Knockbox.Presentation
                 drawnKnees[side] = knee;
                 Draw(legs[side], hip, knee, foot, LegThickness, legsBehind ? SortingLayers.LimbBack : layer);
                 var elbow = TwoBoneIK.Solve(shoulder, hands[side], ArmUpper, ArmLower, side == 0 ? -1f : 1f, out var hand);
+                drawnHands[side] = hand;
                 string armLayer = !handOverride || armLayers == ArmLayers.Natural ? layer
                     : armLayers == ArmLayers.BothFront ? SortingLayers.LimbFront : SortingLayers.LimbBack;
                 Draw(arms[side], shoulder, elbow, hand, ArmThickness, armLayer);
