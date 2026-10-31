@@ -209,7 +209,7 @@ namespace Knockbox.Game
             if (labels != null && labels.gameObject.activeSelf)
                 labels.Render(current, body0, body1, Footer(world));
             if (overlay.gameObject.activeSelf)
-                overlay.Render(current, world.Config);
+                overlay.Render(current, world.Config, dt);
         }
 
         string Footer(SimWorld world)
@@ -283,6 +283,15 @@ namespace Knockbox.Game
                     dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 2, 1.6f, -e.Direction.X);
                     sfxPlayer.Play(Sfx.Dash);
                     break;
+                case SimEventType.LungeStart:
+                    // 돌진 발사: 뒤로 먼지, 바람 소리, 약한 흔들림(빠를수록 조금 더).
+                    dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 3, 2f, -e.Direction.X);
+                    AddTrauma(0.05f + e.Strength * 0.003f);
+                    sfxPlayer.Play(Sfx.Dash);
+                    break;
+                case SimEventType.PowerCheck:
+                    overlay.ShowPower(e.Fighter, e.Strength);
+                    break;
 
                 case SimEventType.Hit:
                 {
@@ -343,8 +352,11 @@ namespace Knockbox.Game
                     break;
                 }
                 case SimEventType.BounceRebound:
-                    dust.Burst(V(e.Position), 2, 1.2f, Mathf.Abs(e.Direction.X) > 0.5f ? e.Direction.X : 0f);
-                    sfxPlayer.Play(Sfx.Land, 0.5f);
+                    // 경직·돌진 중 지형에 튕김: 먼지, 작은 고리, 세기 비례 흔들림.
+                    dust.Burst(V(e.Position), 3, 1.4f, Mathf.Abs(e.Direction.X) > 0.5f ? e.Direction.X : 0f);
+                    fx.RingBurst(V(e.Position), palette.shadow, 0.2f, 0.8f + e.Strength * 0.02f, 0.16f);
+                    AddTrauma(0.04f + e.Strength * 0.006f);
+                    sfxPlayer.Play(Sfx.Land, 0.6f);
                     break;
                 case SimEventType.KO:
                 {

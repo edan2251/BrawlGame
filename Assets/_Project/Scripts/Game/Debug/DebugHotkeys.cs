@@ -1,11 +1,12 @@
 using Knockbox.Presentation;
+using Knockbox.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Knockbox.Game
 {
     /// <summary>
-    /// 디버그 단축키(06-match-and-tools.md 4절) 중 지금 있는 기능만: F3 판정 오버레이, F5 라운드 리셋(튜닝 재적용),
+    /// 디버그 단축키(06-match-and-tools.md 4절) 중 지금 있는 기능만: F1 전투 모드 전환(라운드 리셋), F3 판정 오버레이, F5 라운드 리셋(튜닝 재적용),
     /// F6 P2 입력원 순환(키보드 오른쪽 → 게임패드 → 허수아비), `[` `]` 허수아비 행동 바꾸기,
     /// F7 흔들림 줄이기, F8 SyncTest, P 일시정지, O 정지 중 한 틱 진행. 나머지는 해당 CP에서 붙인다.
     /// 에디터와 개발 빌드에서만 동작한다.
@@ -34,16 +35,18 @@ namespace Knockbox.Game
             if (cameraRig == null && Camera.main != null)
                 cameraRig = Camera.main.GetComponent<CameraRig>();
 
+            if (k.f1Key.wasPressedThisFrame)
+            {
+                var modes = (CombatMode[])System.Enum.GetValues(typeof(CombatMode));
+                int next = (System.Array.IndexOf(modes, runner.Mode) + 1) % modes.Length;
+                runner.Mode = modes[next];
+                RestartKeepingDummy();
+                Debug.Log($"[Knockbox] 전투 모드: {runner.Mode}");
+            }
             if (k.f3Key.wasPressedThisFrame && presenter != null)
                 presenter.SetOverlay(!presenter.OverlayVisible);
             if (k.f5Key.wasPressedThisFrame)
-            {
-                // 새 경기는 P2를 기본 장치로 되돌리므로 고른 입력원을 다시 붙인다.
-                var p2 = runner.Player2Input;
-                runner.StartNewMatch();
-                if (p2 is DummyInputSource)
-                    runner.Player2Input = p2;
-            }
+                RestartKeepingDummy();
             if (k.f6Key.wasPressedThisFrame)
                 CycleP2Input();
             if (runner.Player2Input is DummyInputSource current)
@@ -70,6 +73,15 @@ namespace Knockbox.Game
                 runner.Running = !runner.Running;
             if (k.oKey.wasPressedThisFrame && !runner.Running)
                 runner.StepOnce();
+        }
+
+        /// <summary>새 경기는 P2를 기본 장치로 되돌리므로, 허수아비를 쓰고 있었다면 다시 붙인다.</summary>
+        void RestartKeepingDummy()
+        {
+            var p2 = runner.Player2Input;
+            runner.StartNewMatch();
+            if (p2 is DummyInputSource)
+                runner.Player2Input = p2;
         }
 
         void CycleP2Input()

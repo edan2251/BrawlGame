@@ -12,6 +12,17 @@ namespace Knockbox.Presentation
     /// </summary>
     public sealed class LimbRig : MonoBehaviour
     {
+        /// <summary>손 목표를 직접 정할 때 팔을 그릴 층.</summary>
+        public enum ArmLayers
+        {
+            /// <summary>앞팔은 몸 앞, 뒷팔은 몸 뒤.</summary>
+            Natural,
+            /// <summary>두 팔 모두 몸 앞(가드 때 교차).</summary>
+            BothFront,
+            /// <summary>두 팔 모두 몸 뒤(충전 때 젖힌 팔이 얼굴을 가로지르지 않게).</summary>
+            BothBack,
+        }
+
         public const float LegUpper = 0.3f;
         public const float LegLower = 0.3f;
         public const float StepTrigger = 0.35f;
@@ -51,7 +62,7 @@ namespace Knockbox.Presentation
         float runPhase;
         float idleTime;
         bool handOverride;
-        bool armsInFront;
+        ArmLayers armLayers;
         Vector2 overrideFront;
         Vector2 overrideBack;
 
@@ -94,16 +105,13 @@ namespace Knockbox.Presentation
             handOverride = false;
         }
 
-        /// <summary>
-        /// 이번 프레임의 손 목표를 직접 정한다(공격, 가드). front는 바라보는 쪽 팔.
-        /// bothInFront면 두 팔을 모두 몸 앞에 그린다(가드 때 팔을 교차).
-        /// </summary>
-        public void SetHands(Vector2 front, Vector2 back, bool bothInFront)
+        /// <summary>이번 프레임의 손 목표를 직접 정한다(공격, 가드, 충전, 돌진). front는 바라보는 쪽 팔.</summary>
+        public void SetHands(Vector2 front, Vector2 back, ArmLayers layers)
         {
             handOverride = true;
             overrideFront = front;
             overrideBack = back;
-            armsInFront = bothInFront;
+            armLayers = layers;
         }
 
         public void ClearHands() => handOverride = false;
@@ -149,7 +157,9 @@ namespace Knockbox.Presentation
                 drawnKnees[side] = knee;
                 Draw(legs[side], hip, knee, foot, LegThickness, legsBehind ? SortingLayers.LimbBack : layer);
                 var elbow = TwoBoneIK.Solve(shoulder, hands[side], ArmUpper, ArmLower, side == 0 ? -1f : 1f, out var hand);
-                Draw(arms[side], shoulder, elbow, hand, ArmThickness, handOverride && armsInFront ? SortingLayers.LimbFront : layer);
+                string armLayer = !handOverride || armLayers == ArmLayers.Natural ? layer
+                    : armLayers == ArmLayers.BothFront ? SortingLayers.LimbFront : SortingLayers.LimbBack;
+                Draw(arms[side], shoulder, elbow, hand, ArmThickness, armLayer);
             }
         }
 

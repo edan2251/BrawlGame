@@ -7,13 +7,14 @@ namespace Knockbox.Game
     /// <summary>
     /// F3 판정 오버레이(06-match-and-tools.md 4절): 시뮬레이션의 몸 상자, 활성 공격 판정 원, 속도 벡터,
     /// 패링 구간을 실제 시뮬레이션 위치(보간 없음)에 그린다. 상태 이름과 틱 번호는 DebugStateLabels가 함께 보여 준다.
-    /// 잡기 상자(CP7)와 돌진 위력(CP5)은 해당 CP에서 더한다.
+    /// 모드 A: 몸 충돌 판정을 한 순간 양쪽 위력 숫자를 0.6초 동안 띄운다(6 이상이면 위험색). 잡기 상자는 CP7에서 더한다.
     /// </summary>
     public sealed class HitboxOverlay : MonoBehaviour
     {
         const float Line = 0.04f;
         const float VelocityScale = 0.06f;
         const int SortingOrder = 50;
+        const float PowerShowTime = 0.6f;
 
         struct FighterMarks
         {
@@ -24,9 +25,44 @@ namespace Knockbox.Game
         }
 
         readonly FighterMarks[] marks = new FighterMarks[2];
+        readonly TextMesh[] powerLabels = new TextMesh[2];
+        readonly float[] powerShown = new float[2];
+        readonly float[] powerLeft = new float[2];
+        PaletteAsset palette;
 
-        public void Setup(PaletteAsset palette, ShapeLibrary shapes)
+        /// <summary>몸 충돌 판정에서 계산한 위력을 잠깐 띄운다(PowerCheck 이벤트).</summary>
+        public void ShowPower(int fighter, float power)
         {
+            if (fighter < 0 || fighter > 1)
+                return;
+            powerLeft[fighter] = PowerShowTime;
+            if (Mathf.Abs(power - powerShown[fighter]) < 0.05f && powerLabels[fighter].text.Length > 0)
+                return;
+            powerShown[fighter] = power;
+            powerLabels[fighter].text = power.ToString("0.0");
+            powerLabels[fighter].color = power >= 6f ? palette.hazard : palette.ink;
+        }
+
+        public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)
+        {
+            palette = paletteAsset;
+            for (int k = 0; k < 2; k++)
+            {
+                var go = new GameObject($"P{k + 1}Power");
+                go.transform.SetParent(transform, false);
+                var text = go.AddComponent<TextMesh>();
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                var mr = go.GetComponent<MeshRenderer>();
+                mr.sharedMaterial = text.font.material;
+                mr.sortingLayerName = SortingLayers.UI;
+                mr.sortingOrder = SortingOrder + 5;
+                text.fontSize = 64;
+                text.characterSize = 0.1f;
+                text.anchor = TextAnchor.MiddleCenter;
+                text.fontStyle = FontStyle.Bold;
+                text.text = "";
+                powerLabels[k] = text;
+            }
             for (int k = 0; k < 2; k++)
             {
                 var m = new FighterMarks
@@ -44,10 +80,20 @@ namespace Knockbox.Game
             }
         }
 
-        public void Render(in SimState state, SimConfig config)
+        public void Render(in SimState state, SimConfig config, float dt)
         {
             Render(marks[0], state.Fighter0, config);
             Render(marks[1], state.Fighter1, config);
+            for (int k = 0; k < 2; k++)
+            {
+                var f = state.GetFighter(k);
+                var other = state.GetFighter(1 - k);
+                // 붙어 있어도 겹치지 않게 상대 반대쪽 바깥에 띄운다.
+                float outward = f.Position.X > other.Position.X ? 1f : f.Position.X < other.Position.X ? -1f : k == 0 ? -1f : 1f;
+                powerLeft[k] = Mathf.Max(0f, powerLeft[k] - dt);
+                powerLabels[k].gameObject.SetActive(powerLeft[k] > 0f);
+                powerLabels[k].transform.localPosition = new Vector3(f.Position.X + outward * 0.95f, f.Position.Y + 0.25f, 0f);
+            }
         }
 
         static void Render(in FighterMarks m, in FighterState f, SimConfig config)

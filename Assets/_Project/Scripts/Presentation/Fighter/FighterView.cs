@@ -8,6 +8,8 @@ namespace Knockbox.Presentation
     /// 스프링 몸 변형과 기울기, 대시 잔상. 직전 상태와 현재 상태를 보간해서 그린다.
     /// 전투: 흰색 번쩍임, 히트스탑 중 떨림(이때는 보간하지 않고 몸 변형도 멈춘다), 피격 경직 중 구르는 회전,
     /// 찡그린 눈, 공격 단계에 맞춘 주먹 팔, 가드 때 몸 앞에 교차한 팔, 패링 구간의 밝은 외곽선.
+    /// 모드 A: 충전은 납작해지며 떨리고 단계마다 외곽선이 밝아지며 눈이 가늘어진다. 돌진은 위력에 비례하는 잔상을 남기고,
+    /// 위력 6 이상이면 hazard 외곽선, 팔을 진행 방향으로 뻗는다.
     /// 시간은 시뮬레이션 시간으로 받는다(dt). 그래서 캡처와 실제 플레이가 같은 모습이 된다.
     /// </summary>
     public sealed class FighterView : MonoBehaviour
@@ -23,10 +25,17 @@ namespace Knockbox.Presentation
         // 착지 찌그러짐이 3프레임쯤에 처음 1로 돌아오고 8프레임 안팎에 거의 가라앉는 값.
         const float SpringStiffness = 900f;
         const float SpringDamping = 21f;
-        const int GhostCount = 3;
+        const int GhostCount = 12;
+        const int DashGhosts = 3;
         const float GhostLife = 0.25f;
         const float GhostAlpha = 0.4f;
         const float GhostInterval = 0.045f;
+        /// <summary>돌진 잔상 간격과 길이(수명 = 기본 + 위력 × 비율).</summary>
+        const float TrailInterval = 0.025f;
+        const float TrailLifeBase = 0.06f;
+        const float TrailLifePerPower = 0.011f;
+        /// <summary>충전 2·3단계가 시작되는 충전 틱 비율.</summary>
+        const float ChargeStage2 = 1f / 3f;
         /// <summary>피격 경직 중 회전 속도(도/초)를 속력에 곱하는 값.</summary>
         const float SpinPerSpeed = 38f;
 
@@ -39,6 +48,7 @@ namespace Knockbox.Presentation
         readonly SpriteRenderer[] eyes = new SpriteRenderer[2];
         readonly SpriteRenderer[] ghosts = new SpriteRenderer[GhostCount];
         readonly float[] ghostAge = new float[GhostCount];
+        readonly float[] ghostLife = new float[GhostCount];
         LimbRig rig;
 
         Vector2 scale = Vector2.one;
@@ -58,6 +68,7 @@ namespace Knockbox.Presentation
         float shake;
         float spin;
         float wobbleTime;
+        float trailTimer;
 
         public LimbRig Rig => rig;
         public Vector2 BodyScale => scale;
@@ -108,7 +119,7 @@ namespace Knockbox.Presentation
                 ghosts[i] = ShapeLibrary.CreateSliced(transform.parent, $"Ghost{fighter}_{i}", shapes.RoundedBody, SortingLayers.LimbBack, -10, palette.FighterBody(fighter));
                 ShapeLibrary.SetSize(ghosts[i], BodySize, BodySize);
                 ghosts[i].enabled = false;
-                ghostAge[i] = GhostLife;
+                ghostAge[i] = ghostLife[i] = GhostLife;
             }
 
             rig = new GameObject("Limbs").AddComponent<LimbRig>();
@@ -128,9 +139,10 @@ namespace Knockbox.Presentation
             outlineFlashLeft = 0f;
             shake = 0f;
             spin = 0f;
+            trailTimer = 0f;
             for (int i = 0; i < GhostCount; i++)
             {
-                ghostAge[i] = GhostLife;
+                ghostAge[i] = ghostLife[i] = GhostLife;
                 ghosts[i].enabled = false;
             }
             rig.ResetPose();
@@ -156,8 +168,14 @@ namespace Knockbox.Presentation
                     holdImpulseFrame = true;
                     break;
                 case SimEventType.Dash:
-                    ghostEmitLeft = GhostCount;
+                    ghostEmitLeft = DashGhosts;
                     ghostEmitTimer = 0f;
+                    break;
+                case SimEventType.LungeStart:
+                    scale = new Vector2(1.25f, 0.82f);
+                    scaleVelocity = Vector2.zero;
+                    holdImpulseFrame = true;
+                    trailTimer = 0f;
                     break;
                 case SimEventType.Hit:
                     // 맞은 쪽: 4프레임 흰색, 히트스탑 동안 데미지에 비례해 떨림, 넉백 방향으로 찌그러짐.
@@ -206,21 +224,25 @@ namespace Knockbox.Presentation
 
             if (!frozen)
             {
-                UpdateSquash(current, dt);
-                UpdateTilt(current, dt, config.Movement.MaxRunSpeed);
+                UpdateSquash(current, dt, config);
+                UpdateTilt(current, dt, config);
                 UpdateSpin(current, dt);
             }
             // 벽에 붙으면 몸 그림만 살짝 떼어 외곽선이 벽에 묻히지 않게 한다(시뮬레이션 위치는 그대로).
             float wallTarget = current.WallSide != 0 && current.Action != ActionState.Hitstun ? -current.WallSide * WallClearance : 0f;
             wallShift = Mathf.Lerp(wallShift, wallTarget, 1f - Mathf.Exp(-30f * dt));
-            var jitter = shake > 0f ? new Vector2(random.Range(-1f, 1f), random.Range(-1f, 1f)) * shake : Vector2.zero;
+            // 히트스탑 떨림, 또는 충전이 쌓일수록 커지는 떨림.
+            float tremble = shake;
+            if (!frozen && current.Action == ActionState.Charge && dt > 0f)
+                tremble = 0.008f + 0.022f * ChargeProgress(current, config);
+            var jitter = tremble > 0f ? new Vector2(random.Range(-1f, 1f), random.Range(-1f, 1f)) * tremble : Vector2.zero;
             pose.localPosition = new Vector3(wallShift + jitter.x, VisualLift - BodySize * 0.5f + jitter.y, 0f);
             pose.localScale = new Vector3(scale.x, scale.y, 1f);
             pose.localRotation = Quaternion.Euler(0f, 0f, tilt + spin);
 
-            UpdateColors(current, dt);
+            UpdateColors(current, dt, config);
             UpdateEyes(current, dt);
-            UpdateGhosts(dt);
+            UpdateGhosts(current, dt, config);
 
             Vector2 hip0 = pose.TransformPoint(new Vector3(-0.17f, 0.04f, 0f));
             Vector2 hip1 = pose.TransformPoint(new Vector3(0.17f, 0.04f, 0f));
@@ -230,11 +252,37 @@ namespace Knockbox.Presentation
             rig.UpdateRig(hip0, hip1, shoulder0, shoulder1, position, current, arena, config.HalfBody, dt);
         }
 
-        void UpdateColors(in FighterState f, float dt)
+        static float ChargeProgress(in FighterState f, SimConfig config) =>
+            Mathf.Clamp01(f.ActionTick / (float)config.Combat.Charge.FullChargeTicks);
+
+        /// <summary>충전 단계 1~3: 1/3 전, 최대 충전 전, 최대 충전.</summary>
+        public static int ChargeStage(in FighterState f, SimConfig config)
+        {
+            float k = ChargeProgress(f, config);
+            return k >= 1f ? 3 : k >= ChargeStage2 ? 2 : 1;
+        }
+
+        void UpdateColors(in FighterState f, float dt, SimConfig config)
         {
             body.color = flashLeft > 0f ? palette.flash : f.Action == ActionState.KO ? palette.FighterShade(index) : palette.FighterBody(index);
-            // 패링 구간에는 외곽선이 밝아진다(패링을 노렸다는 것이 보이게).
-            outline.color = outlineFlashLeft > 0f ? palette.flash : f.ParryTicks > 0 ? palette.spark : palette.ink;
+            // 우선순위: 번쩍임 > 패링 구간(밝은 외곽선) > 위험(위력 6 이상) > 충전 단계 > 기본.
+            Color line;
+            float power = Mathf.Sqrt(f.Velocity.X * f.Velocity.X + f.Velocity.Y * f.Velocity.Y) * FighterCombat.Aggression(f, config);
+            if (outlineFlashLeft > 0f)
+                line = palette.flash;
+            else if (f.ParryTicks > 0)
+                line = palette.spark;
+            else if (power >= config.Combat.Charge.PowerThreshold)
+                line = palette.hazard;
+            else if (f.Action == ActionState.Charge)
+            {
+                int stage = ChargeStage(f, config);
+                // 3단계(최대 충전)는 spark와 흰색 사이로 깜박인다.
+                line = stage == 1 ? palette.oneWay : stage == 2 ? palette.spark : (f.ActionTick / 4) % 2 == 0 ? palette.flash : palette.spark;
+            }
+            else
+                line = palette.ink;
+            outline.color = line;
             flashLeft = Mathf.Max(0f, flashLeft - dt);
             outlineFlashLeft = Mathf.Max(0f, outlineFlashLeft - dt);
         }
@@ -251,7 +299,22 @@ namespace Knockbox.Presentation
             if (f.IsGuarding)
             {
                 var chest = (shoulder0 + shoulder1) * 0.5f;
-                rig.SetHands(chest + new Vector2(facing * 0.55f, -0.02f), chest + new Vector2(facing * 0.5f, -0.24f), true);
+                rig.SetHands(chest + new Vector2(facing * 0.55f, -0.02f), chest + new Vector2(facing * 0.5f, -0.24f), LimbRig.ArmLayers.BothFront);
+                return;
+            }
+            if (f.Action == ActionState.Charge)
+            {
+                // 충전: 팔을 뒤로 젖힌다(충전이 쌓일수록 더).
+                float charge = ChargeProgress(f, config);
+                rig.SetHands(front + new Vector2(-facing * (0.2f + 0.14f * charge), -0.1f), back + new Vector2(-facing * (0.28f + 0.1f * charge), -0.12f), LimbRig.ArmLayers.BothBack);
+                return;
+            }
+            if (f.Action == ActionState.Lunge)
+            {
+                // 돌진: 두 팔을 진행 방향으로 뻗는다.
+                var v = new Vector2(f.Velocity.X, f.Velocity.Y);
+                var dir = v.sqrMagnitude > 1e-4f ? v.normalized : new Vector2(facing, 0f);
+                rig.SetHands(front + dir * 0.55f, back + dir * 0.5f + new Vector2(0f, -0.08f), LimbRig.ArmLayers.Natural);
                 return;
             }
             if (f.Action != ActionState.Attack || f.AttackId == FighterState.NoAttack)
@@ -275,7 +338,7 @@ namespace Knockbox.Presentation
                 hand = strike;
             else
                 hand = Vector2.Lerp(strike, rest, Smooth((t - last) / Mathf.Max(attack.RecoveryTicks, 1)));
-            rig.SetHands(hand, back + new Vector2(-facing * 0.22f, -0.22f), false);
+            rig.SetHands(hand, back + new Vector2(-facing * 0.22f, -0.22f), LimbRig.ArmLayers.Natural);
         }
 
         static float Smooth(float x)
@@ -298,12 +361,18 @@ namespace Knockbox.Presentation
             spin = Mathf.Lerp(spin, 0f, 1f - Mathf.Exp(-16f * dt));
         }
 
-        void UpdateSquash(in FighterState f, float dt)
+        void UpdateSquash(in FighterState f, float dt, SimConfig config)
         {
             // 이동 속도에 따라 진행 방향으로 최대 1.25 늘어난다.
             float vx = Mathf.Abs(f.Velocity.X), vy = Mathf.Abs(f.Velocity.Y);
             float stretch = 1f + 0.25f * Mathf.Clamp01((Mathf.Max(vx, vy) - 6f) / 20f);
             var target = vx >= vy ? new Vector2(stretch, 1f / stretch) : new Vector2(1f / stretch, stretch);
+            if (f.Action == ActionState.Charge)
+            {
+                // 충전: 납작해진다.
+                float k = ChargeProgress(f, config);
+                target = new Vector2(1f + 0.16f * k, 1f - 0.2f * k);
+            }
 
             // 사건이 일어난 프레임에는 찌그러진 모양을 그대로 보여 준다.
             if (holdImpulseFrame)
@@ -322,12 +391,19 @@ namespace Knockbox.Presentation
             }
         }
 
-        void UpdateTilt(in FighterState f, float dt, float maxRunSpeed)
+        void UpdateTilt(in FighterState f, float dt, SimConfig config)
         {
+            float maxRunSpeed = config.Movement.MaxRunSpeed;
             wobbleTime += dt;
             float target;
             switch (f.Action)
             {
+                case ActionState.Charge:
+                    target = f.Facing * 6f;
+                    break;
+                case ActionState.Lunge:
+                    target = -Mathf.Clamp(f.Velocity.X / config.Combat.Charge.LungeMaxSpeed, -1f, 1f) * 14f;
+                    break;
                 case ActionState.WallSlide:
                     target = 0f;
                     break;
@@ -370,6 +446,10 @@ namespace Knockbox.Presentation
             {
                 open = Mathf.Min(open, 0.6f);
             }
+            else if (f.Action == ActionState.Charge)
+            {
+                open = Mathf.Min(open, 0.45f);
+            }
 
             // 바라보는 쪽과 속도 쪽을 본다.
             float lookX = f.Facing * 0.08f + Mathf.Clamp(f.Velocity.X * 0.004f, -0.04f, 0.04f);
@@ -382,20 +462,37 @@ namespace Knockbox.Presentation
             }
         }
 
-        void UpdateGhosts(float dt)
+        void EmitGhost(float life)
         {
+            var ghost = ghosts[ghostNext];
+            ghost.transform.position = body.transform.position;
+            ghost.transform.rotation = pose.rotation;
+            ShapeLibrary.SetSize(ghost, BodySize * scale.x, BodySize * scale.y);
+            ghost.enabled = true;
+            ghostAge[ghostNext] = 0f;
+            ghostLife[ghostNext] = life;
+            ghostNext = (ghostNext + 1) % GhostCount;
+        }
+
+        void UpdateGhosts(in FighterState f, float dt, SimConfig config)
+        {
+            // 돌진: 위력에 비례하는 길이의 잔상을 계속 남긴다(시간이 흐를 때만).
+            if (f.Action == ActionState.Lunge && f.HitstopTicks == 0 && dt > 0f)
+            {
+                trailTimer -= dt;
+                if (trailTimer <= 0f)
+                {
+                    float power = Mathf.Sqrt(f.Velocity.X * f.Velocity.X + f.Velocity.Y * f.Velocity.Y) * FighterCombat.Aggression(f, config);
+                    EmitGhost(TrailLifeBase + power * TrailLifePerPower);
+                    trailTimer = TrailInterval;
+                }
+            }
             if (ghostEmitLeft > 0f)
             {
                 ghostEmitTimer -= dt;
                 if (ghostEmitTimer <= 0f)
                 {
-                    var ghost = ghosts[ghostNext];
-                    ghost.transform.position = body.transform.position;
-                    ghost.transform.rotation = pose.rotation;
-                    ShapeLibrary.SetSize(ghost, BodySize * scale.x, BodySize * scale.y);
-                    ghost.enabled = true;
-                    ghostAge[ghostNext] = 0f;
-                    ghostNext = (ghostNext + 1) % GhostCount;
+                    EmitGhost(GhostLife);
                     ghostEmitLeft -= 1f;
                     ghostEmitTimer = GhostInterval;
                 }
@@ -406,12 +503,12 @@ namespace Knockbox.Presentation
                 if (!ghosts[i].enabled)
                     continue;
                 ghostAge[i] += dt;
-                if (ghostAge[i] >= GhostLife)
+                if (ghostAge[i] >= ghostLife[i])
                 {
                     ghosts[i].enabled = false;
                     continue;
                 }
-                color.a = GhostAlpha * (1f - ghostAge[i] / GhostLife);
+                color.a = GhostAlpha * (1f - ghostAge[i] / ghostLife[i]);
                 ghosts[i].color = color;
             }
         }

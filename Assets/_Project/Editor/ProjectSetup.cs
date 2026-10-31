@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Knockbox.Game;
 using Knockbox.Presentation;
+using Knockbox.Simulation;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -144,6 +145,14 @@ namespace Knockbox.EditorTools
             if (runnerFlags.FindProperty("useLocalDevices").boolValue != localPlay)
             {
                 runnerFlags.FindProperty("useLocalDevices").boolValue = localPlay;
+                runnerFlags.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+            // 직접 플레이하는 Main 씬은 테스트 공격 대신 실제 전투 모드(CP5부터 모드 A)로 시작한다.
+            var modeProperty = runnerFlags.FindProperty("mode");
+            if (localPlay && modeProperty.enumValueIndex == (int)CombatMode.Test)
+            {
+                modeProperty.enumValueIndex = (int)CombatMode.Charge;
                 runnerFlags.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }
