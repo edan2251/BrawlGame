@@ -58,7 +58,7 @@ namespace Knockbox.Tests.EditMode
             string report = $"[Knockbox][CP4-6] {map} 시드 {seed}: {counts}";
             TestContext.WriteLine(report);
             UnityEngine.Debug.Log(report);
-            Assert.GreaterOrEqual(counts.Hit, 5, "명중이 충분히 나와야 대칭 검증 의미가 있음");
+            Assert.GreaterOrEqual(counts.Hit + counts.Spike, 5, "명중(Pit은 가시 포함)이 충분히 나와야 대칭 검증 의미가 있음");
             Assert.Greater(counts.GuardHit + counts.Parry + counts.Clash, 0, "가드·패링·클래시 중 하나는 나와야 함");
             Assert.Greater(counts.KO, 0, "KO가 나와야 함");
         }

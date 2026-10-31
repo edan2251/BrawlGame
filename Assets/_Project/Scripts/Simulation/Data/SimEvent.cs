@@ -36,6 +36,8 @@ namespace Knockbox.Simulation
         GrabStart,
         /// <summary>잡기 풀기: 서로 잡아 반대로 튕김.</summary>
         GrabBreak,
+        /// <summary>가시에 닿음. Strength는 데미지.</summary>
+        Spike,
     }
 
     /// <summary>

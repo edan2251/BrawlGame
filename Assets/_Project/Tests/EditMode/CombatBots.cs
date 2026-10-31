@@ -95,7 +95,7 @@ namespace Knockbox.Tests.EditMode
     /// <summary>한 경기 동안의 전투 이벤트 수.</summary>
     public struct CombatEventCounts
     {
-        public int Hit, GuardHit, Parry, Clash, WallSplat, Bounce, KO, RoundTransition, MatchEnd;
+        public int Hit, GuardHit, Parry, Clash, WallSplat, Bounce, KO, RoundTransition, MatchEnd, Spike;
 
         public void Add(SimEventBuffer events)
         {
@@ -112,11 +112,12 @@ namespace Knockbox.Tests.EditMode
                     case SimEventType.KO: KO++; break;
                     case SimEventType.RoundTransition: RoundTransition++; break;
                     case SimEventType.MatchEnd: MatchEnd++; break;
+                    case SimEventType.Spike: Spike++; break;
                 }
             }
         }
 
         public override string ToString() =>
-            $"명중 {Hit}, 가드 {GuardHit}, 패링 {Parry}, 클래시 {Clash}, 벽꽝 {WallSplat}, 튕김 {Bounce}, KO {KO}, 라운드 전환 {RoundTransition}, 경기 종료 {MatchEnd}";
+            $"명중 {Hit}, 가드 {GuardHit}, 패링 {Parry}, 클래시 {Clash}, 벽꽝 {WallSplat}, 튕김 {Bounce}, KO {KO}, 라운드 전환 {RoundTransition}, 경기 종료 {MatchEnd}, 가시 {Spike}";
     }
 }

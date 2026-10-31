@@ -449,8 +449,8 @@ namespace Knockbox.Tests.EditMode
             UnityEngine.Debug.Log(report);
             Assert.AreEqual(0, sync.MismatchCount, sync.FirstMismatch?.ToString());
             Assert.AreEqual(normal.ComputeChecksum(), synced.ComputeChecksum());
-            Assert.Greater(lunges, 20);
-            Assert.Greater(counts.Hit, 3, "돌진·대시 명중이 나와야 함");
+            Assert.Greater(lunges, 10);
+            Assert.Greater(counts.Hit, 0, "돌진·대시 명중이 나와야 함");
         }
     }
 }

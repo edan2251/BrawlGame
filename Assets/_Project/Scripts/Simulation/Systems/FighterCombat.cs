@@ -68,6 +68,8 @@ namespace Knockbox.Simulation
                 f.ParryTicks--;
             if (f.ContactCooldown > 0)
                 f.ContactCooldown--;
+            if (f.SpikeImmunityTicks > 0)
+                f.SpikeImmunityTicks--;
             // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
             bool guardPressed = (pressed & InputButtons.Guard) != 0;
             int sinceGuardPress = SimMath.Min(f.TicksSinceGuardPress + 1, FighterState.TimerCap);
@@ -715,7 +717,7 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>경직 계열 상태로 들어간다. 진행 중이던 공격, 충전·돌진, 패링 구간, 대시를 끊는다. StunTicks는 부르는 쪽이 정한다.</summary>
-        static void EnterStun(ref FighterState f, ActionState action)
+        internal static void EnterStun(ref FighterState f, ActionState action)
         {
             f.RestartAction(action);
             f.ThrowPending = false;

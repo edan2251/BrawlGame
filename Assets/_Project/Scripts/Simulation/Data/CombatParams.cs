@@ -476,6 +476,12 @@ namespace Knockbox.Simulation
         /// <summary>공격 중 공중 조작 배율. 지상에서는 입력 가속 없이 감속만 한다.</summary>
         public float AttackAirControlMultiplier;
 
+        // 가시(04-arena.md 3절): 닿으면 데미지, 위로 튕김, 경직, 면역 동안은 바닥처럼 선다.
+        public int SpikeDamage;
+        public float SpikeBounceSpeed;
+        public int SpikeHitstun;
+        public int SpikeImmunityTicks;
+
         public AttackDef TestAttack;
         public ChargeModeParams Charge;
         public SwingModeParams Swing;
@@ -523,6 +529,11 @@ namespace Knockbox.Simulation
 
             AttackAirControlMultiplier = 0.5f,
 
+            SpikeDamage = 15,
+            SpikeBounceSpeed = 20f,
+            SpikeHitstun = 20,
+            SpikeImmunityTicks = 45,
+
             TestAttack = AttackDef.TestJab,
             Charge = ChargeModeParams.Default,
             Swing = SwingModeParams.Default,
@@ -564,6 +575,10 @@ namespace Knockbox.Simulation
             v.Value(nameof(ClashSpeed), ClashSpeed);
             v.Value(nameof(RecoilTicks), RecoilTicks);
             v.Value(nameof(AttackAirControlMultiplier), AttackAirControlMultiplier);
+            v.Value(nameof(SpikeDamage), SpikeDamage);
+            v.Value(nameof(SpikeBounceSpeed), SpikeBounceSpeed);
+            v.Value(nameof(SpikeHitstun), SpikeHitstun);
+            v.Value(nameof(SpikeImmunityTicks), SpikeImmunityTicks);
             v.Begin(nameof(TestAttack));
             TestAttack.Visit(ref v);
             v.End();

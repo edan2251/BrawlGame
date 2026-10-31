@@ -41,6 +41,7 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(a.ThrowPending, b.ThrowPending, at + " throwPending");
             Assert.AreEqual(a.ThrowDirection.X, -b.ThrowDirection.X, Tolerance, at + " throwDirection.x");
             Assert.AreEqual(a.ThrowDirection.Y, b.ThrowDirection.Y, Tolerance, at + " throwDirection.y");
+            Assert.AreEqual(a.SpikeImmunityTicks, b.SpikeImmunityTicks, at + " spikeImmunity");
         }
 
         [TestCase(11u)]

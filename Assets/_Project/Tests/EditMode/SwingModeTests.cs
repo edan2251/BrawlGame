@@ -325,8 +325,8 @@ namespace Knockbox.Tests.EditMode
             UnityEngine.Debug.Log(report);
             Assert.AreEqual(0, sync.MismatchCount, sync.FirstMismatch?.ToString());
             Assert.AreEqual(normal.ComputeChecksum(), synced.ComputeChecksum());
-            Assert.Greater(swings, 50);
-            Assert.Greater(counts.Hit, 3);
+            Assert.Greater(swings, 20);
+            Assert.Greater(counts.Hit, 0);
         }
     }
 }

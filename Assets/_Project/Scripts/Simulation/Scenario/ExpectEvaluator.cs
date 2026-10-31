@@ -8,7 +8,7 @@ namespace Knockbox.Simulation
     /// </summary>
     public static class ExpectEvaluator
     {
-        public const string SupportedFields = "tick, phase, round, score, roundWinner, pos.x, pos.y, vel.x, vel.y, speed, facing, action, actionTick, grounded, wallSide, airJumps, dashCharges, hp, hitstop, stun, combo, parry, bounces";
+        public const string SupportedFields = "tick, phase, round, score, roundWinner, pos.x, pos.y, vel.x, vel.y, speed, facing, action, actionTick, grounded, wallSide, airJumps, dashCharges, hp, hitstop, stun, combo, parry, bounces, spikeImmunity";
         public const float EqualsTolerance = 1e-4f;
 
         enum Kind { Number, Bool, Text }
@@ -96,6 +96,7 @@ namespace Knockbox.Simulation
                 case "combo": number = f.ComboHits; return true;
                 case "parry": number = f.ParryTicks; return true;
                 case "bounces": number = f.LungeBounces; return true;
+                case "spikeImmunity": number = f.SpikeImmunityTicks; return true;
                 default: return false;
             }
         }

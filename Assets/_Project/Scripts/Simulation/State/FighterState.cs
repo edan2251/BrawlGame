@@ -117,6 +117,8 @@ namespace Knockbox.Simulation
         public bool ThrowPending;
         /// <summary>던질 방향(월드, 단위 벡터).</summary>
         public Vec2 ThrowDirection;
+        /// <summary>남은 가시 면역 틱. 면역 동안 가시는 바닥처럼 선다.</summary>
+        public int SpikeImmunityTicks;
 
         public const int NoAttack = -1;
 
@@ -191,6 +193,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(ThrowPending), ThrowPending);
             v.Value("ThrowDirection.X", ThrowDirection.X);
             v.Value("ThrowDirection.Y", ThrowDirection.Y);
+            v.Value(nameof(SpikeImmunityTicks), SpikeImmunityTicks);
         }
     }
 }

@@ -320,6 +320,11 @@ namespace Knockbox.Simulation
                 bounced = true;
                 events.Add(new SimEvent(tick, SimEventType.PadBounce, index, f.Position, new Vec2(0f, 1f), m.BouncePadSpeed));
             }
+            else if (contacts.Landed && contacts.LandedKind == TerrainKind.Spike && CanTouchSpikes(f))
+            {
+                SpikeHit(ref f, config, index, tick, events);
+                bounced = true;
+            }
             else if (f.IsLaunched)
             {
                 bounced = Rebound(ref f, contacts, config, index, tick, events);
@@ -335,6 +340,13 @@ namespace Knockbox.Simulation
                 ground = TerrainCollision.ProbeGround(f.Position, half, arena, m.GroundProbeDistance, f.DropThroughBox);
                 if (ground == FighterState.NoBox && StandsOn(f.Position, other.Position, config))
                     ground = FighterState.OnFighter;
+            }
+            // 면역이 끝난 뒤 가시 위에 서 있으면 다시 닿은 것이다.
+            if (ground >= 0 && arena.GetBox(ground).Kind == TerrainKind.Spike && CanTouchSpikes(f))
+            {
+                SpikeHit(ref f, config, index, tick, events);
+                ground = FighterState.NoBox;
+                bounced = true;
             }
             f.Grounded = ground != FighterState.NoBox;
             f.GroundBox = ground;
@@ -533,6 +545,32 @@ namespace Knockbox.Simulation
             }
             events.Add(new SimEvent(tick, SimEventType.BounceRebound, index, point, normal, strongest));
             return true;
+        }
+
+        /// <summary>면역 중이거나 붙잡기 중(둘이 함께 멈춰 있음)이면 가시에 닿지 않는다.</summary>
+        static bool CanTouchSpikes(in FighterState f) =>
+            f.SpikeImmunityTicks == 0 && f.Action != ActionState.Held && f.Action != ActionState.Holding;
+
+        /// <summary>
+        /// 가시: 데미지 15, vy = 20으로 튕겨 올림, 경직 20틱, 45틱 면역, 공중 점프·대시 회복(빠져나올 기회).
+        /// 이미 날아가는 경직 중이면 연속 명중 수는 그대로 둔다.
+        /// </summary>
+        static void SpikeHit(ref FighterState f, SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            ref readonly var m = ref config.Movement;
+            int combo = f.IsLaunched ? f.ComboHits : 0;
+            f.Velocity = new Vec2(f.Velocity.X, c.SpikeBounceSpeed);
+            f.Health = SimMath.Max(0, f.Health - c.SpikeDamage);
+            f.StunTicks = c.SpikeHitstun;
+            FighterCombat.EnterStun(ref f, ActionState.Hitstun);
+            f.ComboHits = combo;
+            f.SpikeImmunityTicks = c.SpikeImmunityTicks;
+            f.AirJumpsLeft = m.AirJumps;
+            f.DashCharges = m.DashCharges;
+            f.Grounded = false;
+            f.GroundBox = FighterState.NoBox;
+            events.Add(new SimEvent(tick, SimEventType.Spike, index, new Vec2(f.Position.X, f.Position.Y - config.HalfBody), new Vec2(0f, 1f), c.SpikeDamage));
         }
 
         /// <summary>상대 머리 위(단방향 발판처럼)에 서 있는지.</summary>

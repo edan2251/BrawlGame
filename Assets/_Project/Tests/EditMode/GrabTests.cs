@@ -229,7 +229,7 @@ namespace Knockbox.Tests.EditMode
         // CP7-7 ---------------------------------------------------------------
 
         [TestCase(CombatMode.Charge, "Box", 41u)]
-        [TestCase(CombatMode.Charge, "Pit", 42u)]
+        [TestCase(CombatMode.Charge, "Towers", 42u)]
         [TestCase(CombatMode.Swing, "Box", 43u)]
         [TestCase(CombatMode.Swing, "Towers", 44u)]
         public void MirroredGrabFight_AndSyncTest(CombatMode mode, string map, uint seed)
