@@ -65,6 +65,25 @@ namespace Knockbox.EditorTools
                 Debug.Log($"[Knockbox] 에셋 생성: {CombatTuningFastPath}");
             }
             CreateAssetIfMissing<PaletteAsset>(PalettePath);
+            UpgradePalette();
+        }
+
+        /// <summary>
+        /// 팔레트 토큰 구성이 바뀌면(CR-001: 08-visual-direction.md) 기존 에셋을 새 기본값으로 덮는다. GUID는 그대로라 씬 참조가 유지된다.
+        /// </summary>
+        [MenuItem("Knockbox/Setup/Upgrade Palette")]
+        public static void UpgradePalette()
+        {
+            var palette = AssetDatabase.LoadAssetAtPath<PaletteAsset>(PalettePath);
+            if (palette == null || palette.version >= PaletteAsset.CurrentVersion)
+                return;
+            var fresh = ScriptableObject.CreateInstance<PaletteAsset>();
+            EditorUtility.CopySerialized(fresh, palette);
+            Object.DestroyImmediate(fresh);
+            palette.version = PaletteAsset.CurrentVersion;
+            EditorUtility.SetDirty(palette);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Knockbox] 팔레트를 버전 {PaletteAsset.CurrentVersion}으로 바꿈: {PalettePath}");
         }
 
         static void CreateAssetIfMissing<T>(string path) where T : ScriptableObject

@@ -13,6 +13,8 @@ namespace Knockbox.Simulation
         public bool Overlay;
         /// <summary>캡처할 때 `~` 단축키 도움말을 연다(연출 전용).</summary>
         public bool Help;
+        /// <summary>화면 테마(0 A 민트, 1 B 사이언, 2 C 슬레이트). -1이면 맵이 정한다(연출 전용, 08 2절).</summary>
+        public int Theme = -1;
         public int Ticks;
         public uint Seed = 1;
         public bool HasSpawn;

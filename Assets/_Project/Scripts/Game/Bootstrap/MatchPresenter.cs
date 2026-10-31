@@ -24,6 +24,7 @@ namespace Knockbox.Game
 
         MatchRunner runner;
         BackgroundView background;
+        PostFx postFx;
         ArenaView arenaView;
         FighterView fighter0;
         FighterView fighter1;
@@ -99,7 +100,6 @@ namespace Knockbox.Game
             shapes.Activate();
 
             background = Create<BackgroundView>("Background");
-            background.Build(palette, shapes);
             arenaView = Create<ArenaView>("Arena");
             fighter0 = CreateFighter(0);
             fighter1 = CreateFighter(1);
@@ -120,7 +120,8 @@ namespace Knockbox.Game
             if (showDebugLabels)
             {
                 labels = Create<DebugStateLabels>("Debug Labels");
-                labels.Setup(palette.ink, palette.shadow);
+                // 파이터 위 상태 글자와 위 틱 줄은 어두운 배경 위(uiSub), 아래 설정 줄은 바닥 테두리 지형 위(ink).
+                labels.Setup(palette.uiSub, palette.ink);
                 debugText = Application.isEditor;
             }
             overlay = Create<HitboxOverlay>("Hitbox Overlay");
@@ -136,6 +137,8 @@ namespace Knockbox.Game
                 cam.backgroundColor = palette.bgBase;
                 cameraRig = cam.GetComponent<CameraRig>() ?? cam.gameObject.AddComponent<CameraRig>();
             }
+            postFx = Create<PostFx>("Post Fx");
+            postFx.Setup(cam);
 
             runner.MatchBegan += OnMatchBegan;
             runner.Ticked += OnTicked;
@@ -165,9 +168,35 @@ namespace Knockbox.Game
             return view;
         }
 
+        /// <summary>
+        /// 시나리오가 정한 테마(0 A 민트, 1 B 사이언, 2 C 슬레이트). -1이면 맵이 정한다.
+        /// 맵 형식 v2(CP12) 전에는 v1 맵 이름으로 정한다: Box A, Towers B, Pit C.
+        /// </summary>
+        public int ThemeOverride { get; set; } = -1;
+
+        public int ThemeIndex(ArenaDef arena)
+        {
+            if (ThemeOverride >= 0)
+                return Mathf.Min(ThemeOverride, palette.ThemeCount - 1);
+            switch (arena.Name)
+            {
+                case "Towers": return 1;
+                case "Pit": return 2;
+                default: return 0;
+            }
+        }
+
+        public ArenaTheme CurrentTheme { get; private set; }
+        public BackgroundView Background => background;
+        public PostFx PostFx => postFx;
+
         void OnMatchBegan(MatchRunner r)
         {
-            arenaView.Build(r.World.Arena, palette, shapes);
+            CurrentTheme = palette.Theme(ThemeIndex(r.World.Arena));
+            background.Build(r.World.Arena, CurrentTheme, palette, shapes, BackgroundView.DefaultLight);
+            background.ResetMotes();
+            postFx.ResetEffects();
+            arenaView.Build(r.World.Arena, CurrentTheme, palette, shapes);
             koShatter.BuildArena(r.World.Arena);
             shattered[0] = shattered[1] = false;
             countdownKey = -1;
@@ -251,8 +280,13 @@ namespace Knockbox.Game
             UpdateCountdownSound(current, world.Config);
             dust.Tick(dt);
             koShatter.Tick(dt);
+            background.Tick(dt);
             if (cameraRig != null)
+            {
                 cameraRig.Tick(dt);
+                postFx.ReduceMotion = cameraRig.ReduceMotion;
+            }
+            postFx.Tick(dt);
             fx.Tick(dt, cameraRig != null ? (Vector2)cameraRig.transform.position : Vector2.zero);
 
             Vector2 body0 = fighter0.transform.localPosition;
@@ -385,13 +419,13 @@ namespace Knockbox.Game
                     break;
                 case SimEventType.PadBounce:
                     dust.Burst(feet, 3, 1.5f, 0f);
-                    fx.RingBurst(feet, palette.bouncy, 0.3f, 1.4f, 0.18f);
+                    fx.RingBurst(feet, palette.energySoft, 0.3f, 1.4f, 0.18f);
                     sfxPlayer.Play(Sfx.Pad);
                     break;
                 case SimEventType.Spike:
                     // 가시: 위험색 파편이 위로, 고리, 흔들림.
-                    fx.Shards(V(e.Position), Vector2.up, 70f, 7, palette.hazard, 9f, 0.18f, 0.4f);
-                    fx.RingBurst(V(e.Position), palette.hazard, 0.3f, 1.6f, 0.18f);
+                    fx.Shards(V(e.Position), Vector2.up, 70f, 7, palette.hit, 9f, 0.18f, 0.4f);
+                    fx.RingBurst(V(e.Position), palette.hit, 0.3f, 1.6f, 0.18f);
                     AddTrauma(0.3f);
                     sfxPlayer.Play(Sfx.Spike);
                     break;
@@ -428,7 +462,7 @@ namespace Knockbox.Game
                 case SimEventType.GrabBreak:
                     // 잡기 풀기: 불꽃과 고리, 양쪽 외곽선 번쩍임.
                     fx.Sparks(onBody, 8, 11f);
-                    fx.RingBurst(onBody, palette.spark, 0.3f, 1.4f, 0.18f);
+                    fx.RingBurst(onBody, palette.energy, 0.3f, 1.4f, 0.18f);
                     fighter0.FlashOutline(3f * Frame);
                     fighter1.FlashOutline(3f * Frame);
                     AddTrauma(0.2f);
@@ -437,21 +471,27 @@ namespace Knockbox.Game
 
                 case SimEventType.Hit:
                 {
-                    // 맞은 쪽 4프레임·때린 쪽 3프레임 번쩍임, 공격자 색 파편 6~10개, 흰 고리, 데미지 비례 흔들림, 15 이상이면 확대.
+                    // 맞은 쪽 4프레임·때린 쪽 3프레임 번쩍임, 파편 6~10개(hit 빨강 위주 + 공격자 몸 색 일부, 08 5절), 흰 고리,
+                    // 데미지 비례 흔들림, 15 이상이면 확대와 약한 색수차.
                     int attacker = 1 - e.Fighter;
                     float damage = e.Strength;
                     Fighter(attacker).Flash(3f * Frame);
-                    fx.Shards(onBody, V(e.Direction), 75f, Mathf.Clamp(6 + Mathf.RoundToInt(damage / 4f), 6, 10), palette.FighterBody(attacker), 8f + damage * 0.35f, 0.24f);
+                    int shards = Mathf.Clamp(6 + Mathf.RoundToInt(damage / 4f), 6, 10);
+                    fx.Shards(onBody, V(e.Direction), 75f, shards - shards / 3, palette.hit, 8f + damage * 0.35f, 0.24f);
+                    fx.Shards(onBody, V(e.Direction), 60f, shards / 3, palette.FighterBody(attacker), 8f + damage * 0.35f, 0.24f);
                     fx.RingBurst(onBody, palette.flash, 0.3f, 1.5f + damage * 0.04f);
                     AddTrauma(0.2f + damage * 0.016f);
                     if (damage >= 15f)
+                    {
                         Punch(0.015f, 6f * Frame);
+                        postFx.Pulse(0.25f, 0.15f);
+                    }
                     sfxPlayer.Play(damage >= 15f ? Sfx.HitStrong : Sfx.HitWeak);
                     break;
                 }
                 case SimEventType.GuardHit:
-                    fx.RingBurst(onBody, palette.ink, 0.25f, 0.9f, 0.15f);
-                    fx.Shards(onBody, V(e.Direction), 60f, 3, palette.shadow, 6f, 0.14f, 0.3f);
+                    fx.RingBurst(onBody, palette.uiSub, 0.25f, 0.9f, 0.15f);
+                    fx.Shards(onBody, V(e.Direction), 60f, 3, palette.uiSub, 6f, 0.14f, 0.3f);
                     AddTrauma(0.12f);
                     sfxPlayer.Play(Sfx.Guard);
                     break;
@@ -473,7 +513,7 @@ namespace Knockbox.Game
                     // 접점의 별 모양 폭발과 불꽃, 양쪽 외곽선 번쩍임, 중간 흔들림, 금속성 소리.
                     fx.Star(onBody, 8, 1.1f);
                     fx.Sparks(onBody, 12, 15f);
-                    fx.RingBurst(onBody, palette.spark, 0.2f, 1.2f, 0.15f);
+                    fx.RingBurst(onBody, palette.energy, 0.2f, 1.2f, 0.15f);
                     fighter0.FlashOutline(4f * Frame);
                     fighter1.FlashOutline(4f * Frame);
                     AddTrauma(0.3f);
@@ -486,17 +526,18 @@ namespace Knockbox.Game
                     var normal = V(e.Direction);
                     fx.Crack(point, normal);
                     dust.Burst(point, 4, 2.6f, Mathf.Abs(normal.x) > 0.5f ? normal.x : 0f);
-                    fx.Shards(point, normal, 110f, 6, palette.ink, 7f, 0.15f, 0.55f);
+                    fx.Shards(point, normal, 110f, 6, CurrentTheme.terrain, 7f, 0.15f, 0.55f);
                     fx.RingBurst(point, palette.flash, 0.3f, 1.8f, 0.2f);
                     AddTrauma(0.5f);
                     Punch(0.02f, 8f * Frame);
+                    postFx.Pulse(0.25f, 0.15f);
                     sfxPlayer.Play(Sfx.WallSplat);
                     break;
                 }
                 case SimEventType.BounceRebound:
                     // 경직·돌진 중 지형에 튕김: 먼지, 작은 고리, 세기 비례 흔들림.
                     dust.Burst(V(e.Position), 3, 1.4f, Mathf.Abs(e.Direction.X) > 0.5f ? e.Direction.X : 0f);
-                    fx.RingBurst(V(e.Position), palette.shadow, 0.2f, 0.8f + e.Strength * 0.02f, 0.16f);
+                    fx.RingBurst(V(e.Position), palette.uiSub, 0.2f, 0.8f + e.Strength * 0.02f, 0.16f);
                     AddTrauma(0.04f + e.Strength * 0.006f);
                     sfxPlayer.Play(Sfx.Land, 0.6f);
                     break;
@@ -510,6 +551,7 @@ namespace Knockbox.Game
                         fx.ScreenFlash(false);
                     AddTrauma(0.6f);
                     Punch(0.03f, 12f * Frame);
+                    postFx.Pulse(0.6f, 0.25f);
                     sfxPlayer.Play(Sfx.KO);
                     break;
                 }

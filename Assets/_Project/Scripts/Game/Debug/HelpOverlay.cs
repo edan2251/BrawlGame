@@ -45,7 +45,7 @@ namespace Knockbox.Game
             text.lineSpacing = 1.15f;
             text.anchor = TextAnchor.MiddleCenter;
             text.alignment = TextAlignment.Left;
-            text.color = PaletteAsset.ForText(palette.bgBase);
+            text.color = PaletteAsset.ForText(palette.flash);
             text.text = Text;
             transform.localPosition = new Vector3(0f, 0.5f, 0f);
         }

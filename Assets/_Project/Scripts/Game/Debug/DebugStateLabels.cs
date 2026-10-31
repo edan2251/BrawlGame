@@ -18,11 +18,11 @@ namespace Knockbox.Game
         TextMesh label0;
         TextMesh label1;
 
-        /// <param name="color">파이터 위 상태 이름(밝은 배경 위)</param>
-        /// <param name="frameColor">틱 줄과 아래 설정 줄(어두운 테두리 위)</param>
+        /// <param name="color">파이터 위 상태 이름과 위 틱 줄(어두운 배경 위)</param>
+        /// <param name="frameColor">아래 설정 줄(바닥 테두리 지형 위)</param>
         public void Setup(Color color, Color frameColor)
         {
-            header = Create("Header", frameColor, TextAnchor.UpperLeft);
+            header = Create("Header", color, TextAnchor.UpperLeft);
             header.transform.localPosition = new Vector3(-15.8f, 8.85f, 0f);
             footer = Create("Footer", frameColor, TextAnchor.LowerLeft);
             footer.transform.localPosition = new Vector3(-15.8f, -8.95f, 0f);

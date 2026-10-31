@@ -33,5 +33,34 @@ namespace Knockbox.Presentation
                 return square;
             }
         }
+
+        /// <summary>
+        /// 배경 질감용 저주파 노이즈 마스크(08 4절): 흰색에 노이즈 값을 알파로 담는다(0 ~ maxAlpha).
+        /// 색은 이 마스크를 그리는 렌더러가 팔레트에서 정한다. Mathf.PerlinNoise라 실행마다 같다.
+        /// </summary>
+        public static Texture2D NoiseMask(int width, int height, float scale, float maxAlpha)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave,
+                name = "KnockboxNoise",
+            };
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    // 두 옥타브: 큰 얼룩 + 붓질 같은 가로로 긴 결.
+                    float n = Mathf.PerlinNoise(x * scale + 17.3f, y * scale + 41.9f) * 0.7f
+                              + Mathf.PerlinNoise(x * scale * 3.1f + 5.1f, y * scale * 9.7f + 2.7f) * 0.3f;
+                    pixels[y * width + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(Mathf.Clamp01(n) * maxAlpha * 255f));
+                }
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
     }
 }

@@ -52,7 +52,7 @@ namespace Knockbox.Game
                 return;
             powerShown[fighter] = power;
             powerLabels[fighter].text = power.ToString("0.0");
-            powerLabels[fighter].color = PaletteAsset.ForText(power >= 6f ? palette.hazard : palette.ink);
+            powerLabels[fighter].color = PaletteAsset.ForText(power >= 6f ? palette.hit : palette.flash);
         }
 
         public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)
@@ -84,13 +84,13 @@ namespace Knockbox.Game
                     GrabBox = new SpriteRenderer[4],
                 };
                 for (int i = 0; i < 4; i++)
-                    m.GrabBox[i] = ShapeLibrary.Create(transform, $"P{k + 1}Grab{i}", shapes.Square, SortingLayers.UI, SortingOrder + 1, palette.spark);
+                    m.GrabBox[i] = ShapeLibrary.Create(transform, $"P{k + 1}Grab{i}", shapes.Square, SortingLayers.UI, SortingOrder + 1, palette.energy);
                 for (int i = 0; i < 4; i++)
-                    m.Box[i] = ShapeLibrary.Create(transform, $"P{k + 1}Box{i}", shapes.Square, SortingLayers.UI, SortingOrder, palette.ink);
+                    m.Box[i] = ShapeLibrary.Create(transform, $"P{k + 1}Box{i}", shapes.Square, SortingLayers.UI, SortingOrder, palette.uiSub);
                 for (int i = 0; i < m.Circles.Length; i++)
-                    m.Circles[i] = ShapeLibrary.Create(transform, $"P{k + 1}Hit{i}", shapes.Ring, SortingLayers.UI, SortingOrder + 1, palette.hazard);
-                m.Velocity = ShapeLibrary.Create(transform, $"P{k + 1}Velocity", shapes.Square, SortingLayers.UI, SortingOrder + 2, palette.bouncy);
-                m.Parry = ShapeLibrary.Create(transform, $"P{k + 1}Parry", shapes.Ring, SortingLayers.UI, SortingOrder, palette.spark);
+                    m.Circles[i] = ShapeLibrary.Create(transform, $"P{k + 1}Hit{i}", shapes.Ring, SortingLayers.UI, SortingOrder + 1, palette.hit);
+                m.Velocity = ShapeLibrary.Create(transform, $"P{k + 1}Velocity", shapes.Square, SortingLayers.UI, SortingOrder + 2, palette.energySoft);
+                m.Parry = ShapeLibrary.Create(transform, $"P{k + 1}Parry", shapes.Ring, SortingLayers.UI, SortingOrder, palette.energy);
                 marks[k] = m;
             }
         }

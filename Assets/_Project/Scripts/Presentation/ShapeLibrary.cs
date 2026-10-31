@@ -54,6 +54,9 @@ namespace Knockbox.Presentation
             }
         }
 
+        /// <summary>메시 렌더러(빛 원뿔, 그림자)도 스프라이트와 같은 무광 재질로 그린다.</summary>
+        public static Material ActiveMaterial => activeMaterial;
+
         public Sprite Square => square != null ? square : ShapeSprites.Square;
         public Sprite RoundedBody => roundedBody != null ? roundedBody : Square;
         public Sprite RoundedOutline => roundedOutline != null ? roundedOutline : Square;

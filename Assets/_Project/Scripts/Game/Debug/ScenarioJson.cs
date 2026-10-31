@@ -45,6 +45,7 @@ namespace Knockbox.Game
                 Grab = GetBool(root, "grab", true),
                 Overlay = GetBool(root, "overlay", false),
                 Help = GetBool(root, "help", false),
+                Theme = ParseTheme(GetString(root, "theme", "")),
                 Ticks = GetInt(root, "ticks", -1),
                 Seed = (uint)GetInt(root, "seed", 1),
             };
@@ -239,6 +240,17 @@ namespace Knockbox.Game
             if (list.Count != 2)
                 throw new FormatException($"spawn.{key}: [x, y] 두 숫자가 필요함");
             return new Vec2((float)AsNumber(list[0], key), (float)AsNumber(list[1], key));
+        }
+
+        /// <summary>"A", "B", "C"(대소문자 무관) → 0, 1, 2. 비어 있으면 -1(맵이 정함).</summary>
+        static int ParseTheme(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return -1;
+            char c = char.ToUpperInvariant(value[0]);
+            if (c < 'A' || c > 'C')
+                throw new System.FormatException($"알 수 없는 테마: {value}(A, B, C 중 하나)");
+            return c - 'A';
         }
     }
 }

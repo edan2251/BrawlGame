@@ -21,7 +21,6 @@ namespace Knockbox.Presentation
         public const float VisualLift = 0.2f;
         const float BodySize = 1f;
         const float OutlineSize = 1.12f;
-        const float ShadowOffset = 0.08f;
         const float MaxTiltDegrees = 8f;
         /// <summary>벽에 닿아 있을 때 몸 그림을 벽에서 떼는 거리(그림 1.12와 충돌 0.9의 차이만큼).</summary>
         const float WallClearance = 0.11f;
@@ -52,7 +51,6 @@ namespace Knockbox.Presentation
         Transform pose;
         SpriteRenderer body;
         SpriteRenderer outline;
-        SpriteRenderer shadow;
         readonly SpriteRenderer[] eyes = new SpriteRenderer[2];
         readonly SpriteRenderer[] ghosts = new SpriteRenderer[GhostCount];
         readonly float[] ghostAge = new float[GhostCount];
@@ -124,9 +122,6 @@ namespace Knockbox.Presentation
             pose.SetParent(transform, false);
             pose.localPosition = new Vector3(0f, VisualLift - BodySize * 0.5f, 0f);
 
-            shadow = ShapeLibrary.CreateSliced(pose, "Shadow", shapes.RoundedOutline, SortingLayers.Shadow, 0, palette.shadow);
-            shadow.transform.localPosition = new Vector3(ShadowOffset, BodySize * 0.5f - ShadowOffset, 0f);
-            ShapeLibrary.SetSize(shadow, OutlineSize, OutlineSize);
             outline = ShapeLibrary.CreateSliced(pose, "Outline", shapes.RoundedOutline, SortingLayers.Fighter, 0, palette.ink);
             outline.transform.localPosition = new Vector3(0f, BodySize * 0.5f, 0f);
             ShapeLibrary.SetSize(outline, OutlineSize, OutlineSize);
@@ -416,14 +411,14 @@ namespace Knockbox.Presentation
             if (outlineFlashLeft > 0f)
                 line = palette.flash;
             else if (f.ParryTicks > 0)
-                line = palette.spark;
+                line = palette.energy;
             else if (power >= config.Combat.Charge.PowerThreshold)
-                line = palette.hazard;
+                line = palette.hit;
             else if (f.Action == ActionState.Charge)
             {
                 int stage = ChargeStage(f, config);
-                // 3단계(최대 충전)는 spark와 흰색 사이로 깜박인다.
-                line = stage == 1 ? palette.oneWay : stage == 2 ? palette.spark : (f.ActionTick / 4) % 2 == 0 ? palette.flash : palette.spark;
+                // 08 5절: 1단계 energySoft → 2단계 energy → 3단계(최대 충전)는 흰색과 energy 사이로 깜박인다.
+                line = stage == 1 ? palette.energySoft : stage == 2 ? palette.energy : (f.ActionTick / 4) % 2 == 0 ? palette.flash : palette.energy;
             }
             else
                 line = palette.ink;

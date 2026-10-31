@@ -55,11 +55,13 @@ namespace Knockbox.Game
             var config = ScenarioConfig.Create(def, runner.Tuning, runner.CombatTuning);
             var arena = runner.ResolveArena(def.Arena);
             runner.InputDelayTicks = 0;
+            var presenter = runner.GetComponent<MatchPresenter>();
+            if (presenter != null)
+                presenter.ThemeOverride = def.Theme;
             runner.Begin(config, arena, ScenarioInputs.CreateInitialState(def, config, arena));
             runner.Player1Input = new FrameArrayInputSource(ScenarioInputs.Build(def.P1, def.Ticks));
             runner.Player2Input = new FrameArrayInputSource(ScenarioInputs.Build(def.P2, def.Ticks));
             runner.StopAtTick = def.Ticks;
-            var presenter = runner.GetComponent<MatchPresenter>();
             if (presenter != null)
             {
                 presenter.SetOverlay(def.Overlay);

@@ -85,7 +85,7 @@ namespace Knockbox.Presentation
             {
                 shardRenderers[i] = ShapeLibrary.Create(transform, "Shard", shapes.Triangle, SortingLayers.Fx, 5, palette.flash);
                 shardRenderers[i].enabled = false;
-                streakRenderers[i] = ShapeLibrary.Create(transform, "Spark", shapes.Square, SortingLayers.Fx, 12, palette.spark);
+                streakRenderers[i] = ShapeLibrary.Create(transform, "Spark", shapes.Square, SortingLayers.Fx, 12, palette.energy);
                 streakRenderers[i].enabled = false;
                 shards[i].Age = shards[i].Life = 1f;
             }
@@ -97,14 +97,14 @@ namespace Knockbox.Presentation
             }
             for (int i = 0; i < RayCapacity; i++)
             {
-                rayRenderers[i] = ShapeLibrary.Create(transform, "Ray", shapes.Square, SortingLayers.Fx, 14, palette.spark);
+                rayRenderers[i] = ShapeLibrary.Create(transform, "Ray", shapes.Square, SortingLayers.Fx, 14, palette.flash);
                 rayRenderers[i].enabled = false;
                 rays[i].Age = rays[i].Life = 1f;
             }
             for (int i = 0; i < crackRenderers.Length; i++)
             {
                 // 지형 몸체가 잉크색이라 금은 밝은 그림자색으로 지형 위에 그린다.
-                crackRenderers[i] = ShapeLibrary.Create(transform, "Crack", shapes.Square, SortingLayers.Terrain, 20, palette.shadow);
+                crackRenderers[i] = ShapeLibrary.Create(transform, "Crack", shapes.Square, SortingLayers.Terrain, 20, palette.bgBase);
                 crackRenderers[i].enabled = false;
             }
             for (int i = 0; i < CrackCapacity; i++)
@@ -180,7 +180,7 @@ namespace Knockbox.Presentation
                 s.Size = random.Range(0.05f, 0.08f);
                 s.Gravity = 6f;
                 s.Streak = true;
-                s.Color = palette.spark;
+                s.Color = palette.energy;
                 Activate(nextShard);
                 nextShard = (nextShard + 1) % ShardCapacity;
             }
@@ -346,7 +346,7 @@ namespace Knockbox.Presentation
                 {
                     var sr = crackRenderers[c * CrackLines + i];
                     sr.enabled = alive;
-                    var color = palette.shadow;
+                    var color = palette.bgBase;
                     color.a = alpha;
                     sr.color = color;
                 }

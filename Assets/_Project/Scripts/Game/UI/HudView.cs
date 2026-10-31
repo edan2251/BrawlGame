@@ -5,8 +5,8 @@ using UnityEngine;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// HUD(05-presentation.md 6절): 머리 위 체력 바(폭 1.2, 높이 0.12, 줄어든 부분은 흰색으로 0.4초 남음),
-    /// 화면 위 가운데 라운드 점수 칸(양쪽 RoundsToWin칸), 가운데 큰 문구(READY·GO·KO·DRAW·P1 WINS, 영문만 — D-016)와
+    /// HUD(08-visual-direction.md 6절): 머리 위 작은 체력 바(폭 1.2, 높이 0.12, 깎인 부분은 hit 빨강으로 0.4초 남음),
+    /// 화면 왼쪽 위의 작은 점수 점 두 줄(P1 골드 줄, P2 퍼플 줄, 빈 점 uiEmpty), 가운데 큰 문구(flash, 영문만 — D-016)와
     /// MatchEnd의 안내 문구. 월드 공간 스프라이트와 TextMesh라 카메라 캡처에도 찍힌다. 문구는 바뀔 때만 새로 만든다.
     /// </summary>
     public sealed class HudView : MonoBehaviour
@@ -16,9 +16,10 @@ namespace Knockbox.Game
         const float BarOffsetY = 1.05f;
         const float TrailHold = 0.4f;
         const float TrailSpeed = 2.5f;
-        const float SlotSize = 0.42f;
-        const float SlotGap = 0.14f;
-        const float SlotY = 8.5f;
+        const float SlotSize = 0.24f;
+        const float SlotGap = 0.12f;
+        /// <summary>점수 점 첫 줄(P1) 위치: 경기장 왼쪽 위 안쪽(테두리 벽 아래).</summary>
+        static readonly Vector2 SlotOrigin = new Vector2(-ArenaDef.HalfWidth + 1.45f, ArenaDef.HalfHeight - 1.45f);
         const int MaxSlots = 9;
         const float BannerY = 1.6f;
         const float SubY = -0.6f;
@@ -55,19 +56,19 @@ namespace Knockbox.Game
             palette = paletteAsset;
             for (int i = 0; i < 2; i++)
             {
-                bars[i].Back = ShapeLibrary.Create(transform, $"Bar{i}Back", shapes.Square, SortingLayers.UI, 0, palette.ink);
-                bars[i].Trail = ShapeLibrary.Create(transform, $"Bar{i}Trail", shapes.Square, SortingLayers.UI, 1, palette.flash);
+                bars[i].Back = ShapeLibrary.Create(transform, $"Bar{i}Back", shapes.Square, SortingLayers.UI, 0, palette.uiEmpty);
+                bars[i].Trail = ShapeLibrary.Create(transform, $"Bar{i}Trail", shapes.Square, SortingLayers.UI, 1, palette.hit);
                 bars[i].Fill = ShapeLibrary.Create(transform, $"Bar{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.FighterBody(i));
                 bars[i].Shown = 1f;
                 bars[i].Trailing = 1f;
             }
-            bannerShadow = CreateText("BannerShadow", 128, 0.2f, palette.shadow, 10);
-            banner = CreateText("Banner", 128, 0.2f, palette.ink, 11);
-            sub = CreateText("Sub", 64, 0.1f, palette.ink, 11);
+            bannerShadow = CreateText("BannerShadow", 128, 0.2f, palette.ink, 10);
+            banner = CreateText("Banner", 128, 0.2f, palette.flash, 11);
+            sub = CreateText("Sub", 64, 0.1f, palette.uiSub, 11);
             for (int k = 0; k < MaxSlots; k++)
             {
-                slots0[k] = ShapeLibrary.CreateSliced(transform, $"Score0_{k}", shapes.RoundedBody, SortingLayers.UI, 0, palette.terrainLip);
-                slots1[k] = ShapeLibrary.CreateSliced(transform, $"Score1_{k}", shapes.RoundedBody, SortingLayers.UI, 0, palette.terrainLip);
+                slots0[k] = ShapeLibrary.Create(transform, $"Score0_{k}", shapes.Circle, SortingLayers.UI, 0, palette.uiEmpty);
+                slots1[k] = ShapeLibrary.Create(transform, $"Score1_{k}", shapes.Circle, SortingLayers.UI, 0, palette.uiEmpty);
                 ShapeLibrary.SetSize(slots0[k], SlotSize, SlotSize);
                 ShapeLibrary.SetSize(slots1[k], SlotSize, SlotSize);
             }
@@ -103,24 +104,24 @@ namespace Knockbox.Game
                 case MatchPhase.Countdown:
                     bool go = m.PhaseTick >= match.CountdownTicks - GoTicks;
                     text = go ? "GO" : "READY";
-                    color = go ? palette.hazard : palette.ink;
+                    color = palette.flash;
                     subText = go ? "" : $"ROUND {m.Round}";
                     return;
                 case MatchPhase.KO:
                 case MatchPhase.RoundEnd:
                 case MatchPhase.RoundTransition:
                     text = m.RoundWinner < 0 ? "DRAW" : "KO";
-                    color = palette.hazard;
+                    color = palette.flash;
                     return;
                 case MatchPhase.MatchEnd:
                     int winner = m.Score0 >= m.Score1 ? 0 : 1;
                     text = winner == 0 ? "P1 WINS" : "P2 WINS";
-                    color = palette.FighterShade(winner);
+                    color = palette.flash;
                     subText = m.PhaseTick >= match.MatchEndMinTicks ? "PRESS ANY BUTTON" : "";
                     return;
                 default:
                     text = "";
-                    color = palette.ink;
+                    color = palette.flash;
                     return;
             }
         }
@@ -165,12 +166,12 @@ namespace Knockbox.Game
                 slots1[k].enabled = visible;
                 if (!visible)
                     continue;
-                // P1은 가운데에서 왼쪽으로, P2는 오른쪽으로 채운다.
-                float offset = SlotGap * 2f + k * (SlotSize + SlotGap) + SlotSize * 0.5f;
-                slots0[k].transform.localPosition = new Vector3(-offset, SlotY, 0f);
-                slots1[k].transform.localPosition = new Vector3(offset, SlotY, 0f);
-                slots0[k].color = k < state.Match.Score0 ? palette.p1Body : palette.terrainLip;
-                slots1[k].color = k < state.Match.Score1 ? palette.p2Body : palette.terrainLip;
+                // 왼쪽 위에서 오른쪽으로 채운다. 윗줄 P1, 아랫줄 P2.
+                float x = SlotOrigin.x + k * (SlotSize + SlotGap);
+                slots0[k].transform.localPosition = new Vector3(x, SlotOrigin.y, 0f);
+                slots1[k].transform.localPosition = new Vector3(x, SlotOrigin.y - SlotSize - SlotGap, 0f);
+                slots0[k].color = k < state.Match.Score0 ? palette.p1Body : palette.uiEmpty;
+                slots1[k].color = k < state.Match.Score1 ? palette.p2Body : palette.uiEmpty;
             }
         }
 

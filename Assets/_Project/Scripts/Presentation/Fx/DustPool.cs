@@ -29,7 +29,7 @@ namespace Knockbox.Presentation
 
         public void Setup(PaletteAsset palette, ShapeLibrary shapes)
         {
-            color = palette.shadow;
+            color = palette.uiSub;
             for (int i = 0; i < Capacity; i++)
             {
                 renderers[i] = ShapeLibrary.Create(transform, "Dust", shapes.Circle, SortingLayers.Fx, 0, color);
