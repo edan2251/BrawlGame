@@ -73,7 +73,8 @@ namespace Knockbox.Game
         }
 
         const float StackDistance = 3.2f;
-        const float LineHeight = 0.42f;
+        // 글자 한 줄 높이(48 × 0.12 / 10 ≈ 0.58)보다 조금 크게.
+        const float LineHeight = 0.6f;
 
         static void UpdateLabel(TextMesh label, string name, in FighterState f, ref int shownKey)
         {

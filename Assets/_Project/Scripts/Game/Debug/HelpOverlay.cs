@@ -5,7 +5,7 @@ namespace Knockbox.Game
 {
     /// <summary>
     /// `~` 단축키 도움말(06-match-and-tools.md 4·6절). 빌드에서는 처음 실행할 때 열려 있다.
-    /// 화면 가운데의 반투명 잉크색 판과 밝은 영문 글자(D-016). 월드 공간이라 캡처에도 찍힌다.
+    /// 화면 가운데의 잉크색 판과 밝은 영문 글자(D-016). 월드 공간이라 캡처에도 찍힌다.
     /// </summary>
     public sealed class HelpOverlay : MonoBehaviour
     {
@@ -28,11 +28,9 @@ namespace Knockbox.Game
 
         public void Setup(PaletteAsset palette, ShapeLibrary shapes)
         {
-            // 경기 화면(밝은 배경) 위에 확실히 떠 보이도록 잉크색 판에 밝은 글자.
+            // 경기 화면(밝은 배경) 위에 확실히 떠 보이도록 불투명 잉크색 판에 밝은 글자.
+            // 반투명이면 Linear 색 공간 혼합 때문에 뒤의 발판 선이 글자 사이로 비친다.
             panel = ShapeLibrary.CreateSliced(transform, "Panel", shapes.RoundedBody, SortingLayers.UI, 200, palette.ink);
-            var color = palette.ink;
-            color.a = 0.97f;
-            panel.color = color;
             ShapeLibrary.SetSize(panel, 25f, 9.6f);
             var go = new GameObject("Text");
             go.transform.SetParent(transform, false);
