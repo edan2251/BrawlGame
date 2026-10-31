@@ -4,12 +4,62 @@ namespace Knockbox.Simulation
 {
     /// <summary>
     /// 공격 버튼이 무엇을 하는가(03-combat.md 1절).
-    /// Test: 테스트용 공격(CP4). Charge: 모드 A 돌진 충돌(CP5). 모드 B(휘두르기)는 CP6에서 추가한다.
+    /// Test: 테스트용 공격(CP4). Charge: 모드 A 돌진 충돌(CP5). Swing: 모드 B 무기 휘두르기(CP6).
     /// </summary>
     public enum CombatMode : byte
     {
         Test,
         Charge,
+        Swing,
+    }
+
+    /// <summary>SimConfig.GetAttack의 공격 번호.</summary>
+    public static class AttackIds
+    {
+        public const int Test = 0;
+        public const int SwingForward = 1;
+        public const int SwingUp = 2;
+        public const int SwingDown = 3;
+    }
+
+    /// <summary>모드 B: 무기 휘두르기(03-combat.md 5절).</summary>
+    [Serializable]
+    public struct SwingModeParams
+    {
+        public AttackDef Forward;
+        public AttackDef Up;
+        public AttackDef Down;
+        /// <summary>대시 시작 뒤 이 틱이 지나면 공격으로 대시를 캔슬할 수 있다(대시의 관성을 실은 공격).</summary>
+        public bool DashAttackCancelEnabled;
+        public int DashAttackCancelMinTicks;
+        /// <summary>공중에서 시작한 공격 도중 착지하면 이만큼 조작할 수 없다.</summary>
+        public int LandingLagTicks;
+
+        public static SwingModeParams Default => new SwingModeParams
+        {
+            Forward = AttackDef.SwingForward,
+            Up = AttackDef.SwingUp,
+            Down = AttackDef.SwingDown,
+            DashAttackCancelEnabled = true,
+            DashAttackCancelMinTicks = 4,
+            LandingLagTicks = 4,
+        };
+
+        public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
+        {
+            v.Begin(nameof(Forward));
+            Forward.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Up));
+            Up.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Down));
+            Down.Visit(ref v);
+            v.End();
+            v.Value(nameof(DashAttackCancelEnabled), DashAttackCancelEnabled);
+            v.Value(nameof(DashAttackCancelMinTicks), DashAttackCancelMinTicks);
+            v.Value(nameof(LandingLagTicks), LandingLagTicks);
+        }
     }
 
     /// <summary>모드 A: 돌진 충돌(03-combat.md 4절). 위력 = max(0, 속도·법선) × 공격성 가중치.</summary>
@@ -123,27 +173,49 @@ namespace Knockbox.Simulation
         }
     }
 
-    /// <summary>공격 판정 원 하나. 위치는 파이터 중심 기준이고 x는 바라보는 방향이다.</summary>
+    /// <summary>
+    /// 공격 판정 원 하나. 위치는 파이터 중심 기준이고 x는 바라보는 방향이다.
+    /// 활성 구간 동안 Start → Mid → End를 꺾은선으로 따라간다(휘두르는 호를 삼각함수 없이 근사).
+    /// </summary>
     [Serializable]
     public struct HitCircle
     {
         /// <summary>활성 첫 틱의 위치.</summary>
         public Vec2 Start;
-        /// <summary>활성 마지막 틱의 위치. 사이 틱은 직선으로 옮긴다.</summary>
+        /// <summary>활성 구간 가운데의 위치.</summary>
+        public Vec2 Mid;
+        /// <summary>활성 마지막 틱의 위치.</summary>
         public Vec2 End;
         public float Radius;
 
-        public HitCircle(Vec2 start, Vec2 end, float radius)
+        public HitCircle(Vec2 start, Vec2 mid, Vec2 end, float radius)
         {
             Start = start;
+            Mid = mid;
             End = end;
             Radius = radius;
+        }
+
+        /// <summary>직선으로 움직이는 원(가운데 = 두 끝의 중간).</summary>
+        public HitCircle(Vec2 start, Vec2 end, float radius)
+            : this(start, (start + end) * 0.5f, end, radius)
+        {
+        }
+
+        /// <summary>활성 진행도 t(0 = 첫 틱, 1 = 마지막 틱)의 위치.</summary>
+        public readonly Vec2 At(float t)
+        {
+            if (t <= 0.5f)
+                return Start + (Mid - Start) * (t * 2f);
+            return Mid + (End - Mid) * ((t - 0.5f) * 2f);
         }
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
         {
             v.Value("Start.X", Start.X);
             v.Value("Start.Y", Start.Y);
+            v.Value("Mid.X", Mid.X);
+            v.Value("Mid.Y", Mid.Y);
             v.Value("End.X", End.X);
             v.Value("End.Y", End.Y);
             v.Value(nameof(Radius), Radius);
@@ -169,8 +241,13 @@ namespace Knockbox.Simulation
         public HitCircle Circle0;
         public HitCircle Circle1;
         public HitCircle Circle2;
+        /// <summary>0보다 크면 명중했을 때 공격자 vy를 이 값으로 바꾸고 공중 점프·대시를 회복한다(내려찍기 포고 튕김).</summary>
+        public float PogoSpeed;
 
         public readonly int TotalTicks => StartupTicks + ActiveTicks + RecoveryTicks;
+
+        /// <summary>실제로 쓰는 판정 원 개수(0~3). 설정 값은 그대로 두고 쓸 때 자른다(설정 체크섬이 모든 값을 덮게).</summary>
+        public readonly int UsedCircles => SimMath.Clamp(CircleCount, 0, MaxCircles);
 
         public readonly HitCircle GetCircle(int index) => index == 0 ? Circle0 : index == 1 ? Circle1 : Circle2;
 
@@ -189,6 +266,58 @@ namespace Knockbox.Simulation
             CircleCount = 2,
             Circle0 = new HitCircle(new Vec2(0.55f, 0.05f), new Vec2(0.95f, 0.05f), 0.3f),
             Circle1 = new HitCircle(new Vec2(0.35f, 0.05f), new Vec2(0.6f, 0.05f), 0.22f),
+        };
+
+        // 모드 B 기술. 판정 원 3개는 무기를 따라 손잡이 쪽(0.45)부터 끝(1.15)까지 놓이고,
+        // 어깨 근처 회전축을 도는 호의 세 각도(시작·가운데·끝)를 키프레임으로 쓴다(값은 미리 계산한 상수).
+
+        /// <summary>앞 휘두르기: 5/4/14, 데미지 12, 넉백 14 앞쪽 위 30°. 머리 위 앞(70°)에서 앞 아래(-25°)로.</summary>
+        public static AttackDef SwingForward => new AttackDef
+        {
+            StartupTicks = 5,
+            ActiveTicks = 4,
+            RecoveryTicks = 14,
+            Damage = 12,
+            KnockbackStrength = 14f,
+            KnockbackDirection = new Vec2(0.8660254f, 0.5f),
+            CircleCount = 3,
+            Circle0 = new HitCircle(new Vec2(0.504f, 0.673f), new Vec2(0.773f, 0.404f), new Vec2(0.758f, 0.06f), 0.22f),
+            Circle1 = new HitCircle(new Vec2(0.624f, 1.002f), new Vec2(1.102f, 0.524f), new Vec2(1.075f, -0.088f), 0.24f),
+            Circle2 = new HitCircle(new Vec2(0.743f, 1.331f), new Vec2(1.431f, 0.643f), new Vec2(1.392f, -0.236f), 0.26f),
+        };
+
+        /// <summary>위 휘두르기: 5/4/16, 데미지 10, 넉백 16 위 80°. 앞(20°)에서 머리 위(90°)를 지나 뒤(160°)로.</summary>
+        public static AttackDef SwingUp => new AttackDef
+        {
+            StartupTicks = 5,
+            ActiveTicks = 4,
+            RecoveryTicks = 16,
+            Damage = 10,
+            KnockbackStrength = 16f,
+            KnockbackDirection = new Vec2(0.1736482f, 0.9848078f),
+            CircleCount = 3,
+            Circle0 = new HitCircle(new Vec2(0.573f, 0.454f), new Vec2(0.15f, 0.75f), new Vec2(-0.273f, 0.454f), 0.22f),
+            Circle1 = new HitCircle(new Vec2(0.902f, 0.574f), new Vec2(0.15f, 1.1f), new Vec2(-0.602f, 0.574f), 0.24f),
+            Circle2 = new HitCircle(new Vec2(1.231f, 0.693f), new Vec2(0.15f, 1.45f), new Vec2(-0.931f, 0.693f), 0.26f),
+        };
+
+        /// <summary>
+        /// 아래 내려찍기(공중 전용): 6/5/16, 데미지 10, 넉백 12 아래 앞 -70°. 앞 위(40°)에서 바로 아래(-90°)로.
+        /// 명중하면 공격자 vy = 18(포고 튕김), 공중 점프·대시 회복.
+        /// </summary>
+        public static AttackDef SwingDown => new AttackDef
+        {
+            StartupTicks = 6,
+            ActiveTicks = 5,
+            RecoveryTicks = 16,
+            Damage = 10,
+            KnockbackStrength = 12f,
+            KnockbackDirection = new Vec2(0.3420201f, -0.9396926f),
+            CircleCount = 3,
+            Circle0 = new HitCircle(new Vec2(0.645f, 0.389f), new Vec2(0.69f, -0.125f), new Vec2(0.3f, -0.35f), 0.22f),
+            Circle1 = new HitCircle(new Vec2(0.913f, 0.614f), new Vec2(0.993f, -0.3f), new Vec2(0.3f, -0.7f), 0.24f),
+            Circle2 = new HitCircle(new Vec2(1.181f, 0.839f), new Vec2(1.296f, -0.475f), new Vec2(0.3f, -1.05f), 0.26f),
+            PogoSpeed = 18f,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -210,6 +339,7 @@ namespace Knockbox.Simulation
             v.Begin(nameof(Circle2));
             Circle2.Visit(ref v);
             v.End();
+            v.Value(nameof(PogoSpeed), PogoSpeed);
         }
     }
 
@@ -270,6 +400,7 @@ namespace Knockbox.Simulation
 
         public AttackDef TestAttack;
         public ChargeModeParams Charge;
+        public SwingModeParams Swing;
 
         public static CombatParams Default => new CombatParams
         {
@@ -315,6 +446,7 @@ namespace Knockbox.Simulation
 
             TestAttack = AttackDef.TestJab,
             Charge = ChargeModeParams.Default,
+            Swing = SwingModeParams.Default,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -357,6 +489,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Charge));
             Charge.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Swing));
+            Swing.Visit(ref v);
             v.End();
         }
     }

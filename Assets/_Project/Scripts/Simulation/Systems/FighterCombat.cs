@@ -79,6 +79,7 @@ namespace Knockbox.Simulation
                 case ActionState.GuardStun:
                 case ActionState.Stagger:
                 case ActionState.Recoil:
+                case ActionState.LandingLag:
                     if (f.StunTicks > 0)
                     {
                         f.StunTicks--;
@@ -107,7 +108,17 @@ namespace Knockbox.Simulation
             }
 
             if (f.Action == ActionState.Dash && f.DashTicksLeft > 0)
+            {
+                // 모드 B: 대시 시작 4틱 이후에는 공격으로 캔슬할 수 있다(대시 속도를 그대로 실은 공격).
+                ref readonly var swing = ref c.Swing;
+                int elapsed = config.Movement.DashTicks - f.DashTicksLeft;
+                if (config.Mode == CombatMode.Swing && swing.DashAttackCancelEnabled && (pressed & InputButtons.Attack) != 0
+                    && elapsed >= swing.DashAttackCancelMinTicks)
+                {
+                    StartAttack(ref f, input.MoveX, SwingAttack(f, input), index, tick, events);
+                }
                 return pressed;
+            }
 
             if (input.Held(InputButtons.Guard))
             {
@@ -127,12 +138,30 @@ namespace Knockbox.Simulation
 
             if ((pressed & InputButtons.Attack) != 0)
             {
-                if (config.Mode == CombatMode.Charge)
-                    StartCharge(ref f, input.MoveX);
-                else
-                    StartAttack(ref f, input.MoveX, 0, index, tick, events);
+                switch (config.Mode)
+                {
+                    case CombatMode.Charge:
+                        StartCharge(ref f, input.MoveX);
+                        break;
+                    case CombatMode.Swing:
+                        StartAttack(ref f, input.MoveX, SwingAttack(f, input), index, tick, events);
+                        break;
+                    default:
+                        StartAttack(ref f, input.MoveX, AttackIds.Test, index, tick, events);
+                        break;
+                }
             }
             return pressed;
+        }
+
+        /// <summary>모드 B 기술 고르기: 위 → 위 휘두르기, 공중에서 아래 → 내려찍기, 그 외(중립·좌우·지상 아래) → 앞 휘두르기.</summary>
+        static int SwingAttack(in FighterState f, in InputFrame input)
+        {
+            if (input.MoveY > 0)
+                return AttackIds.SwingUp;
+            if (input.MoveY < 0 && !f.Grounded)
+                return AttackIds.SwingDown;
+            return AttackIds.SwingForward;
         }
 
         static void StartAttack(ref FighterState f, int moveX, int attackId, int index, int tick, SimEventBuffer events)
@@ -142,6 +171,7 @@ namespace Knockbox.Simulation
                 f.Facing = (sbyte)moveX;
             f.AttackId = attackId;
             f.AttackHasHit = false;
+            f.AttackFromAir = !f.Grounded;
             f.DashTicksLeft = 0;
             f.RestartAction(ActionState.Attack);
             events.Add(new SimEvent(tick, SimEventType.AttackStart, index, f.Position, new Vec2(f.Facing, 0f), attackId));
@@ -188,12 +218,12 @@ namespace Knockbox.Simulation
             return k >= 0 && k < attack.ActiveTicks;
         }
 
-        /// <summary>활성 판정 원의 월드 위치. 활성 첫 틱에 Start, 마지막 틱에 End.</summary>
+        /// <summary>활성 판정 원의 월드 위치. 활성 첫 틱에 Start, 가운데에 Mid, 마지막 틱에 End.</summary>
         public static Vec2 CircleCenter(in FighterState f, in AttackDef attack, in HitCircle circle)
         {
             int k = f.ActionTick - attack.StartupTicks;
             float t = attack.ActiveTicks > 1 ? (float)k / (attack.ActiveTicks - 1) : 0f;
-            var offset = circle.Start + (circle.End - circle.Start) * t;
+            var offset = circle.At(t);
             return new Vec2(f.Position.X + offset.X * f.Facing, f.Position.Y + offset.Y);
         }
 
@@ -221,7 +251,7 @@ namespace Knockbox.Simulation
         {
             ref readonly var attack = ref config.GetAttack(attacker.AttackId);
             float half = config.HalfBody;
-            for (int i = 0; i < attack.CircleCount; i++)
+            for (int i = 0; i < attack.UsedCircles; i++)
             {
                 var circle = attack.GetCircle(i);
                 var center = CircleCenter(attacker, attack, circle);
@@ -242,11 +272,11 @@ namespace Knockbox.Simulation
         {
             ref readonly var attackA = ref config.GetAttack(a.AttackId);
             ref readonly var attackB = ref config.GetAttack(b.AttackId);
-            for (int i = 0; i < attackA.CircleCount; i++)
+            for (int i = 0; i < attackA.UsedCircles; i++)
             {
                 var circleA = attackA.GetCircle(i);
                 var centerA = CircleCenter(a, attackA, circleA);
-                for (int j = 0; j < attackB.CircleCount; j++)
+                for (int j = 0; j < attackB.UsedCircles; j++)
                 {
                     var circleB = attackB.GetCircle(j);
                     var centerB = CircleCenter(b, attackB, circleB);
@@ -326,7 +356,17 @@ namespace Knockbox.Simulation
                 Knockback = attack.KnockbackStrength,
                 Point = point,
             };
-            ApplyStrike(ref attacker, ref defender, snapAttacker, snapDefender, strike, defenderIndex, config, tick, events);
+            var outcome = ApplyStrike(ref attacker, ref defender, snapAttacker, snapDefender, strike, defenderIndex, config, tick, events);
+            if (outcome == SimEventType.Hit && attack.PogoSpeed > 0f)
+            {
+                // 내려찍기 포고 튕김: 히트스탑이 끝나면 위로 튀어 오르고 공중 점프·대시를 되찾는다.
+                attacker.Velocity.Y = attack.PogoSpeed;
+                attacker.Grounded = false;
+                attacker.GroundBox = FighterState.NoBox;
+                attacker.AirJumpsLeft = config.Movement.AirJumps;
+                attacker.DashCharges = config.Movement.DashCharges;
+                attacker.JumpCutEligible = false;
+            }
         }
 
         /// <summary>
@@ -424,7 +464,8 @@ namespace Knockbox.Simulation
             public Vec2 ContactNormal;
         }
 
-        static void ApplyStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, in Strike strike, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)
+        /// <summary>결과(Parry, GuardHit, Hit)를 돌려준다.</summary>
+        static SimEventType ApplyStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, in Strike strike, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)
         {
             ref readonly var c = ref config.Combat;
 
@@ -450,7 +491,7 @@ namespace Knockbox.Simulation
                 attacker.HitstopTicks = c.ParryHitstop;
                 defender.HitstopTicks = c.ParryHitstop;
                 events.Add(new SimEvent(tick, SimEventType.Parry, defenderIndex, strike.Point, new Vec2(away, 0f), strike.Damage));
-                return;
+                return SimEventType.Parry;
             }
 
             int hitstop = HitstopFor(strike.Damage, c);
@@ -468,7 +509,7 @@ namespace Knockbox.Simulation
                 if (strike.Body)
                     Rebound(ref attacker, snapAttacker, config);
                 events.Add(new SimEvent(tick, SimEventType.GuardHit, defenderIndex, strike.Point, strike.Direction, damage));
-                return;
+                return SimEventType.GuardHit;
             }
 
             // 명중: 넉백은 속도를 대체한다. 경직이 풀리기 전에 다시 맞으면 넉백 × 0.85^n, 경직 × 0.8^n.
@@ -484,6 +525,7 @@ namespace Knockbox.Simulation
             if (strike.Body)
                 Rebound(ref attacker, snapAttacker, config);
             events.Add(new SimEvent(tick, SimEventType.Hit, defenderIndex, strike.Point, strike.Direction, strike.Damage));
+            return SimEventType.Hit;
         }
 
         /// <summary>몸 충돌에서 이긴 쪽: 속도 × -0.25로 살짝 튕겨 나오고 돌진(대시)이 끝난다.</summary>

@@ -193,20 +193,31 @@ namespace Knockbox.Simulation
             Match = match;
             Combat = combat;
             Combat.TestAttack = Prepare(combat.TestAttack);
+            Combat.Swing.Forward = Prepare(combat.Swing.Forward);
+            Combat.Swing.Up = Prepare(combat.Swing.Up);
+            Combat.Swing.Down = Prepare(combat.Swing.Down);
             Mode = mode;
             HalfBody = movement.BodySize * 0.5f;
         }
 
         public static SimConfig CreateDefault() => new SimConfig(MovementParams.Default, MatchParams.Default);
 
-        /// <summary>공격 번호 → 데이터. CP4는 0번(테스트 공격)만 있다.</summary>
-        public ref readonly AttackDef GetAttack(int id) => ref Combat.TestAttack;
+        /// <summary>공격 번호(AttackIds) → 데이터.</summary>
+        public ref readonly AttackDef GetAttack(int id)
+        {
+            switch (id)
+            {
+                case AttackIds.SwingForward: return ref Combat.Swing.Forward;
+                case AttackIds.SwingUp: return ref Combat.Swing.Up;
+                case AttackIds.SwingDown: return ref Combat.Swing.Down;
+                default: return ref Combat.TestAttack;
+            }
+        }
 
-        /// <summary>넉백 방향을 정규화하고 판정 원 개수를 0~3으로 맞춘다.</summary>
+        /// <summary>넉백 방향을 정규화하고 활성 틱을 1 이상으로 맞춘다. 판정 원 개수는 쓸 때 자른다(AttackDef.UsedCircles).</summary>
         static AttackDef Prepare(AttackDef attack)
         {
             attack.KnockbackDirection = SimMath.Normalize(attack.KnockbackDirection);
-            attack.CircleCount = SimMath.Clamp(attack.CircleCount, 0, AttackDef.MaxCircles);
             attack.ActiveTicks = SimMath.Max(attack.ActiveTicks, 1);
             return attack;
         }

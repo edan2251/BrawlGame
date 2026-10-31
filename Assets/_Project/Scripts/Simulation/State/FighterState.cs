@@ -27,6 +27,8 @@ namespace Knockbox.Simulation
         Charge,
         /// <summary>모드 A: 충전을 풀어 날아가는 돌진.</summary>
         Lunge,
+        /// <summary>모드 B: 공중에서 시작한 공격 도중 착지한 경직.</summary>
+        LandingLag,
     }
 
     /// <summary>
@@ -91,6 +93,8 @@ namespace Knockbox.Simulation
         public int AttackId;
         /// <summary>이번 공격이 이미 상대에게 닿았다(한 번 휘두를 때 같은 상대는 한 번만).</summary>
         public bool AttackHasHit;
+        /// <summary>이번 공격을 공중에서 시작했다(착지 경직 판정).</summary>
+        public bool AttackFromAir;
         /// <summary>남은 패링 구간 틱.</summary>
         public int ParryTicks;
         /// <summary>마지막으로 가드 버튼을 누른 뒤 지난 틱(패링 재사용 제한).</summary>
@@ -108,7 +112,8 @@ namespace Knockbox.Simulation
         public readonly bool InMovementState => Action <= ActionState.Dash;
 
         public readonly bool IsStunned =>
-            Action == ActionState.Hitstun || Action == ActionState.GuardStun || Action == ActionState.Stagger || Action == ActionState.Recoil;
+            Action == ActionState.Hitstun || Action == ActionState.GuardStun || Action == ActionState.Stagger
+            || Action == ActionState.Recoil || Action == ActionState.LandingLag;
 
         public readonly bool IsGuarding => Action == ActionState.Guard || Action == ActionState.GuardStun;
 
@@ -162,6 +167,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(ComboHits), ComboHits);
             v.Value(nameof(AttackId), AttackId);
             v.Value(nameof(AttackHasHit), AttackHasHit);
+            v.Value(nameof(AttackFromAir), AttackFromAir);
             v.Value(nameof(ParryTicks), ParryTicks);
             v.Value(nameof(TicksSinceGuardPress), TicksSinceGuardPress);
             v.Value(nameof(PendingPresses), (int)PendingPresses);

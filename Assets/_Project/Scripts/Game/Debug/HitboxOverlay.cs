@@ -111,7 +111,7 @@ namespace Knockbox.Game
             if (active)
             {
                 ref readonly var attack = ref config.GetAttack(f.AttackId);
-                count = attack.CircleCount;
+                count = attack.UsedCircles;
                 for (int i = 0; i < count; i++)
                 {
                     var circle = attack.GetCircle(i);

@@ -368,6 +368,15 @@ namespace Knockbox.Simulation
                 f.TicksSinceWall = SimMath.Min(f.TicksSinceWall + 1, FighterState.TimerCap);
             }
 
+            // 모드 B: 공중에서 시작한 공격 도중 착지하면 공격이 끝나고 착지 경직.
+            if (f.Action == ActionState.Attack && f.AttackFromAir && f.Grounded && !scratch.WasGrounded && config.Mode == CombatMode.Swing)
+            {
+                f.RestartAction(ActionState.LandingLag);
+                f.StunTicks = config.Combat.Swing.LandingLagTicks;
+                f.AttackId = FighterState.NoAttack;
+                f.AttackHasHit = false;
+            }
+
             // 돌진은 속도가 12 미만이 되거나 30틱이 지나면 끝나고 이동 상태로 돌아간다.
             if (f.Action == ActionState.Lunge)
             {
