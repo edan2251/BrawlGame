@@ -209,6 +209,7 @@
 | S-145 | 2026-11-01 | CP16 | 연출: 상자는 상자마다 밝기 ±6%(번호로 정함), 움직이는 상자마다 아랫변에 어두운 이음매(상자를 따라 돎). 쳐냄은 먼지·파편·둔탁한 소리, 세게 부딪힘(다가온 속도 5 이상, 몸마다 틱에 한 번 `PropImpact`)은 작은 먼지와 착지 소리(속도 비례). 효과음은 기존 합성음 재사용 | 08 2절·09 6절. 새 효과음 없이 기존 `WallSplat`·`Land`로 충분 | `PropView`, `MatchPresenter` |
 | S-146 | 2026-11-01 | CP16 | 테스트 정의: 깨어난 기둥은 부드러운 접촉 6층이 0.07~0.09 내려앉으므로 "무너지지 않음"의 세로 허용 0.12. 거울 회전 비교는 2배각(직사각형은 180° 돌려도 같은 모양). 실험 맵 PropLab에 6단 기둥 추가(캡처 `showcase_cp16_collapse`) | 내려앉음을 붕괴로 세지 않고, 같은 모양의 회전을 차이로 세지 않게 | `PropCollapseTests`, `PropStage2Tests` |
 | S-147 | 2026-11-01 | CP17 | 기준선 빌드: `Builds/Windows`가 CP16 빌드가 아니어서(11-01 01:30, CP11 무렵) HEAD = `cp-16`(작업 트리 변경 없음)에서 다시 빌드해 `Builds/Baseline_CP16`으로 복사했다(BurstDebugInformation 폴더 제외, `BASELINE.txt`에 커밋). 봇 측정 테스트 보고에 벽꽝/분·클래시/분을 더했다 | CR-003 2절은 "CP16 빌드"를 보존하라고 했고, 폴더가 없을 때만 보고하라고 했다. 폴더는 있었지만 내용이 CP16이 아니어서 같은 소스로 다시 만드는 것이 의도에 맞다 | `baseline-cp16.md`, `MapV2Tests` |
+| S-148 | 2026-11-01 | CP17 | 느린 테스트 분리: 맵 도달성 탐색 `ArenaPlayTests.EveryPlatform_ReachableFromSpawn`(18건)에만 카테고리 `Slow`(`TestCategories.Slow`). 개발 중에는 카테고리 필터 `!Slow`로 빠른 묶음을 돌리고 CP 끝에 전체를 돌린다. 테스트마다 시간을 `Logs/test-timings-{모드}.csv`에 남기는 `TestTimingRecorder` 추가. `PropPhysicsTests.StepAndRollback_WithinBudget`의 롤백 시간은 같은 되감기 3번 중 가장 짧은 값의 최댓값으로 잰다(S-140과 같은 방식) | 전체 EditMode 1170초 중 도달성 탐색이 약 1080초(한 건 36~160초). 나머지 테스트는 한 건 최대 18초라 묶음을 더 나누지 않았다. 롤백 최댓값은 에디터가 백그라운드일 때 2.4~9.8 ms로 튀었다(포커스 상태에서는 통과) | `ArenaPlayTests`, `TestCategories`, `TestTimingRecorder`, `PropPhysicsTests` |
 
 ---
 

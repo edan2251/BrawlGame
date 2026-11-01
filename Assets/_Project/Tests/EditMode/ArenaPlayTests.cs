@@ -233,6 +233,8 @@ namespace Knockbox.Tests.EditMode
         [TestCase("Scales", 1)]
         [TestCase("Totems", 0)]
         [TestCase("Totems", 1)]
+        // 전체 EditMode 시간의 약 90%(맵 v2 한 건에 36~160초). 개발 중에는 빼고 CP 끝에 돌린다(CP17-2).
+        [Category(TestCategories.Slow)]
         public void EveryPlatform_ReachableFromSpawn(string map, int fighter)
         {
             var arena = ArenaFiles.LoadByName(map);

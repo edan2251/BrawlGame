@@ -439,13 +439,19 @@ namespace Knockbox.Tests.EditMode
                 }
                 if (t >= 8 && t % 60 == 0)
                 {
+                    // 같은 되감기를 3번 재 가장 짧은 값(S-140·S-148): 에디터의 순간 끊김이 아닌 계산 비용을 잰다.
                     var keep = w.State;
-                    watch.Restart();
-                    w.State = history[t - 7];
-                    for (int k = t - 7; k <= t; k++)
-                        w.Step(in1[k], in2[k]);
-                    watch.Stop();
-                    worstRollback = System.Math.Max(worstRollback, watch.Elapsed.TotalMilliseconds);
+                    double best = double.MaxValue;
+                    for (int repeat = 0; repeat < 3; repeat++)
+                    {
+                        watch.Restart();
+                        w.State = history[t - 7];
+                        for (int k = t - 7; k <= t; k++)
+                            w.Step(in1[k], in2[k]);
+                        watch.Stop();
+                        best = System.Math.Min(best, watch.Elapsed.TotalMilliseconds);
+                    }
+                    worstRollback = System.Math.Max(worstRollback, best);
                     Assert.AreEqual(keep.ComputeChecksum(), w.State.ComputeChecksum(), $"틱 {t}: 되감아 다시 계산한 결과");
                 }
             }
