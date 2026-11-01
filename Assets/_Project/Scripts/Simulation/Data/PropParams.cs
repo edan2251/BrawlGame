@@ -25,6 +25,12 @@ namespace Knockbox.Simulation
         public float SleepSpeed;
         public float SleepAngularSpeed;
         public int SleepTicks;
+        /// <summary>경첩 발판·시소: 각도 한계(사인값, 처음 자세 기준)와 복원 스프링(토크 = 강성 × sin θ), 각 감쇠.</summary>
+        public float HingeLimitSin;
+        public float HingeStiffness;
+        public float SeesawLimitSin;
+        public float SeesawStiffness;
+        public float PivotDamping;
 
         // 캐릭터 상호작용
         public float FighterMass;
@@ -66,6 +72,11 @@ namespace Knockbox.Simulation
             SleepSpeed = 0.05f,
             SleepAngularSpeed = 0.05f,
             SleepTicks = 30,
+            HingeLimitSin = 0.5f,
+            HingeStiffness = 400f,
+            SeesawLimitSin = 0.342f,
+            SeesawStiffness = 150f,
+            PivotDamping = 3f,
 
             FighterMass = 1f,
             FighterRestitution = 0.15f,
@@ -101,6 +112,11 @@ namespace Knockbox.Simulation
             v.Value(nameof(SleepSpeed), SleepSpeed);
             v.Value(nameof(SleepAngularSpeed), SleepAngularSpeed);
             v.Value(nameof(SleepTicks), SleepTicks);
+            v.Value(nameof(HingeLimitSin), HingeLimitSin);
+            v.Value(nameof(HingeStiffness), HingeStiffness);
+            v.Value(nameof(SeesawLimitSin), SeesawLimitSin);
+            v.Value(nameof(SeesawStiffness), SeesawStiffness);
+            v.Value(nameof(PivotDamping), PivotDamping);
             v.Value(nameof(FighterMass), FighterMass);
             v.Value(nameof(FighterRestitution), FighterRestitution);
             v.Value(nameof(StandCos), StandCos);

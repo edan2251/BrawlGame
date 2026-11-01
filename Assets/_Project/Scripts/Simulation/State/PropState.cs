@@ -21,6 +21,8 @@ namespace Knockbox.Simulation
         /// <summary>파이터 0·1의 돌진이 이 구조물을 다시 칠 수 있을 때까지 남은 틱(돌진 한 번에 한 번).</summary>
         public int StrikeCooldown0;
         public int StrikeCooldown1;
+        /// <summary>연결(줄·축·경첩)이 끊어졌으면 1(CP15). 끊어진 몸은 자유롭게 떨어진다.</summary>
+        public int Broken;
         /// <summary>거의 움직이지 않은 연속 틱 수. PropParams.SleepTicks 이상이면 잠들어 적분을 건너뛴다(결정론적, 충격을 받으면 0).</summary>
         public int SleepTicks;
 
@@ -67,6 +69,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(HitCooldown1), HitCooldown1);
             v.Value(nameof(StrikeCooldown0), StrikeCooldown0);
             v.Value(nameof(StrikeCooldown1), StrikeCooldown1);
+            v.Value(nameof(Broken), Broken);
             v.Value(nameof(SleepTicks), SleepTicks);
         }
     }

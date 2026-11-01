@@ -44,6 +44,8 @@ namespace Knockbox.Simulation
         PropHit,
         /// <summary>돌진이 구조물을 침(CP14). Fighter는 친 쪽, Direction은 구조물 쪽, Strength는 위력.</summary>
         PropStrike,
+        /// <summary>구조물의 줄·축·경첩이 끊어짐(CP15). Fighter는 마지막 접촉자(없으면 NoFighter), Position은 연결점, Strength는 받은 충격.</summary>
+        JointBreak,
     }
 
     /// <summary>

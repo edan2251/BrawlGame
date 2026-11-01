@@ -20,6 +20,7 @@ namespace Knockbox.Presentation
         Countdown,
         KO,
         Boundary,
+        Snap,
     }
 
     /// <summary>
@@ -32,7 +33,7 @@ namespace Knockbox.Presentation
         const float PitchRange = 0.05f;
 
         readonly AudioSource[] voices = new AudioSource[Voices];
-        readonly int[] lastFrame = new int[16];
+        readonly int[] lastFrame = new int[24];
         SfxLibrary library;
         int nextVoice;
         FxRandom random = new FxRandom(0x5F3759DFu);

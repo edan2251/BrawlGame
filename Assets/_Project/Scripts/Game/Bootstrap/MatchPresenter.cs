@@ -535,6 +535,13 @@ namespace Knockbox.Game
                     sfxPlayer.Play(damage >= 15f ? Sfx.HitStrong : Sfx.HitWeak);
                     break;
                 }
+                case SimEventType.JointBreak:
+                    // 줄·경첩이 끊어짐(CP15): 연결점에서 작은 섬광과 먼지, 짧은 끊어지는 소리.
+                    fx.Glow(V(e.Position), palette.flash, 1.6f, 0.4f, 0.15f);
+                    fx.Shards(V(e.Position), Vector2.down, 140f, 4, CurrentTheme.prop, 6f, 0.12f, 0.35f);
+                    AddTrauma(0.12f);
+                    sfxPlayer.Play(Sfx.Snap);
+                    break;
                 case SimEventType.PropStrike:
                     // 돌진이 구조물을 침: 먼지, 작은 고리, 둔탁한 소리, 위력 비례 흔들림.
                     dust.Burst(V(e.Position), 3, 1.6f, 0f);

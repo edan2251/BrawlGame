@@ -98,7 +98,7 @@ namespace Knockbox.Tests.PlayMode
             var names = Enum.GetNames(typeof(Sfx));
             foreach (Sfx sfx in Enum.GetValues(typeof(Sfx)))
                 Assert.IsNotNull(library.Get(sfx), $"{sfx} 효과음 파일이 없음");
-            Assert.AreEqual(16, names.Length, "05 7절 목록 15개 + 경계 튕김(CR-002)");
+            Assert.AreEqual(17, names.Length, "05 7절 목록 15개 + 경계 튕김(CR-002) + 끊어짐(CP15)");
 
             var go = new GameObject("SfxProbe");
             try

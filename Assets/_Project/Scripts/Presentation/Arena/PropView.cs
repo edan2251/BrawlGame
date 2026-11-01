@@ -73,7 +73,7 @@ namespace Knockbox.Presentation
                 ShapeLibrary.SetSize(bodies[b], p.HalfSize.X * 2f, p.HalfSize.Y * 2f);
                 bodies[b].transform.localPosition = ToVector(p.Center);
                 ropes[b] = joint.Kind == PropJointKind.Rope ? Rope(shapes, theme.prop) : null;
-                if (joint.Kind == PropJointKind.Axis)
+                if (joint.Pinned)
                     Dot(shapes, PaletteAsset.Scaled(theme.prop, PivotDarkness), 5, ToVector(joint.WorldAnchor), PivotSize);
             }
         }
@@ -95,9 +95,20 @@ namespace Knockbox.Presentation
                 if (ropes[b] != null)
                 {
                     ref readonly var joint = ref current.GetJoint(b);
-                    var local = new Vector2(joint.LocalAnchor.X, joint.LocalAnchor.Y);
-                    var end = position + new Vector2(rotation.x * local.x - rotation.y * local.y, rotation.y * local.x + rotation.x * local.y);
-                    Line(ropes[b], ToVector(joint.WorldAnchor), end);
+                    // 끊어진 줄은 그리지 않는다(CP15).
+                    ropes[b].enabled = now.Broken == 0;
+                    if (now.Broken != 0)
+                        continue;
+                    var end = position + Rotate(rotation, joint.LocalAnchor);
+                    var start = ToVector(joint.WorldAnchor);
+                    if (joint.OtherBody >= 0)
+                    {
+                        // 다른 몸에 이어진 줄(연결 구조): 그 몸이 지금 그려진 자리에서 시작.
+                        var other = bodies[joint.OtherBody].transform;
+                        float angle = other.localEulerAngles.z * Mathf.Deg2Rad;
+                        start = (Vector2)other.localPosition + Rotate(new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)), joint.OtherLocal);
+                    }
+                    Line(ropes[b], start, end);
                 }
             }
         }
@@ -119,6 +130,8 @@ namespace Knockbox.Presentation
         }
 
         static Vector2 ToVector(Vec2 v) => new Vector2(v.X, v.Y);
+
+        static Vector2 Rotate(Vector2 q, Vec2 local) => new Vector2(q.x * local.X - q.y * local.Y, q.y * local.X + q.x * local.Y);
 
         void Rect(ShapeLibrary shapes, Color color, int order, float minX, float minY, float maxX, float maxY)
         {

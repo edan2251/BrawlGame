@@ -81,7 +81,7 @@ namespace Knockbox.Simulation
 
             // 구조물은 카운트다운·싸움·KO 동안 움직인다(히트스탑과 상관없이, 09 4절).
             if (phase == MatchPhase.Countdown || phase == MatchPhase.Fighting || phase == MatchPhase.KO)
-                PropPhysics.Step(ref s.Props, Arena, Config, PropScratch);
+                PropPhysics.Step(ref s.Props, Arena, Config, PropScratch, s.Tick, Events);
 
             switch (phase)
             {
@@ -139,7 +139,7 @@ namespace Knockbox.Simulation
                 StepFighter(ref s.Fighter1, p2, 1, s.Tick, out scratch1);
 
             // 구조물과의 상호작용(09 4절): 이동 직후, 캐릭터끼리 밀어내기 전.
-            PropInteraction.Resolve(ref s, Arena, Config, prev0, prev1, frozen0, frozen1, Events);
+            PropInteraction.Resolve(ref s, Arena, Config, prev0, prev1, frozen0, frozen1, Events, PropScratch);
 
             // 몸 충돌 판정은 이동 직후(밀어내기 전) 스냅숏의 접촉과 법선으로 한다.
             var contact = BodyContact.Measure(s.Fighter0, s.Fighter1, Config);

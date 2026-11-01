@@ -131,36 +131,50 @@ namespace Knockbox.Simulation
                 all.Add(boxes[i]);
             var statics = new System.Collections.Generic.List<int>();
             var dynamics = new System.Collections.Generic.List<int>();
-            var jointList = new System.Collections.Generic.List<PropJoint>();
+            var bodyOf = new int[newProps.Length];
             for (int i = 0; i < newProps.Length; i++)
             {
                 ref readonly var p = ref newProps[i];
                 if (PropDef.Stage(p.Kind) <= PropPhysics.ImplementedStage)
                 {
+                    bodyOf[i] = dynamics.Count;
                     dynamics.Add(i);
-                    jointList.Add(JointOf(p));
                     continue;
                 }
+                bodyOf[i] = -1;
                 statics.Add(i);
                 all.Add(new ArenaBox(TerrainKind.Prop, p.MinX, p.MinY, p.MaxX, p.MaxY));
             }
+            var jointList = new System.Collections.Generic.List<PropJoint>(dynamics.Count);
+            foreach (int i in dynamics)
+                jointList.Add(JointOf(newProps, i, bodyOf));
             if (dynamics.Count > PropState.Capacity)
                 throw new System.InvalidOperationException($"{Name}: 강체 구조물 {dynamics.Count}개(용량 {PropState.Capacity})");
             return new ArenaDef(Name, Columns, Rows, HasBoundary, all.ToArray(), SpawnFoot0, SpawnFoot1, (PropDef[])newProps.Clone(),
                 statics.ToArray(), dynamics.ToArray(), jointList.ToArray());
         }
 
-        static PropJoint JointOf(in PropDef p)
+        static PropJoint JointOf(PropDef[] all, int index, int[] bodyOf)
         {
+            ref readonly var p = ref all[index];
             if (!p.HasAnchor)
-                return new PropJoint { Kind = PropJointKind.None };
+                return new PropJoint { Kind = PropJointKind.None, OtherBody = -1 };
             if (p.HangsByRope)
             {
                 var local = new Vec2(0f, p.HalfSize.Y);
-                var d = p.Center + local - p.Anchor;
-                return new PropJoint { Kind = PropJointKind.Rope, WorldAnchor = p.Anchor, LocalAnchor = local, Length = SimMath.Sqrt(d.LengthSquared) };
+                int other = p.AnchorProp >= 0 ? bodyOf[p.AnchorProp] : -1;
+                // 다른 강체에 이어진 줄: 그 몸의 아랫면 가운데에서 이 몸의 윗면 가운데까지.
+                var otherLocal = other >= 0 ? new Vec2(0f, -all[p.AnchorProp].HalfSize.Y) : Vec2.Zero;
+                var anchor = other >= 0 ? all[p.AnchorProp].Center + otherLocal : p.Anchor;
+                var d = p.Center + local - anchor;
+                return new PropJoint
+                {
+                    Kind = PropJointKind.Rope, WorldAnchor = anchor, LocalAnchor = local, Length = SimMath.Sqrt(d.LengthSquared),
+                    OtherBody = other, OtherLocal = otherLocal, BreakImpulse = p.BreakImpulse,
+                };
             }
-            return new PropJoint { Kind = PropJointKind.Axis, WorldAnchor = p.Anchor, LocalAnchor = p.Anchor - p.Center };
+            var kind = p.Kind == PropKind.Hinged ? PropJointKind.Hinge : p.Kind == PropKind.Seesaw ? PropJointKind.Seesaw : PropJointKind.Axis;
+            return new PropJoint { Kind = kind, WorldAnchor = p.Anchor, LocalAnchor = p.Anchor - p.Center, OtherBody = -1, BreakImpulse = p.BreakImpulse };
         }
 
         public ref readonly ArenaBox GetBox(int index) => ref boxes[index];
@@ -203,6 +217,7 @@ namespace Knockbox.Simulation
                 h.AddFloat(props[i].Anchor.X);
                 h.AddFloat(props[i].Anchor.Y);
                 h.AddInt(props[i].AnchorProp);
+                h.AddFloat(props[i].BreakImpulse);
             }
             h.AddFloat(SpawnFoot0.X);
             h.AddFloat(SpawnFoot0.Y);

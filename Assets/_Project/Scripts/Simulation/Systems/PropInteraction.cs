@@ -10,7 +10,7 @@ namespace Knockbox.Simulation
     public static class PropInteraction
     {
         public static void Resolve(ref SimState s, ArenaDef arena, SimConfig config, in FighterState prev0, in FighterState prev1,
-            bool frozen0, bool frozen1, SimEventBuffer events)
+            bool frozen0, bool frozen1, SimEventBuffer events, PropScratch scratch)
         {
             if (s.Props.Count == 0)
             {
@@ -22,7 +22,9 @@ namespace Knockbox.Simulation
             var impulses = new PropImpulses();
             ResolveFighter(ref s.Fighter0, prev0, frozen0, 0, before, ref impulses, arena, config, s.Tick, events);
             ResolveFighter(ref s.Fighter1, prev1, frozen1, 1, before, ref impulses, arena, config, s.Tick, events);
-            impulses.ApplyTo(ref s.Props, arena, config);
+            impulses.ApplyTo(ref s.Props, arena, config, scratch);
+            // 캐릭터가 준 충격까지 더해 끊어짐을 판정(09 5절: 기준 충격 이상에서만).
+            PropPhysics.CheckBreaks(ref s.Props, arena, scratch, s.Tick, events);
         }
 
         /// <summary>틱 동안 두 캐릭터가 구조물에 준 충격량의 합(몸마다 선·각 충격량). 할당 없이 PropState 모양을 빌린다.</summary>
@@ -65,7 +67,7 @@ namespace Knockbox.Simulation
                     sums.Count = body + 1;
             }
 
-            public void ApplyTo(ref PropState props, ArenaDef arena, SimConfig config)
+            public void ApplyTo(ref PropState props, ArenaDef arena, SimConfig config, PropScratch scratch)
             {
                 for (int i = 0; i < sums.Count; i++)
                 {
@@ -80,6 +82,7 @@ namespace Knockbox.Simulation
                         b.Velocity = (b.Velocity - n * (2f * Vec2.Dot(b.Velocity, n))) * sum.Rotation.X;
                         b.AngularVelocity *= -sum.Rotation.X;
                     }
+                    scratch.TickImpulse[i] += SimMath.Sqrt(sum.Velocity.LengthSquared);
                     b.Velocity += sum.Velocity / m;
                     b.AngularVelocity += sum.AngularVelocity / PropPhysics.Inertia(def, m);
                     // 충격을 받으면 깬다.

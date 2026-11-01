@@ -26,8 +26,14 @@ namespace Knockbox.Simulation
     public enum PropJointKind : byte
     {
         None,
+        /// <summary>최대 거리(매달린 블록, 연결 구조). OtherBody가 있으면 다른 몸에 이어진 줄.</summary>
         Rope,
+        /// <summary>점 고정, 자유 회전(회전 블록).</summary>
         Axis,
+        /// <summary>점 고정 + 각도 한계 + 복원 스프링(경첩 발판, CP15).</summary>
+        Hinge,
+        /// <summary>점 고정 + 각도 한계 + 약한 복원 스프링(시소, CP15).</summary>
+        Seesaw,
     }
 
     /// <summary>강체 구조물 하나의 고정 정보(맵에서 정해짐, 상태 아님).</summary>
@@ -40,6 +46,13 @@ namespace Knockbox.Simulation
         public Vec2 LocalAnchor;
         /// <summary>줄의 최대 길이(처음 놓인 모양에서 잰 길이).</summary>
         public float Length;
+        /// <summary>줄이 이어진 다른 강체(-1이면 월드의 WorldAnchor). 그 몸 쪽 연결점은 OtherLocal(몸 좌표).</summary>
+        public int OtherBody;
+        public Vec2 OtherLocal;
+        /// <summary>이 충격(한 틱 합) 이상을 받으면 끊어진다. 0이면 끊어지지 않는다.</summary>
+        public float BreakImpulse;
+
+        public bool Pinned => Kind == PropJointKind.Axis || Kind == PropJointKind.Hinge || Kind == PropJointKind.Seesaw;
     }
 
     /// <summary>구조물 하나(강체 하나). 맵의 처음 각도는 모두 0(축 정렬). 회전 상태는 CP14부터 SimState.Props에 둔다.</summary>
@@ -57,6 +70,8 @@ namespace Knockbox.Simulation
         public Vec2 Anchor;
         /// <summary>-1이면 Anchor는 월드 점. 아니면 줄이 이어진 구조물 번호(사슬), Anchor는 그 구조물 쪽 끝의 월드 위치.</summary>
         public int AnchorProp;
+        /// <summary>끊어지는 충격(한 틱 합). 0이면 끊어지지 않는다(09 5절).</summary>
+        public float BreakImpulse;
 
         public float MinX => Center.X - HalfSize.X;
         public float MaxX => Center.X + HalfSize.X;

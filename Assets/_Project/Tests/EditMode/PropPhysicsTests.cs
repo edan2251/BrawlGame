@@ -379,9 +379,10 @@ namespace Knockbox.Tests.EditMode
             for (int i = 0; i < arena.DynamicPropCount; i++)
             {
                 var joint = arena.GetJoint(i);
-                if (joint.Kind != PropJointKind.Rope)
-                    continue;
                 var def = arena.GetProp(arena.DynamicProp(i));
+                // 원칙 9의 대상: 1단계 매달린 블록(월드 고정점에 줄). 연결 구조의 부품은 2단계부터 서로 충돌한다.
+                if (joint.Kind != PropJointKind.Rope || def.Kind != PropKind.Hanging)
+                    continue;
                 var w = World(arena, new Vec2(-16f, -8f), new Vec2(16f, -8f));
                 float m = PropPhysics.Mass(def, config.Combat.Props);
                 Push(w, i, new Vec2((def.Center.X >= 0f ? -1f : 1f) * power / m, 0f), 0f);

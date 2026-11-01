@@ -168,6 +168,8 @@ namespace Knockbox.Game
             };
             if (body.HalfSize.X <= 0f || body.HalfSize.Y <= 0f)
                 throw new FormatException($"{where}: 크기는 양수");
+            if (entry.TryGetValue("break", out object brk) && brk != null)
+                body.BreakImpulse = brk is double bd && bd > 0 ? (float)bd : throw new FormatException($"{where}: \"break\"는 양수");
             if (entry.ContainsKey("anchor"))
             {
                 body.HasAnchor = true;

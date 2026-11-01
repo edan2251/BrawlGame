@@ -132,6 +132,13 @@ namespace Knockbox.Tests.EditMode
                 if (x + half > b.MinX + 1e-3f && x - half < b.MaxX - 1e-3f && y + half > b.MinY + 1e-3f && y - half < b.MaxY - 1e-3f)
                     return false;
             }
+            // 강체 구조물(CP14부터)은 상자가 아니지만 놓인 자리는 차 있다(시소가 덮은 받침 윗면은 설 곳이 아님).
+            for (int i = 0; i < arena.DynamicPropCount; i++)
+            {
+                var p = arena.GetProp(arena.DynamicProp(i));
+                if (x + half > p.MinX + 1e-3f && x - half < p.MaxX - 1e-3f && y + half > p.MinY + 1e-3f && y - half < p.MaxY - 1e-3f)
+                    return false;
+            }
             return true;
         }
 

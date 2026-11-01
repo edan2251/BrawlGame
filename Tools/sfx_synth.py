@@ -186,6 +186,13 @@ def boundary(rng):
     return mix((0.55, lowpass(buzz, 0.35)), (0.5, crackle), (0.35, sting))
 
 
+def snap(rng):
+    """줄·경첩이 끊어짐(CP15): 짧고 높은 '툭' — 날카로운 잡음 터짐 + 빠르게 떨어지는 짧은 음."""
+    crack = noise_burst(rng, 0.09, 0.012, 0.95)
+    twang = sweep(0.16, 900.0, 320.0, rng, attack=0.001, decay=0.04, shape="square")
+    return mix((0.8, crack), (0.35, twang))
+
+
 def pad(rng):
     n = int(0.32 * RATE)
     phase, out = 0.0, []
@@ -226,6 +233,7 @@ SOUNDS = {
     "countdown": (countdown, 114),
     "ko": (ko, 115),
     "boundary": (boundary, 116),
+    "snap": (snap, 117),
 }
 
 
