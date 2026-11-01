@@ -21,7 +21,7 @@ namespace Knockbox.Tests.PlayMode
 
             string[] choices = runner.ArenaChoices();
             Assert.AreEqual(MatchRunner.RotationName, choices[0], "F2 첫 선택지는 맵 순환");
-            CollectionAssert.AreEqual(new[] { "Crossing", "Foundry", "Gallery", "Pillars", "Terrace", "Vault" }, runner.RotationNames());
+            CollectionAssert.AreEqual(new[] { "Chimes", "Gantry", "Mobile", "Ruins", "Scales", "Totems" }, runner.RotationNames());
             CollectionAssert.IsSubsetOf(new[] { "Box", "Pit", "Towers" }, choices, "v1 맵은 F2로 고를 수 있음");
 
             runner.ArenaName = MatchRunner.RotationName;

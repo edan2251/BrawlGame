@@ -105,7 +105,7 @@ namespace Knockbox.Tests.EditMode
                 var b = arena.GetBox(i);
                 if (b.Kind == TerrainKind.Spike || b.MaxY >= arena.HalfHeight - 0.5f)
                     continue;
-                if (b.Kind != TerrainKind.Solid)
+                if (!b.IsSolidBlock)
                 {
                     list.Add(i);
                     continue;
@@ -211,18 +211,18 @@ namespace Knockbox.Tests.EditMode
         [TestCase("Towers", 1)]
         [TestCase("Pit", 0)]
         [TestCase("Pit", 1)]
-        [TestCase("Crossing", 0)]
-        [TestCase("Crossing", 1)]
-        [TestCase("Foundry", 0)]
-        [TestCase("Foundry", 1)]
-        [TestCase("Gallery", 0)]
-        [TestCase("Gallery", 1)]
-        [TestCase("Pillars", 0)]
-        [TestCase("Pillars", 1)]
-        [TestCase("Terrace", 0)]
-        [TestCase("Terrace", 1)]
-        [TestCase("Vault", 0)]
-        [TestCase("Vault", 1)]
+        [TestCase("Chimes", 0)]
+        [TestCase("Chimes", 1)]
+        [TestCase("Gantry", 0)]
+        [TestCase("Gantry", 1)]
+        [TestCase("Mobile", 0)]
+        [TestCase("Mobile", 1)]
+        [TestCase("Ruins", 0)]
+        [TestCase("Ruins", 1)]
+        [TestCase("Scales", 0)]
+        [TestCase("Scales", 1)]
+        [TestCase("Totems", 0)]
+        [TestCase("Totems", 1)]
         public void EveryPlatform_ReachableFromSpawn(string map, int fighter)
         {
             var arena = ArenaFiles.LoadByName(map);

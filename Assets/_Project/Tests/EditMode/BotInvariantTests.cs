@@ -155,12 +155,12 @@ namespace Knockbox.Tests.EditMode
         [TestCase(true, "Box")]
         [TestCase(true, "Towers")]
         [TestCase(true, "Pit")]
-        [TestCase(true, "Crossing")]
-        [TestCase(true, "Foundry")]
-        [TestCase(true, "Gallery")]
-        [TestCase(true, "Pillars")]
-        [TestCase(true, "Terrace")]
-        [TestCase(true, "Vault")]
+        [TestCase(true, "Chimes")]
+        [TestCase(true, "Gantry")]
+        [TestCase(true, "Mobile")]
+        [TestCase(true, "Ruins")]
+        [TestCase(true, "Scales")]
+        [TestCase(true, "Totems")]
         public void ChargeBotMatches_HaveNoInvariantViolations(bool grab, string map)
         {
             var v = new Violations();

@@ -326,7 +326,7 @@ namespace Knockbox.Game
                 foreach (var file in arenaFiles)
                 {
                     if (file != null && file.name == name)
-                        return ArenaFiles.Parse(file.text, name);
+                        return ArenaFiles.WithMeta(ArenaFiles.Parse(file.text, name), GetMeta(name));
                 }
             }
 #if UNITY_EDITOR

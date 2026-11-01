@@ -10,13 +10,20 @@ namespace Knockbox.Game
     {
         public static string Folder => Path.Combine(Application.dataPath, "_Project", "Data", "Arenas");
 
+        /// <summary>격자(.txt)와 짝 파일(.json, 있으면)의 구조물을 합친 맵.</summary>
         public static ArenaDef LoadByName(string name)
         {
             string path = Path.Combine(Folder, name + ".txt");
             if (!File.Exists(path))
                 throw new FileNotFoundException($"맵 파일이 없음: {name}", path);
-            return Parse(File.ReadAllText(path), name);
+            var arena = Parse(File.ReadAllText(path), name);
+            string metaPath = Path.Combine(Folder, name + ".json");
+            return File.Exists(metaPath) ? WithMeta(arena, ArenaMeta.Parse(File.ReadAllText(metaPath), name + ".json")) : arena;
         }
+
+        /// <summary>짝 파일의 구조물을 맵에 더한다(구조물이 없으면 그대로).</summary>
+        public static ArenaDef WithMeta(ArenaDef arena, ArenaMeta meta) =>
+            meta != null && meta.Props.Length > 0 ? arena.WithProps(meta.Props) : arena;
 
         public static ArenaDef Parse(string text, string sourceName)
         {

@@ -61,7 +61,7 @@ namespace Knockbox.Presentation
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 ref readonly var b = ref arena.GetBox(i);
-                if (b.Kind != Knockbox.Simulation.TerrainKind.Solid || y < b.MinY || y > b.MaxY)
+                if (!b.IsSolidBlock || y < b.MinY || y > b.MaxY)
                     continue;
                 if (side > 0 && b.MinX >= x - 1e-3f && b.MinX < wallX)
                 {

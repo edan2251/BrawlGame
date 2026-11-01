@@ -26,6 +26,7 @@ namespace Knockbox.Game
         BackgroundView background;
         PostFx postFx;
         ArenaView arenaView;
+        PropView propView;
         FighterView fighter0;
         FighterView fighter1;
         DustPool dust;
@@ -103,6 +104,7 @@ namespace Knockbox.Game
 
             background = Create<BackgroundView>("Background");
             arenaView = Create<ArenaView>("Arena");
+            propView = Create<PropView>("Props");
             fighter0 = CreateFighter(0);
             fighter1 = CreateFighter(1);
             dust = Create<DustPool>("Dust");
@@ -198,6 +200,7 @@ namespace Knockbox.Game
             background.Build(arena, CurrentTheme, palette, shapes, LightPosition(arena));
             background.ResetMotes();
             arenaView.Build(arena, CurrentTheme, palette, shapes);
+            propView.Build(arena, CurrentTheme, shapes);
             koShatter.BuildArena(arena);
             if (cameraRig != null)
                 cameraRig.FitArena(arena);

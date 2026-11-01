@@ -275,7 +275,7 @@ namespace Knockbox.Simulation
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 ref readonly var b = ref arena.GetBox(i);
-                if (b.Kind != TerrainKind.Solid)
+                if (!b.IsSolidBlock)
                     continue;
                 if (position.Y + half <= b.MinY + Epsilon || position.Y - half >= b.MaxY - Epsilon)
                     continue;

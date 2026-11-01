@@ -214,6 +214,7 @@ namespace Knockbox.Game
             ref readonly var self = ref fighter == 0 ? ref w.State.Fighter0 : ref w.State.Fighter1;
             ref readonly var other = ref fighter == 0 ? ref w.State.Fighter1 : ref w.State.Fighter0;
             var input = bot.Next(self, other, tick);
+            input = AvoidBoundaryLunge(self, other, w.Arena, input);
             return AvoidSpikes(self, config, w.Arena, input);
         }
 
@@ -222,11 +223,34 @@ namespace Knockbox.Game
         /// (아직 점프를 누르고 있으면 멈춰서 뗀다) 없으면 가장자리에서 멈춘다.
         /// 가시 위에 서 있으면(면역 중) 가장 가까운 안전한 쪽으로 뛰어 나가고, 가시 위로 떨어지는 중이면 안전한 쪽으로 몸을 틀며
         /// 공중 점프를 새로 누른다. 면역이 끝나면 가시가 다시 아프므로 면역 중에도 가시 위에 머물지 않는다.
+        /// 경계 튕김 맵(CR-002): 아래에 아무것도 없는 곳은 아래쪽 경계가 아프므로 가시와 같이 피하고, 옆 경계 쪽으로는 걸어가지 않는다.
         /// </summary>
         InputFrame AvoidSpikes(in FighterState self, SimConfig config, ArenaDef arena, InputFrame input)
         {
             int moveX = input.MoveX;
             var buttons = input.Buttons;
+            if (arena.HasBoundary)
+            {
+                // 옆 경계: 지금 속도로 멈추는 데 드는 거리(반대 입력의 공중 가속 70 기준) + 여유 안이면 반대로 밀어 멈추고,
+                // 그 쪽으로 걷거나 대시하지 않는다.
+                int side = self.Position.X >= 0f ? 1 : -1;
+                float gap = arena.BoundaryHalfWidth - config.HalfBody - System.Math.Abs(self.Position.X);
+                float toward = self.Velocity.X * side;
+                float stop = toward > 0f ? toward * toward / (2f * 70f) : 0f;
+                if (gap < stop + 0.8f && toward > 0f)
+                    moveX = -side;
+                else if (moveX == side && gap < 1.2f)
+                    moveX = 0;
+                if ((buttons & InputButtons.Dash) != 0 && moveX == side && gap < 6f)
+                    buttons &= ~InputButtons.Dash;
+                // 아래가 비어 있는 단방향 발판에서는 아래+점프로 내려가지 않는다(아래쪽 경계로 떨어짐).
+                if (self.Grounded && self.GroundBox >= 0 && input.MoveY < 0 && (buttons & InputButtons.Jump) != 0)
+                {
+                    ref readonly var ground = ref arena.GetBox(self.GroundBox);
+                    if (ground.Kind == TerrainKind.OneWay && SurfaceBelow(arena, self.Position.X, ground.MinY - 0.05f) == TerrainKind.Spike)
+                        input = new InputFrame(input.MoveX, 0, input.Buttons);
+                }
+            }
             float foot = self.Position.Y - config.HalfBody;
             bool overSpikes = SurfaceBelow(arena, self.Position.X, foot + 0.05f) == TerrainKind.Spike;
             if (self.Grounded)
@@ -274,6 +298,64 @@ namespace Knockbox.Game
             return new InputFrame(moveX, input.MoveY, buttons);
         }
 
+        /// <summary>
+        /// 경계 튕김 맵(CR-002): 충전을 떼는 틱에 돌진 방향으로 상대 너머 3유닛(최대 12유닛, 빠른 돌진이 가는 거리) 안에 경계가 있으면,
+        /// 상대 쪽 8방향 중 경계까지 여유가 있는 방향으로 바꿔 뗀다(빗나간 돌진이 경계에 꽂히지 않게). 그런 방향이 없으면
+        /// 경계까지 가장 먼 방향으로 뗀다.
+        /// </summary>
+        static InputFrame AvoidBoundaryLunge(in FighterState self, in FighterState other, ArenaDef arena, InputFrame input)
+        {
+            if (!arena.HasBoundary || self.Action != ActionState.Charge || input.Held(InputButtons.Attack))
+                return input;
+            var toOther = other.Position - self.Position;
+            float reach = SimMath.Min(LungeReach, SimMath.Sqrt(toOther.LengthSquared) + 3f);
+            if ((input.MoveX != 0 || input.MoveY != 0) && BoundaryAhead(self.Position, input.MoveX, input.MoveY, arena) > reach)
+                return input;
+            int bestX = input.MoveX, bestY = input.MoveY;
+            float bestDot = float.MinValue, farthest = float.MinValue;
+            int farX = input.MoveX, farY = input.MoveY;
+            for (int x = -1; x <= 1; x++)
+            {
+                for (int y = -1; y <= 1; y++)
+                {
+                    if (x == 0 && y == 0)
+                        continue;
+                    float ahead = BoundaryAhead(self.Position, x, y, arena);
+                    if (ahead > farthest)
+                    {
+                        farthest = ahead;
+                        farX = x;
+                        farY = y;
+                    }
+                    var d = SimMath.Normalize(new Vec2(x, y));
+                    float dot = d.X * toOther.X + d.Y * toOther.Y;
+                    if (ahead > reach && dot >= 0f && dot > bestDot)
+                    {
+                        bestDot = dot;
+                        bestX = x;
+                        bestY = y;
+                    }
+                }
+            }
+            return bestDot > float.MinValue ? new InputFrame(bestX, bestY, input.Buttons) : new InputFrame(farX, farY, input.Buttons);
+        }
+
+        /// <summary>봇이 보는 가장 긴 돌진 거리(유닛, 최대 충전 34에서 감속해 멈출 때까지).</summary>
+        const float LungeReach = 12f;
+
+        /// <summary>위치에서 방향(8방향 입력)으로 경계(몸 반폭 0.5 안쪽)까지의 거리.</summary>
+        static float BoundaryAhead(Vec2 position, int moveX, int moveY, ArenaDef arena)
+        {
+            var d = SimMath.Normalize(new Vec2(moveX, moveY));
+            float best = float.MaxValue;
+            float bx = arena.BoundaryHalfWidth - 0.5f, by = arena.BoundaryHalfHeight - 0.5f;
+            if (d.X > 1e-4f) best = SimMath.Min(best, (bx - position.X) / d.X);
+            if (d.X < -1e-4f) best = SimMath.Min(best, (-bx - position.X) / d.X);
+            if (d.Y > 1e-4f) best = SimMath.Min(best, (by - position.Y) / d.Y);
+            if (d.Y < -1e-4f) best = SimMath.Min(best, (-by - position.Y) / d.Y);
+            return best;
+        }
+
         /// <summary>앞쪽(dir) 0.5~6 유닛 안에 점프로 올라설 만한(발보다 2.8 이하로 높은) 가시 아닌 윗면이 있는가.</summary>
         static bool LandingAhead(ArenaDef arena, float x, float foot, int dir)
         {
@@ -290,11 +372,14 @@ namespace Knockbox.Game
             return false;
         }
 
-        /// <summary>x 열에서 높이 y 아래로 처음 만나는 지형의 종류. 없으면 Solid(경기장 바닥은 막혀 있다).</summary>
+        /// <summary>
+        /// x 열에서 높이 y 아래로 처음 만나는 지형의 종류. 없으면 Solid(경기장 바닥은 막혀 있다).
+        /// 경계 튕김 맵에서 아래에 아무것도 없으면 Spike(아래쪽 경계가 아프다).
+        /// </summary>
         static TerrainKind SurfaceBelow(ArenaDef arena, float x, float y)
         {
             float best = float.NegativeInfinity;
-            var kind = TerrainKind.Solid;
+            var kind = arena.HasBoundary ? TerrainKind.Spike : TerrainKind.Solid;
             for (int i = 0; i < arena.BoxCount; i++)
             {
                 ref readonly var box = ref arena.GetBox(i);
