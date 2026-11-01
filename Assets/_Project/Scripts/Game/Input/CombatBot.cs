@@ -20,6 +20,8 @@ namespace Knockbox.Game
         readonly CombatMode combatMode;
         /// <summary>바위 폼(CP20): 거리를 벌리고 수평·대각으로 맞을 때 쏜다.</summary>
         readonly bool rock;
+        /// <summary>참이면 매 틱 자기 파이터의 지금 폼으로 공격 방식을 정한다(폼 전환 뒤에도 행동 상태와 난수를 이어간다, CP22).</summary>
+        readonly bool followForm;
         int chargeTarget;
 
         /// <param name="grabs">true면 다가가서 잡고 던지는 행동을 섞는다(CP7). 기본값은 이전 CP 테스트의 입력을 바꾸지 않는다.</param>
@@ -32,14 +34,16 @@ namespace Knockbox.Game
             smart = false;
             combatMode = CombatMode.Test;
             rock = false;
+            followForm = false;
             chargeTarget = 0;
         }
 
-        CombatBot(uint seed, bool grabs, CombatMode combatMode, bool rock) : this(seed, grabs)
+        CombatBot(uint seed, bool grabs, CombatMode combatMode, bool rock, bool followForm = false) : this(seed, grabs)
         {
             smart = true;
             this.combatMode = combatMode;
             this.rock = rock;
+            this.followForm = followForm;
         }
 
         /// <summary>모드에 맞게 공격 버튼을 쓰는 봇(F6 상대, 봇 영상).</summary>
@@ -47,8 +51,13 @@ namespace Knockbox.Game
 
         /// <summary>파이터의 폼에 맞게 공격 버튼을 쓰는 봇(CR-003). 가위 = 모드 A 봇, 보 = 모드 B 봇, 바위 = 거리를 두고 쏘는 봇.</summary>
         public static CombatBot ForForm(uint seed, bool grabs, FighterForm form) =>
-            new CombatBot(seed, grabs, form == FighterForm.Scissors ? CombatMode.Charge : form == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test,
-                form == FighterForm.Rock);
+            new CombatBot(seed, grabs, ModeOf(form), form == FighterForm.Rock);
+
+        /// <summary>파이터의 폼을 매 틱 따라가는 봇(BotInputSource). 전환해도 다시 만들지 않는다.</summary>
+        public static CombatBot FollowingForm(uint seed, bool grabs) => new CombatBot(seed, grabs, CombatMode.Test, false, true);
+
+        static CombatMode ModeOf(FighterForm form) =>
+            form == FighterForm.Scissors ? CombatMode.Charge : form == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
 
         public InputFrame Next(in FighterState self, in FighterState other, int tick)
         {
@@ -122,11 +131,13 @@ namespace Knockbox.Game
                 if (self.InMovementState && self.Form != counter && Forms.Owns(self.OwnedForms, counter) && rng.Range(0, 30) == 0)
                     buttons |= InputButtons.SwitchForm;
                 float dy = other.Position.Y - self.Position.Y;
-                if (rock)
+                bool isRock = followForm ? self.Form == FighterForm.Rock : rock;
+                var aimMode = followForm ? ModeOf(self.Form) : combatMode;
+                if (isRock)
                     AimRock(self, toward, distance, dy, tick, ref moveX, ref moveY, ref buttons);
-                else if (combatMode == CombatMode.Charge)
+                else if (aimMode == CombatMode.Charge)
                     AimCharge(self, toward, distance, dy, tick, ref moveX, ref moveY, ref buttons);
-                else if (combatMode == CombatMode.Swing)
+                else if (aimMode == CombatMode.Swing)
                     AimSwing(self, distance, dy, ref moveY, buttons);
             }
             return new InputFrame(moveX, moveY, buttons);
@@ -232,7 +243,6 @@ namespace Knockbox.Game
         CombatBot bot;
         bool created;
         bool botGrabs;
-        FighterForm botForm;
         bool jumpHeld;
         int ledgeJumpTicks;
 
@@ -274,12 +284,11 @@ namespace Knockbox.Game
                 var pickRng = new SimRng(seed ^ (uint)(tick * 2654435761u));
                 return new InputFrame(0, 0, MatchFlow.OptionButton(pickRng.Range(0, count)));
             }
-            // 봇은 자기 파이터의 폼으로 싸운다(CR-003).
-            if (!created || botGrabs != config.GrabEnabled || botForm != self.Form)
+            // 봇은 매 틱 자기 파이터의 폼으로 싸운다(CR-003). 폼이 바뀌어도 다시 만들지 않는다(행동 상태와 난수를 이어감, CP22).
+            if (!created || botGrabs != config.GrabEnabled)
             {
-                bot = CombatBot.ForForm(seed, config.GrabEnabled, self.Form);
+                bot = CombatBot.FollowingForm(seed, config.GrabEnabled);
                 botGrabs = config.GrabEnabled;
-                botForm = self.Form;
                 created = true;
             }
             ref readonly var other = ref fighter == 0 ? ref w.State.Fighter1 : ref w.State.Fighter0;

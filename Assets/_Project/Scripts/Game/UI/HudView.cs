@@ -57,6 +57,9 @@ namespace Knockbox.Game
 
         /// <summary>지금 가운데 문구(없으면 빈 문자열). 테스트·캡처 확인용.</summary>
         public string Banner => shownBanner ?? "";
+
+        /// <summary>세트 흐름(CR-003 개정)이면 세트·세트스코어를 보여 준다.</summary>
+        public bool SetFlow { get; set; }
         public string SubText => shownSub ?? "";
 
         static Vector2 SlotOriginFor(float halfWidth, float halfHeight) => new Vector2(-halfWidth + 1.45f, halfHeight - 1.45f);
@@ -122,7 +125,17 @@ namespace Knockbox.Game
                     bool go = m.PhaseTick >= match.CountdownTicks - GoTicks;
                     text = go ? "GO" : "READY";
                     color = palette.flash;
-                    subText = go ? "" : $"ROUND {m.Round}";
+                    subText = go ? "" : SetFlow ? $"SET {m.Set}   {m.SetScore0} - {m.SetScore1}" : $"ROUND {m.Round}";
+                    return;
+                case MatchPhase.FormSelect:
+                    text = "";
+                    color = palette.flash;
+                    return;
+                case MatchPhase.SetPick:
+                    // 큰 문구는 양쪽 선택 목록을 가리므로 쓰지 않고, 아래 작은 문구로만 알린다.
+                    text = "";
+                    color = palette.flash;
+                    subText = $"P{m.Picker + 1} LOST THE SET   SETS {m.SetScore0} - {m.SetScore1}";
                     return;
                 case MatchPhase.KO:
                 case MatchPhase.RoundEnd:
@@ -131,10 +144,11 @@ namespace Knockbox.Game
                     color = palette.flash;
                     return;
                 case MatchPhase.MatchEnd:
-                    int winner = m.Score0 >= m.Score1 ? 0 : 1;
+                    int winner = SetFlow ? (m.SetScore0 >= m.SetScore1 ? 0 : 1) : m.Score0 >= m.Score1 ? 0 : 1;
                     text = winner == 0 ? "P1 WINS" : "P2 WINS";
                     color = palette.flash;
-                    subText = m.PhaseTick >= match.MatchEndMinTicks ? "PRESS ANY BUTTON" : "";
+                    string sets = SetFlow ? $"SETS {m.SetScore0} - {m.SetScore1}   " : "";
+                    subText = sets + (m.PhaseTick >= match.MatchEndMinTicks ? "PRESS ANY BUTTON" : "");
                     return;
                 default:
                     text = "";
@@ -174,7 +188,7 @@ namespace Knockbox.Game
         /// <param name="energyShown">에너지 스위치가 켜져 있을 때만 줄을 그린다.</param>
         public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, in EnergyParams energy, bool energyShown, float dt)
         {
-            int roundsToWin = match.RoundsToWin;
+            int roundsToWin = SetFlow ? match.RoundsToWinSet : match.RoundsToWin;
             RenderBanner(state, match, dt);
             RenderBar(ref bars[0], body0, Health(state.Fighter0, maxHealth), dt);
             RenderBar(ref bars[1], body1, Health(state.Fighter1, maxHealth), dt);

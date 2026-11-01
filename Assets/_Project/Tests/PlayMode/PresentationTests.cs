@@ -260,6 +260,57 @@ namespace Knockbox.Tests.PlayMode
             LogAssert.NoUnexpectedReceived();
         }
 
+        /// <summary>
+        /// CP22-12·CP23-12: 선택 화면(초기 폼, 세트 패자)과 경기 종료 화면이 오류 없이 그려진다. 렌더링 확인용 캡처를 960×540으로 남긴다.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator PickAndMatchEndScreens_Render()
+        {
+            yield return LoadSandbox();
+            var config = new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default,
+                new RuleSet { Switches = FeatureSwitches.Default }.WithForms(FighterForm.Scissors, FighterForm.Rock));
+            var arena = ArenaFiles.LoadByName("Ruins");
+            runner.Running = false;
+            runner.Begin(config, arena, SimState.CreateRound(config, arena, 3, MatchPhase.FormSelect));
+            string folder = ScenarioPlayer.CaptureFolder("CP22");
+            Directory.CreateDirectory(folder);
+
+            // 초기 폼 선택: P1은 아직, P2는 고름.
+            var s = runner.World.State;
+            s.Match.FormChoice1 = 1;
+            runner.World.State = s;
+            presenter.RenderFrame();
+            yield return null;
+            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "form_select.png"), 960, 540);
+
+            // 세트 패자(P2) 선택: 폼 획득 둘과 증강 자리.
+            s = runner.World.State;
+            s.Match.SetPhase(MatchPhase.SetPick);
+            s.Match.SetScore0 = 1;
+            s.Match.Picker = 1;
+            s.Match.PickedAt = -1;
+            s.Match.Option0 = PickOption.Form(FighterForm.Scissors);
+            s.Match.Option1 = PickOption.Form(FighterForm.Paper);
+            s.Match.Option2 = PickOption.AugmentBase;
+            runner.World.State = s;
+            presenter.RenderFrame();
+            yield return null;
+            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "set_pick.png"), 960, 540);
+            Assert.AreEqual("", presenter.Hud.Banner, "선택 목록을 가리지 않게 큰 문구 없음");
+            StringAssert.StartsWith("P2 LOST THE SET", presenter.Hud.SubText);
+
+            s = runner.World.State;
+            s.Match.SetPhase(MatchPhase.MatchEnd);
+            s.Match.SetScore0 = config.Match.SetsToWinMatch;
+            s.Match.SetScore1 = 2;
+            runner.World.State = s;
+            presenter.RenderFrame();
+            yield return null;
+            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "match_end.png"), 960, 540);
+            Assert.AreEqual("P1 WINS", presenter.Hud.Banner);
+            LogAssert.NoUnexpectedReceived();
+        }
+
         [UnityTest]
         public IEnumerator FrameTimeAndPresentationAllocations()
         {

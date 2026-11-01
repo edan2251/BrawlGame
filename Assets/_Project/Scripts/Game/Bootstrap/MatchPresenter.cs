@@ -28,6 +28,10 @@ namespace Knockbox.Game
         ArenaView arenaView;
         PropView propView;
         ProjectileView projectileView;
+        PickPanelView pickPanel;
+
+        /// <summary>선택 화면(CP22). 증강 이름은 CP23이 채운다.</summary>
+        public PickPanelView PickPanel => pickPanel;
         PropShadowView propShadows;
         BoundaryView boundaryView;
         FighterView fighter0;
@@ -126,6 +130,8 @@ namespace Knockbox.Game
             koShatter.Setup(palette, shapes);
             hud = Create<HudView>("Hud");
             hud.Setup(palette, shapes);
+            pickPanel = Create<PickPanelView>("PickPanel");
+            pickPanel.Setup(palette, shapes);
             sfxPlayer = Create<SfxPlayer>("Sfx");
             sfxPlayer.Setup(sfx);
             // 최종 출력 리미터는 AudioListener와 같은 오브젝트에 있어야 전체 소리에 걸린다(F-2).
@@ -218,6 +224,7 @@ namespace Knockbox.Game
             if (cameraRig != null)
                 cameraRig.FitArena(arena);
             hud.SetArena(arena);
+            pickPanel.SetArena(arena);
         }
 
         void OnMatchBegan(MatchRunner r)
@@ -331,6 +338,8 @@ namespace Knockbox.Game
             boundaryView.Tick(dt);
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
                 world.Config.Match, world.Config.Combat.MaxHealth, world.Config.Combat.Energy, world.Config.EnergyEnabled, dt);
+            hud.SetFlow = !world.Config.Rules.LegacyMatch;
+            pickPanel.Render(current);
             hud.RenderForms(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift), FormDisplay, world.Config);
             projectileView.RenderWindup(current.Fighter0, 0, V(current.Fighter0.Position), world.Config);
             projectileView.RenderWindup(current.Fighter1, 1, V(current.Fighter1.Position), world.Config);
