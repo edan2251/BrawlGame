@@ -58,11 +58,10 @@ namespace Knockbox.Presentation
         public static Color BoxShade(Color prop, int index)
         {
             float k = ((index * 37 + 11) % 13) / 12f * 2f - 1f;
-            float scale = 1f + BoxShadeRange * k;
-            return new Color(prop.r * scale, prop.g * scale, prop.b * scale, prop.a);
+            return PaletteAsset.Scaled(prop, 1f + BoxShadeRange * k);
         }
 
-        static Color Darken(Color c, float scale) => new Color(c.r * scale, c.g * scale, c.b * scale, c.a);
+        static Color Darken(Color c, float scale) => PaletteAsset.Scaled(c, scale);
 
         static Vector2 ToVector(Vec2 v) => new Vector2(v.X, v.Y);
 

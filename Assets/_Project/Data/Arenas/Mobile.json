@@ -4,7 +4,7 @@
   "rotation": true,
   "props": [
     {"kind": "spinner", "pos": [0, 2.2], "size": [7.6, 1.0]},
-    {"kind": "hinged", "pos": [-5.5, 0.7], "size": [3.2, 0.6], "anchor": [-7.0, 0.7], "mirror": true},
+    {"kind": "hinged", "pos": [-5.4, 0.7], "size": [3.2, 0.6], "anchor": [-7.0, 0.7], "mirror": true},
     {"kind": "hanging", "pos": [-4.0, 6.8], "size": [1.8, 1.8], "anchor": [-4.0, 10], "mirror": true},
     {"kind": "hanging", "pos": [-11.0, 5.6], "size": [2.2, 1.0], "anchor": [-11.0, 10], "mirror": true},
     {"kind": "hanging", "pos": [-16.0, 7.6], "size": [0.8, 0.8], "anchor": [-16.0, 10], "mirror": true},

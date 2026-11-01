@@ -68,6 +68,15 @@ namespace Knockbox.Presentation
         public Color FighterBody(int fighter) => fighter == 0 ? p1Body : p2Body;
         public Color FighterShade(int fighter) => fighter == 0 ? p1Shade : p2Shade;
 
+        /// <summary>색의 밝기만 배율로 바꾼 것(알파 유지). 상자마다 다른 밝기, 이음매·축 같은 어두운 면(CP13).</summary>
+        public static Color Scaled(Color color, float scale)
+        {
+            color.r *= scale;
+            color.g *= scale;
+            color.b *= scale;
+            return color;
+        }
+
         /// <summary>색에서 알파만 바꾼 것(투명한 색도 토큰에서 만든다).</summary>
         public static Color WithAlpha(Color color, float alpha)
         {

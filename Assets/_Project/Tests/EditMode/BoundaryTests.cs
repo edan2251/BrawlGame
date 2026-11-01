@@ -52,10 +52,11 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(1, arena.BoxCount, "테두리 칸은 지형이 아니고 가운데 발판만 남음");
         }
 
-        [TestCase(0f, 4)]
-        [TestCase(10f, 8)]
-        [TestCase(20f, 11)]
-        [TestCase(30f, 15)]
+        // CP13 조정(S-118): 기본 3 + 법선 속도 × 0.25, 3~15. (CR-002 초기값 4 + × 0.35, 4~15)
+        [TestCase(0f, 3)]
+        [TestCase(10f, 6)]
+        [TestCase(20f, 8)]
+        [TestCase(30f, 11)]
         [TestCase(60f, 15)]
         public void Damage_FollowsFormula(float speed, int expected)
         {

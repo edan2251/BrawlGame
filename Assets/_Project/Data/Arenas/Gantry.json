@@ -9,7 +9,7 @@
     {"kind": "hanging", "pos": [-14.8, 7.0], "size": [1.4, 1.0], "anchor": [-14.8, 10], "mirror": true},
     {"kind": "hanging", "pos": [-10.0, 7.0], "size": [1.0, 1.0], "anchor": [-10.0, 10], "mirror": true},
     {"kind": "box", "pos": [0, -6.3], "size": [1.8, 1.4]},
-    {"kind": "box", "pos": [-7.5, -3.3], "size": [1.4, 1.4], "mirror": true},
-    {"kind": "box", "pos": [-12.8, -4.3], "size": [1.4, 1.4], "mirror": true}
+    {"kind": "box", "pos": [-5.0, -2.3], "size": [1.4, 1.4], "mirror": true},
+    {"kind": "box", "pos": [-13.2, -4.3], "size": [1.4, 1.4], "mirror": true}
   ]
 }
