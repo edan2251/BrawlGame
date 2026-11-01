@@ -9,9 +9,12 @@
   ],
   "p2": [],
   "captures": [
-    { "tick": 21, "name": "a_strike" },
-    { "tick": 26, "name": "b_break" },
-    { "tick": 34, "name": "c_fall" },
-    { "tick": 60, "name": "d_rest" }
+    { "tick": 20, "name": "a_approach" },
+    { "tick": 22, "name": "b_strike" },
+    { "tick": 23, "name": "c_break" },
+    { "tick": 25, "name": "d_swing" },
+    { "tick": 30, "name": "e_fly" },
+    { "tick": 45, "name": "f_fall" },
+    { "tick": 89, "name": "g_rest" }
   ]
 }

@@ -28,3 +28,4 @@
 | `logs/CP12.md` | CP12 로그 | `docs/progress/logs/` |
 | `logs/CP13.md` | CP13 로그 | `docs/progress/logs/` |
 | `logs/CP14.md` | CP14 로그 | `docs/progress/logs/` |
+| `logs/CP15.md` | CP15 로그 | `docs/progress/logs/` |
