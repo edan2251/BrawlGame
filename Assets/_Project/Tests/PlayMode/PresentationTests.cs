@@ -272,7 +272,7 @@ namespace Knockbox.Tests.PlayMode
             var arena = ArenaFiles.LoadByName("Ruins");
             runner.Running = false;
             runner.Begin(config, arena, SimState.CreateRound(config, arena, 3, MatchPhase.FormSelect));
-            string folder = ScenarioPlayer.CaptureFolder("CP22");
+            string folder = ScenarioPlayer.CaptureFolder("CP23");
             Directory.CreateDirectory(folder);
 
             // 초기 폼 선택: P1은 아직, P2는 고름.
@@ -298,6 +298,17 @@ namespace Knockbox.Tests.PlayMode
             ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "set_pick.png"), 960, 540);
             Assert.AreEqual("", presenter.Hud.Banner, "선택 목록을 가리지 않게 큰 문구 없음");
             StringAssert.StartsWith("P2 LOST THE SET", presenter.Hud.SubText);
+
+            // 증강 발동 표시(CP23): 전투 중 머리 위에 이름이 잠깐.
+            s = runner.World.State;
+            s.Match.SetPhase(MatchPhase.Fighting);
+            s.Match.Picker = -1;
+            runner.World.State = s;
+            presenter.Hud.ShowAugment(0, "SPEED");
+            presenter.RenderFrame();
+            yield return null;
+            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(folder, "augment_icon.png"), 960, 540);
+            Assert.AreEqual("SPEED", presenter.Hud.AugmentShown(0));
 
             s = runner.World.State;
             s.Match.SetPhase(MatchPhase.MatchEnd);

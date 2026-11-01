@@ -181,9 +181,11 @@ namespace Knockbox.Tests.EditMode
             WinSet(w, 0);
             Assert.AreEqual(MatchPhase.SetPick, w.State.Match.Phase);
             var m = w.State.Match;
-            Assert.AreEqual(2, m.OptionCount, "가진 바위는 빼고 가위·보");
+            // 가진 바위는 빼고 가위·보 획득, 그다음 바위 증강(철갑탄, CP23).
+            Assert.AreEqual(3, m.OptionCount);
             Assert.AreEqual(PickOption.Form(FighterForm.Scissors), m.Option0);
             Assert.AreEqual(PickOption.Form(FighterForm.Paper), m.Option1);
+            Assert.AreEqual(PickOption.AugmentBase + AugmentCatalog.ArmorPiercing, m.Option2);
             Pick(w, 1);
             ToFighting(w);
             Assert.AreEqual(FighterForm.Paper, w.State.Fighter1.Form, "새로 얻은 폼으로 시작");

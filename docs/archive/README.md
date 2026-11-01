@@ -36,3 +36,4 @@
 | `logs/CP20.md` | CP20 로그(보 폼, 속성 해석기, 봇 매트릭스) | `docs/progress/logs/` |
 | `logs/CP21.md` | CP21 로그(폼 전환) | `docs/progress/logs/` |
 | `logs/CP22.md` | CP22 로그(라운드·세트·경기, 세트 패자 선택, 개정 구조) | `docs/progress/logs/` |
+| `logs/CP23.md` | CP23 로그(증강 틀) | `docs/progress/logs/` |

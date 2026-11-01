@@ -89,7 +89,7 @@ namespace Knockbox.Game
             }
             for (int i = 0; i < 2; i++)
             {
-                augmentRings[i] = ShapeLibrary.Create(transform, $"Augment{i}Ring", shapes.Ring, SortingLayers.UI, 5, palette.energy);
+                augmentRings[i] = ShapeLibrary.Create(transform, $"Augment{i}Line", shapes.Square, SortingLayers.UI, 5, palette.energy);
                 augmentTexts[i] = CreateText($"Augment{i}Text", 48, 0.08f, palette.energy, 6);
                 augmentRings[i].enabled = false;
             }
@@ -246,9 +246,9 @@ namespace Knockbox.Game
             float k = Mathf.Clamp01(augmentTimers[i] / AugmentShowSeconds);
             var at = new Vector3(body.x, body.y + BarOffsetY + 0.95f + (1f - k) * 0.3f, 0f);
             augmentTexts[i].transform.localPosition = at;
-            augmentRings[i].transform.localPosition = at;
-            float ring = Mathf.Lerp(1.4f, 0.9f, k);
-            ShapeLibrary.SetSize(augmentRings[i], ring, ring * 0.45f);
+            // 글자를 가리지 않게 아래 얇은 밑줄(사라지며 줄어든다).
+            augmentRings[i].transform.localPosition = at + new Vector3(0f, -0.2f, 0f);
+            ShapeLibrary.SetSize(augmentRings[i], Mathf.Lerp(0.5f, 1.1f, k), 0.05f);
         }
 
         /// <summary>현재 폼 표시(10 문서 5.1): 체력 바 위의 작은 모양. 방식은 FormDisplayMode.</summary>
