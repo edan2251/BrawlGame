@@ -27,6 +27,7 @@ namespace Knockbox.Game
         PostFx postFx;
         ArenaView arenaView;
         PropView propView;
+        ProjectileView projectileView;
         PropShadowView propShadows;
         BoundaryView boundaryView;
         FighterView fighter0;
@@ -112,6 +113,8 @@ namespace Knockbox.Game
             fighter1 = CreateFighter(1);
             dust = Create<DustPool>("Dust");
             dust.Setup(palette, shapes);
+            projectileView = Create<ProjectileView>("Projectiles");
+            projectileView.Setup(palette, shapes);
             boundaryView = Create<BoundaryView>("Boundary");
             boundaryView.Setup(palette, shapes);
             fx = Create<ImpactFx>("Impact Fx");
@@ -302,6 +305,7 @@ namespace Knockbox.Game
                 alpha = 1f;
             }
             propView.Render(previous.Props, current.Props, alpha);
+            projectileView.Render(previous.Projectiles, current.Projectiles, alpha, world.Config.Combat.Rock.Radius);
             propShadows.Render(propView, current.Props);
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
@@ -469,6 +473,19 @@ namespace Knockbox.Game
                     dust.Burst(new Vector2(e.Position.X, e.Position.Y - half), 3, 2f, -e.Direction.X);
                     AddTrauma(0.05f + e.Strength * 0.003f);
                     sfxPlayer.Play(Sfx.Dash);
+                    break;
+                case SimEventType.ProjectileFire:
+                    // 바위 발사(CP19): 작은 고리, 높은 바람 소리(돌진 소리 재사용, S-151).
+                    fx.RingBurst(V(e.Position), palette.FighterBody(e.Fighter), 0.15f, 0.6f, 0.12f);
+                    sfxPlayer.Play(Sfx.Dash, 0.55f, 1.45f);
+                    break;
+                case SimEventType.ProjectileEnd:
+                    if (e.Strength == (int)ProjectileEndReason.Terrain || e.Strength == (int)ProjectileEndReason.Prop
+                        || e.Strength == (int)ProjectileEndReason.Boundary)
+                    {
+                        fx.Shards(V(e.Position), -new Vector2(e.Direction.X, e.Direction.Y), 80f, 4, palette.FighterBody(e.Fighter), 6f, 0.12f, 0.3f);
+                        sfxPlayer.Play(Sfx.Land, 0.35f, 1.3f);
+                    }
                     break;
                 case SimEventType.PowerCheck:
                     overlay.ShowPower(e.Fighter, e.Strength);
