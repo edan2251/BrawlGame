@@ -27,3 +27,4 @@ MonoBehaviour:
   pad: {fileID: 8300000, guid: 8d39a7e9bde8998449ebba6cb85f711e, type: 3}
   countdown: {fileID: 8300000, guid: 517743af97f52f847989091a49ff0913, type: 3}
   ko: {fileID: 8300000, guid: e4c12c3c391ccdb45b9a4026a8a43ea6, type: 3}
+  boundary: {fileID: 8300000, guid: 59a8b38091f0a2a429205c4df149235a, type: 3}

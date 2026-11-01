@@ -169,6 +169,23 @@ def spike(rng):
     return mix((0.6, sting), (0.5, crunch), (0.35, ouch))
 
 
+def boundary(rng):
+    """경계 튕김(CR-002): 짧은 전기 소리. 빠르게 흔들리는 사각파 윙 + 지지직 잡음 + 높은 따끔함."""
+    n = int(0.28 * RATE)
+    buzz = []
+    phase = 0.0
+    for i in range(n):
+        t = i / RATE
+        f = 150.0 + 90.0 * math.sin(2.0 * math.pi * 31.0 * t)
+        phase += 2.0 * math.pi * f / RATE
+        square = 1.0 if math.sin(phase) >= 0.0 else -1.0
+        gate = 1.0 if rng.random() > 0.18 else 0.2
+        buzz.append(square * gate * envelope(t, 0.002, 0.07))
+    crackle = noise_burst(rng, 0.22, 0.05, 0.9)
+    sting = bells(rng, 0.12, [(2900.0, 1.0), (4100.0, 0.6)], 0.025)
+    return mix((0.55, lowpass(buzz, 0.35)), (0.5, crackle), (0.35, sting))
+
+
 def pad(rng):
     n = int(0.32 * RATE)
     phase, out = 0.0, []
@@ -208,6 +225,7 @@ SOUNDS = {
     "pad": (pad, 113),
     "countdown": (countdown, 114),
     "ko": (ko, 115),
+    "boundary": (boundary, 116),
 }
 
 

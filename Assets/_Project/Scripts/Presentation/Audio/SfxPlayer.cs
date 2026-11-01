@@ -19,6 +19,7 @@ namespace Knockbox.Presentation
         Pad,
         Countdown,
         KO,
+        Boundary,
     }
 
     /// <summary>

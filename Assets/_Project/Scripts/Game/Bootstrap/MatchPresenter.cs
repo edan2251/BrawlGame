@@ -27,6 +27,7 @@ namespace Knockbox.Game
         PostFx postFx;
         ArenaView arenaView;
         PropView propView;
+        BoundaryView boundaryView;
         FighterView fighter0;
         FighterView fighter1;
         DustPool dust;
@@ -109,6 +110,8 @@ namespace Knockbox.Game
             fighter1 = CreateFighter(1);
             dust = Create<DustPool>("Dust");
             dust.Setup(palette, shapes);
+            boundaryView = Create<BoundaryView>("Boundary");
+            boundaryView.Setup(palette, shapes);
             fx = Create<ImpactFx>("Impact Fx");
             fx.Setup(palette, shapes);
             koShatter = Create<KoShatter>("KO Shatter");
@@ -201,6 +204,7 @@ namespace Knockbox.Game
             background.ResetMotes();
             arenaView.Build(arena, CurrentTheme, palette, shapes);
             propView.Build(arena, CurrentTheme, shapes);
+            boundaryView.SetArena(arena);
             koShatter.BuildArena(arena);
             if (cameraRig != null)
                 cameraRig.FitArena(arena);
@@ -311,6 +315,8 @@ namespace Knockbox.Game
 
             Vector2 body0 = fighter0.transform.localPosition;
             Vector2 body1 = fighter1.transform.localPosition;
+            boundaryView.Render(V(current.Fighter0.Position), V(current.Fighter1.Position), world.Config.HalfBody);
+            boundaryView.Tick(dt);
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
                 world.Config.Match, world.Config.Combat.MaxHealth, dt);
             if (labels != null && labels.gameObject.activeSelf)
@@ -557,6 +563,17 @@ namespace Knockbox.Game
                     Punch(0.02f, 8f * Frame);
                     postFx.Pulse(0.25f, 0.15f);
                     sfxPlayer.Play(Sfx.WallSplat);
+                    break;
+                }
+                case SimEventType.BoundaryHit:
+                {
+                    // 경계 튕김(CR-002): 가장자리를 따라 퍼지는 빨강 물결, 흰 섬광, 흔들림, 짧은 전기 소리. 면역 중(피해 0)은 작게.
+                    var point = V(e.Position);
+                    bool hurt = e.Strength > 0f;
+                    boundaryView.Hit(point, V(e.Direction));
+                    fx.Glow(point, palette.flash, hurt ? 3f : 1.6f, hurt ? 0.45f : 0.2f, 0.2f);
+                    AddTrauma(hurt ? 0.25f + e.Strength * 0.015f : 0.06f);
+                    sfxPlayer.Play(Sfx.Boundary, hurt ? 1f : 0.5f);
                     break;
                 }
                 case SimEventType.BounceRebound:

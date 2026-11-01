@@ -185,6 +185,11 @@ CP12의 맵 6개(Crossing, Foundry, Gallery, Pillars, Terrace, Vault)는 플랫�
 - 파서 검증, 대칭 검사, 도달 가능성 탐색(5절, CP8 방식. 임시 물체 구조물도 발판으로 센다), 같은 시드면 같은 맵 순서, 6라운드 안에 중복 없음, SyncTest.
 - 모드 A Smart 봇으로 맵마다 시드 6 × 2분: 라운드 평균 10~30초, 이탈 0, 경계 튕김 데미지 30% 이하, 가시 데미지 25% 이하.
 
+### 구현 (CP13)
+
+- 맵: A Chimes·Scales, B Mobile·Totems, C Ruins·Gantry(S-120). 격자 머리글 `boundary: true`(테두리 칸은 지형 아님, S-114). 짝 파일 `props` 형식은 S-115, 측정 정의는 S-116, 흔들림 간격 검사는 S-117.
+- 아래쪽에 얇은 단방향 받이 발판 3개(틈 있음)를 둔다(S-120).
+
 ### 구현 (CP12에서 유지하는 것)
 
 - 크기 36 × 20, 카메라는 세로 전체(S-107). 격자 `Data/Arenas/<이름>.txt` + 짝 파일 `<이름>.json`(S-108). 순환은 `MatchState.Rotation`(S-109). F2와 Main 씬 설정은 S-110.

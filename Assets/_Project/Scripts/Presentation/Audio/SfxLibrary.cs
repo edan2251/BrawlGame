@@ -24,6 +24,7 @@ namespace Knockbox.Presentation
         public AudioClip pad;
         public AudioClip countdown;
         public AudioClip ko;
+        public AudioClip boundary;
 
         public AudioClip Get(Sfx sfx)
         {
@@ -44,6 +45,7 @@ namespace Knockbox.Presentation
                 case Sfx.Pad: return pad;
                 case Sfx.Countdown: return countdown;
                 case Sfx.KO: return ko;
+                case Sfx.Boundary: return boundary;
                 default: return null;
             }
         }
