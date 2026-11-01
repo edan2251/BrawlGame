@@ -125,6 +125,9 @@ namespace Knockbox.Simulation
         public int BoundaryImmunityTicks;
         /// <summary>서 있는 구조물 강체: 0 없음, 1 + 몸 번호(CP14). 기본값 0이 "없음"이 되도록 1을 더한다.</summary>
         public int OnProp;
+        /// <summary>상자 피해 상한(CP16): 첫 상자 피해 뒤 남은 창 틱과 그동안 받은 상자 피해 합.</summary>
+        public int BoxDamageTicks;
+        public int BoxDamageSum;
 
         public const int NoAttack = -1;
 
@@ -202,6 +205,8 @@ namespace Knockbox.Simulation
             v.Value(nameof(SpikeImmunityTicks), SpikeImmunityTicks);
             v.Value(nameof(BoundaryImmunityTicks), BoundaryImmunityTicks);
             v.Value(nameof(OnProp), OnProp);
+            v.Value(nameof(BoxDamageTicks), BoxDamageTicks);
+            v.Value(nameof(BoxDamageSum), BoxDamageSum);
         }
     }
 }

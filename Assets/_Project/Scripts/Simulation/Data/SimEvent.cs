@@ -46,6 +46,12 @@ namespace Knockbox.Simulation
         PropStrike,
         /// <summary>구조물의 줄·축·경첩이 끊어짐(CP15). Fighter는 마지막 접촉자(없으면 NoFighter), Position은 연결점, Strength는 받은 충격.</summary>
         JointBreak,
+        /// <summary>상자에 맞음(CP16). PropHit과 같은 뜻이지만 상자 피해 비중을 따로 재기 위해 나눈다. Strength는 데미지(상한 적용 뒤).</summary>
+        BoxHit,
+        /// <summary>돌진이 상자를 기둥에서 쳐냄(CP16 부분 붕괴). Fighter는 친 쪽, Position은 상자 중심, Direction은 친 방향, Strength는 위력.</summary>
+        BoxKnockout,
+        /// <summary>구조물이 지형·다른 구조물에 세게 부딪힘(CP16 연출용). Fighter는 NoFighter, Position은 접촉점, Direction은 법선, Strength는 다가온 속도. 몸마다 틱에 한 번.</summary>
+        PropImpact,
     }
 
     /// <summary>

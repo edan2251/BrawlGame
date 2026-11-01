@@ -42,6 +42,16 @@ namespace Knockbox.Simulation
                     sums.Count = body + 1;
             }
 
+            /// <summary>서 있는 캐릭터의 무게(상자 전용): 깨우지도, 마지막 접촉자를 바꾸지도 않는다.</summary>
+            public void Press(int body, Vec2 impulse, Vec2 point, in PropBody b)
+            {
+                ref var sum = ref PropState.Get(ref sums, body);
+                sum.Velocity += impulse;
+                sum.AngularVelocity += PropBody.Cross(point - b.Position, impulse);
+                if (body + 1 > sums.Count)
+                    sums.Count = body + 1;
+            }
+
             public void Strike(int body, int fighter, int cooldown)
             {
                 ref var sum = ref PropState.Get(ref sums, body);
@@ -54,6 +64,17 @@ namespace Knockbox.Simulation
             {
                 ref var sum = ref PropState.Get(ref sums, body);
                 sum.SetHitCooldown(fighter, cooldown);
+                if (body + 1 > sums.Count)
+                    sums.Count = body + 1;
+            }
+
+            /// <summary>부분 붕괴: 쳐낸 방향(Position 대신 쓸 칸이 없어 StrikeCooldown과 함께 Broken 칸에 표시).</summary>
+            public void Knockout(int body, Vec2 direction)
+            {
+                ref var sum = ref PropState.Get(ref sums, body);
+                sum.Broken = 1;
+                sum.Warm.W0.Normal = direction.X;
+                sum.Warm.W0.Tangent = direction.Y;
                 if (body + 1 > sums.Count)
                     sums.Count = body + 1;
             }
@@ -85,6 +106,17 @@ namespace Knockbox.Simulation
                     scratch.TickImpulse[i] += SimMath.Sqrt(sum.Velocity.LengthSquared);
                     b.Velocity += sum.Velocity / m;
                     b.AngularVelocity += sum.AngularVelocity / PropPhysics.Inertia(def, m);
+                    if (sum.Broken != 0)
+                    {
+                        // 부분 붕괴: 친 방향으로 적어도 KnockoutSpeed, 잠시 다른 상자와 마찰 0.
+                        var dir = new Vec2(sum.Warm.W0.Normal, sum.Warm.W0.Tangent);
+                        float along = Vec2.Dot(b.Velocity, dir);
+                        ref readonly var pc = ref config.Combat.Props;
+                        if (along < pc.KnockoutSpeed)
+                            b.Velocity += dir * (pc.KnockoutSpeed - along);
+                        b.LooseTicks = pc.LooseTicks;
+                        b.SleepTicks = 0;
+                    }
                     // 충격을 받으면 깬다.
                     if (sum.LastToucher > 0 || sum.Rotation.Y > 0f)
                         b.SleepTicks = 0;
@@ -143,15 +175,21 @@ namespace Knockbox.Simulation
                 {
                     impulses.Add(i, -n * (power * c.LungeImpulseScale), point, b, index);
                     impulses.Strike(i, index, c.StrikeCooldownTicks);
+                    if (power >= c.KnockoutPower && PropPhysics.IsBox(def.Kind))
+                    {
+                        impulses.Knockout(i, -n);
+                        events.Add(new SimEvent(tick, SimEventType.BoxKnockout, index, b.Position, -n, power));
+                    }
                     if (m >= c.LungeHeavyMass)
                         f.Velocity = (f.Velocity - n * (2f * Vec2.Dot(f.Velocity, n))) * c.LungeHeavyRestitution;
                     events.Add(new SimEvent(tick, SimEventType.PropStrike, index, point, -n, power));
                 }
                 // 2) 구조물이 캐릭터를 침: 상대 법선 속도 10 이상, 구조물이 다가오는 쪽, 그 위에 서 있지 않음, 쌍마다 20틱.
                 else if (-vn >= c.HitMinSpeed && Vec2.Dot(vp, n) > Vec2.Dot(f.Velocity, -n) && !onThis
-                         && b.GetHitCooldown(index) == 0 && FighterCombat.CanBeHit(f, config))
+                         && b.GetHitCooldown(index) == 0 && FighterCombat.CanBeHit(f, config)
+                         && !(PropPhysics.IsBox(def.Kind) && f.BoxDamageSum >= c.BoxDamageCap))
                 {
-                    PropHit(ref f, -vn, m, n, point, index, i, b, ref impulses, config, tick, events);
+                    PropHit(ref f, -vn, m, n, point, index, i, b, PropPhysics.IsBox(def.Kind), ref impulses, config, tick, events);
                 }
                 // 3) 그 밖: 질량 비에 따른 운동량 교환(반발 0.15). 날아가던 캐릭터가 무거운 구조물에 세게 부딪히면 벽꽝.
                 else if (vn < 0f)
@@ -160,7 +198,11 @@ namespace Knockbox.Simulation
                     bool splat = f.IsLaunched && m >= c.SplatMinMass && -vn >= config.Combat.WallSplatSpeed;
                     if (!frozen)
                         f.Velocity += n * (j / c.FighterMass);
-                    impulses.Add(i, -n * j, point, b, index);
+                    // 상자에 느리게(1 미만) 닿은 것은 깨우지 않는다(위에 가만히 선 캐릭터가 매 틱 상자를 깨워 기둥이 잠들지 못했다).
+                    if (!PropPhysics.IsBox(def.Kind) || -vn >= 1f)
+                        impulses.Add(i, -n * j, point, b, index);
+                    else if (!PropPhysics.Asleep(b, c))
+                        impulses.Press(i, -n * j, point, b);
                     if (splat)
                         Splat(ref f, n, -vn, point, index, config, tick, events);
                 }
@@ -171,11 +213,27 @@ namespace Knockbox.Simulation
                 if (n.Y >= c.StandCos && f.Velocity.Y <= vp.Y + 0.5f)
                 {
                     standing = i + 1;
-                    if (f.Velocity.Y < vp.Y)
-                        f.Velocity.Y = vp.Y;
-                    // 캐릭터 무게만큼 누른다(밟으면 기운다).
-                    impulses.Add(i, new Vec2(0f, -c.FighterMass * c.Gravity * SimConfig.Dt), point, b, index);
+                    // 구조물의 위 방향 속도는 0.5 이상일 때만 이어받는다(부드러운 접촉이 상자를 0.01~0.03 밀어 올리는 것까지 받으면 접지가 풀렸다, CP16).
+                    float carry = vp.Y >= 0.5f ? vp.Y : SimMath.Min(vp.Y, 0f);
+                    if (f.Velocity.Y < carry)
+                        f.Velocity.Y = carry;
+                    // 캐릭터 무게만큼 누른다(밟으면 기운다). 상자는 무게로 깨우지 않는다(CP16: 잠든 상자는 움직이지 않는 받침,
+                    // 깨어 있으면 무게만 전하고 잠들기는 그대로 세어 위에 서 있어도 다시 잠든다).
+                    var weight = new Vec2(0f, -c.FighterMass * c.Gravity * SimConfig.Dt);
+                    if (!PropPhysics.IsBox(def.Kind))
+                        impulses.Add(i, weight, point, b, index);
+                    else if (!PropPhysics.Asleep(b, c))
+                        impulses.Press(i, weight, point, b);
                 }
+            }
+            // 서 있던 구조물에 겹치지 않고 딱 맞닿아 있으면(잠든 상자는 내려앉지 않는다) 지형처럼 접지 탐지 거리만큼 아래를 더듬어 계속 선 것으로 본다.
+            if (standing == 0 && wasOn > 0 && wasOn <= props.Count && f.Velocity.Y <= 0f)
+            {
+                ref readonly var under = ref PropState.At(in props, wasOn - 1);
+                var probe = new Vec2(0f, config.Movement.GroundProbeDistance);
+                var halfSize = arena.GetProp(arena.DynamicProp(wasOn - 1)).HalfSize;
+                if (Overlap(f.Position - probe, prev.Position - probe, half, under, halfSize, out var n, out _) && n.Y >= c.StandCos)
+                    standing = wasOn;
             }
             f.OnProp = standing;
         }
@@ -189,13 +247,21 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>구조물에 맞음(09 4절): 피해 clamp(round(속도 × 질량 × 0.15), 3, 18), 넉백 max(10, 속도 × 0.8), 경직은 공통 규칙. 가드·패링 적용.</summary>
-        static void PropHit(ref FighterState f, float speed, float mass, Vec2 n, Vec2 point, int index, int body, in PropBody b,
+        static void PropHit(ref FighterState f, float speed, float mass, Vec2 n, Vec2 point, int index, int body, in PropBody b, bool box,
             ref PropImpulses impulses, SimConfig config, int tick, SimEventBuffer events)
         {
             ref readonly var c = ref config.Combat;
             ref readonly var p = ref c.Props;
             impulses.Hit(body, index, p.HitCooldownTicks);
             int damage = SimMath.Clamp(SimMath.RoundToInt(speed * mass * p.HitDamageScale), p.HitMinDamage, p.HitMaxDamage);
+            if (box)
+            {
+                // 상자 피해 상한(CP16): 작은 상자 여러 개에 연속으로 맞아 순식간에 쓰러지지 않게, 창 안의 합을 BoxDamageCap까지.
+                damage = SimMath.Min(damage, p.BoxDamageCap - f.BoxDamageSum);
+                if (f.BoxDamageTicks == 0)
+                    f.BoxDamageTicks = p.BoxDamageWindowTicks;
+                f.BoxDamageSum += damage;
+            }
             float knockback = SimMath.Max(p.HitKnockbackMin, speed * p.HitKnockbackScale);
             if (f.Action == ActionState.Guard && f.ParryTicks > 0)
             {
@@ -225,7 +291,7 @@ namespace Knockbox.Simulation
             f.ComboHits = combo + 1;
             FighterCombat.EnterStun(ref f, ActionState.Hitstun);
             f.HitstopTicks = hitstop;
-            events.Add(new SimEvent(tick, SimEventType.PropHit, index, point, n, damage));
+            events.Add(new SimEvent(tick, box ? SimEventType.BoxHit : SimEventType.PropHit, index, point, n, damage));
         }
 
         /// <summary>무거운 구조물에 벽꽝(03 3절과 같은 수치).</summary>

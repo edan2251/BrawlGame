@@ -523,6 +523,7 @@ namespace Knockbox.Game
                     break;
                 }
                 case SimEventType.PropHit:
+                case SimEventType.BoxHit:
                 {
                     // 구조물에 맞음(CP14): 명중과 같은 크기의 연출, 파편은 hit 빨강과 구조물 색.
                     float damage = e.Strength;
@@ -549,6 +550,22 @@ namespace Knockbox.Game
                     AddTrauma(0.06f + e.Strength * 0.006f);
                     sfxPlayer.Play(Sfx.WallSplat, 0.5f);
                     break;
+                case SimEventType.BoxKnockout:
+                    // 상자가 기둥에서 빠짐(CP16): 상자 중심에서 먼지와 구조물 색 파편, 둔탁한 소리, 위력 비례 흔들림.
+                    dust.Burst(V(e.Position), 5, 2.2f, 0f);
+                    fx.Shards(V(e.Position), V(e.Direction), 70f, 4, CurrentTheme.prop, 7f, 0.16f, 0.4f);
+                    AddTrauma(0.1f + e.Strength * 0.006f);
+                    sfxPlayer.Play(Sfx.WallSplat, 0.8f);
+                    break;
+                case SimEventType.PropImpact:
+                    // 구조물이 세게 부딪힘(09 6절): 작은 먼지와 둔탁한 소리. 속도 비례(5 → 작게, 20 이상 → 크게).
+                {
+                    float strength = Mathf.InverseLerp(5f, 20f, e.Strength);
+                    dust.Burst(V(e.Position), 2 + Mathf.RoundToInt(strength * 3f), 1.2f + strength, 0f);
+                    AddTrauma(0.02f + strength * 0.06f);
+                    sfxPlayer.Play(Sfx.Land, 0.35f + strength * 0.4f);
+                    break;
+                }
                 case SimEventType.GuardHit:
                     fx.RingBurst(onBody, palette.uiSub, 0.25f, 0.9f, 0.15f);
                     fx.Shards(onBody, V(e.Direction), 60f, 3, palette.uiSub, 6f, 0.14f, 0.3f);

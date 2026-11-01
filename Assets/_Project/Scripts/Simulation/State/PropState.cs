@@ -25,6 +25,8 @@ namespace Knockbox.Simulation
         public int Broken;
         /// <summary>거의 움직이지 않은 연속 틱 수. PropParams.SleepTicks 이상이면 잠들어 적분을 건너뛴다(결정론적, 충격을 받으면 0).</summary>
         public int SleepTicks;
+        /// <summary>기둥에서 빠지는 중인 상자의 남은 틱(CP16 부분 붕괴). 0보다 크면 다른 상자와의 마찰이 0.</summary>
+        public int LooseTicks;
         /// <summary>지난 틱 접촉의 충격량(웜 스타트, CP16). 되감아 다시 계산해도 같은 결과가 나오도록 상태에 둔다(09 3절).</summary>
         public PropWarm Warm;
 
@@ -73,6 +75,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(StrikeCooldown1), StrikeCooldown1);
             v.Value(nameof(Broken), Broken);
             v.Value(nameof(SleepTicks), SleepTicks);
+            v.Value(nameof(LooseTicks), LooseTicks);
             v.Begin(nameof(Warm));
             Warm.Visit(ref v);
             v.End();

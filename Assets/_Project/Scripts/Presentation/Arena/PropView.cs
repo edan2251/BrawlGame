@@ -5,7 +5,8 @@ namespace Knockbox.Presentation
 {
     /// <summary>
     /// 구조물 그리기(09-props-physics.md 6절, 08-visual-direction.md 2절). 테마의 `prop` 색 단색, 줄은 같은 색의 가는 선,
-    /// 축과 경첩은 작은 점. 상자(기둥, 흩어진 상자)는 상자마다 밝기 ±6% 이내로 다르고 상자 사이에 얇고 어두운 이음매를 둔다.
+    /// 축과 경첩은 작은 점. 상자(기둥, 흩어진 상자)는 상자마다 밝기 ±6% 이내로 다르고 상자 사이에 얇고 어두운 이음매를 둔다
+    /// (CP16부터 상자도 강체: 이음매는 상자마다 아랫변에 붙어 함께 움직인다).
     /// 아직 물리가 없는 구조물(임시 물체)은 맵을 그릴 때 한 번 놓고, 강체 구조물(CP14부터)은 매 프레임 직전·현재 상태를
     /// 보간해(회전은 (cos, sin)을 보간해 정규화) 움직이며 줄이 따라간다.
     /// </summary>
@@ -23,6 +24,9 @@ namespace Knockbox.Presentation
         string currentTheme;
         readonly SpriteRenderer[] bodies = new SpriteRenderer[PropState.Capacity];
         readonly SpriteRenderer[] ropes = new SpriteRenderer[PropState.Capacity];
+        /// <summary>움직이는 상자의 아랫변 이음매(상자를 따라 돌고, 쌓이면 위아래 상자 사이의 어두운 선이 된다). 상자가 아니면 null.</summary>
+        readonly SpriteRenderer[] seams = new SpriteRenderer[PropState.Capacity];
+        readonly Vector2[] halves = new Vector2[PropState.Capacity];
         int dynamicCount;
 
         /// <summary>강체 구조물 i가 지금 그려진 위치·회전(그림자, 테스트·캡처 확인용).</summary>
@@ -69,9 +73,19 @@ namespace Knockbox.Presentation
             {
                 ref readonly var p = ref arena.GetProp(arena.DynamicProp(b));
                 ref readonly var joint = ref arena.GetJoint(b);
-                bodies[b] = ShapeLibrary.Create(transform, "PropBody", shapes.Square, SortingLayers.Terrain, 3, theme.prop);
+                bool isBox = p.Kind == PropKind.BoxPillar || p.Kind == PropKind.LooseBox;
+                bodies[b] = ShapeLibrary.Create(transform, "PropBody", shapes.Square, SortingLayers.Terrain, 3,
+                    isBox ? BoxShade(theme.prop, arena.DynamicProp(b)) : theme.prop);
                 ShapeLibrary.SetSize(bodies[b], p.HalfSize.X * 2f, p.HalfSize.Y * 2f);
                 bodies[b].transform.localPosition = ToVector(p.Center);
+                halves[b] = ToVector(p.HalfSize);
+                seams[b] = null;
+                if (isBox)
+                {
+                    seams[b] = ShapeLibrary.Create(transform, "BoxSeam", shapes.Square, SortingLayers.Terrain, 4, PaletteAsset.Scaled(theme.prop, SeamDarkness));
+                    ShapeLibrary.SetSize(seams[b], p.HalfSize.X * 2f, SeamHeight);
+                    seams[b].transform.localPosition = ToVector(p.Center) + new Vector2(0f, -p.HalfSize.Y);
+                }
                 ropes[b] = joint.Kind == PropJointKind.Rope ? Rope(shapes, theme.prop) : null;
                 if (joint.Pinned)
                     Dot(shapes, PaletteAsset.Scaled(theme.prop, PivotDarkness), 5, ToVector(joint.WorldAnchor), PivotSize);
@@ -92,6 +106,12 @@ namespace Knockbox.Presentation
                 var tr = bodies[b].transform;
                 tr.localPosition = position;
                 tr.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(rotation.y, rotation.x) * Mathf.Rad2Deg);
+                if (seams[b] != null)
+                {
+                    var seam = seams[b].transform;
+                    seam.localPosition = position + Rotate(rotation, new Vec2(0f, -halves[b].y));
+                    seam.localRotation = tr.localRotation;
+                }
                 if (ropes[b] != null)
                 {
                     ref readonly var joint = ref current.GetJoint(b);

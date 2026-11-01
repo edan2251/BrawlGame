@@ -333,9 +333,9 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(5.5f, meta.Props[5].Anchor.Y, 1e-5f, "앞 부품 아래 가운데에 이어짐");
         }
 
-        /// <summary>구조물은 아직 움직이지 않는 임시 물체로 캐릭터와 충돌한다(위에 서고, 옆에서 막힌다).</summary>
+        /// <summary>기둥 꼭대기 상자 위에 설 수 있다(CP13~15는 임시 물체, CP16부터 강체 상자).</summary>
         [Test]
-        public void TemporaryProps_BlockFighters()
+        public void PillarTop_IsStandable()
         {
             var config = Config();
             var arena = ArenaFiles.LoadByName("Totems");
@@ -351,9 +351,18 @@ namespace Knockbox.Tests.EditMode
             for (int t = 0; t < 90; t++)
                 world.Step(default, default);
             var f = world.State.Fighter0;
+            int body = -1;
+            for (int b = 0; b < arena.DynamicPropCount; b++)
+            {
+                if (arena.DynamicProp(b) == pillarTop)
+                    body = b;
+            }
+            // CP16부터 기둥 상자도 강체: 꼭대기 상자 위에 선다(구조물 위 접지). 깨어난 기둥은 조금(0.1 이하) 내려앉는다.
+            Assert.GreaterOrEqual(body, 0, "기둥 상자는 강체(3단계)");
             Assert.IsTrue(f.Grounded, "기둥 꼭대기 상자 위에 선다");
-            Assert.AreEqual(box.MaxY + config.HalfBody, f.Position.Y, 1e-3f);
-            Assert.AreEqual(pillarTop, arena.PropOfBox(f.GroundBox), "임시 물체 상자(3단계 종류는 아직 강체가 아님)");
+            Assert.AreEqual(FighterState.OnPropBox, f.GroundBox);
+            Assert.AreEqual(body + 1, f.OnProp);
+            Assert.AreEqual(box.MaxY + config.HalfBody, f.Position.Y, 0.1f);
         }
 
         // CP12-2 (맵 교체, CP13에서 그대로 유지) ------------------------------------------
@@ -465,8 +474,8 @@ namespace Knockbox.Tests.EditMode
         {
             var config = Config();
             var arena = ArenaFiles.LoadByName(name);
-            int rounds = 0, fightingTicks = 0, outOfBounds = 0, wallSplats = 0, boundaryHits = 0, propHits = 0;
-            double total = 0, boundary = 0, spike = 0, other = 0, prop = 0;
+            int rounds = 0, fightingTicks = 0, outOfBounds = 0, wallSplats = 0, boundaryHits = 0, propHits = 0, boxHits = 0, knockouts = 0;
+            double total = 0, boundary = 0, spike = 0, other = 0, prop = 0, boxed = 0;
             for (uint seed = 1; seed <= 6; seed++)
             {
                 var world = TestWorlds.Create(MatchPhase.Countdown, seed, config, arena);
@@ -483,6 +492,7 @@ namespace Knockbox.Tests.EditMode
                     var spiked = new float[2];
                     var bounded = new float[2];
                     var propped = new float[2];
+                    var boxDamage = new float[2];
                     for (int i = 0; i < world.Events.Count; i++)
                     {
                         var e = world.Events[i];
@@ -503,6 +513,13 @@ namespace Knockbox.Tests.EditMode
                             case SimEventType.PropHit:
                                 propped[f] += e.Strength;
                                 propHits++;
+                                break;
+                            case SimEventType.BoxHit:
+                                boxDamage[f] += e.Strength;
+                                boxHits++;
+                                break;
+                            case SimEventType.BoxKnockout:
+                                knockouts++;
                                 break;
                             case SimEventType.WallSplat:
                                 wallSplats++;
@@ -531,6 +548,9 @@ namespace Knockbox.Tests.EditMode
                         double pr = System.Math.Min(rest, propped[f]);
                         prop += pr;
                         rest -= pr;
+                        double bx = System.Math.Min(rest, boxDamage[f]);
+                        boxed += bx;
+                        rest -= bx;
                         rest -= System.Math.Min(rest, known[f]);
                         other += rest;
                     }
@@ -539,13 +559,15 @@ namespace Knockbox.Tests.EditMode
             float average = rounds > 0 ? fightingTicks / 60f / rounds : float.PositiveInfinity;
             double boundaryShare = total > 0 ? boundary / total : 0, spikeShare = total > 0 ? spike / total : 0;
             string report = $"[Knockbox][CP13-3] {name}: 라운드 {rounds}, 평균 {average:F1}초, 경계 튕김 데미지 {boundaryShare:P0}({boundaryHits}회), 가시 {spikeShare:P0}, "
-                            + $"구조물에 맞음 {(total > 0 ? prop / total : 0):P0}({propHits}회), 벽꽝 등 지형 {(total > 0 ? other / total : 0):P0}(벽꽝 {wallSplats}), 경기장 이탈 {outOfBounds}";
+                            + $"구조물에 맞음 {(total > 0 ? prop / total : 0):P0}({propHits}회), 상자에 맞음 {(total > 0 ? boxed / total : 0):P0}({boxHits}회, 상자 쳐냄 {knockouts}), 벽꽝 등 지형 {(total > 0 ? other / total : 0):P0}(벽꽝 {wallSplats}), 경기장 이탈 {outOfBounds}";
             TestContext.WriteLine(report);
             UnityEngine.Debug.Log(report);
             Assert.AreEqual(0, outOfBounds, "경기장 이탈");
             Assert.That(average, Is.InRange(10f, 30f), report);
             Assert.LessOrEqual(boundaryShare, 0.30, report);
             Assert.LessOrEqual(spikeShare, 0.25, report);
+            // CP16-6: 상자 데미지 비중 25% 이하(09 4절).
+            Assert.LessOrEqual(total > 0 ? boxed / total : 0, 0.25, report);
         }
     }
 }

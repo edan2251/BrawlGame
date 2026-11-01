@@ -72,6 +72,8 @@ namespace Knockbox.Simulation
                 f.SpikeImmunityTicks--;
             if (f.BoundaryImmunityTicks > 0)
                 f.BoundaryImmunityTicks--;
+            if (f.BoxDamageTicks > 0 && --f.BoxDamageTicks == 0)
+                f.BoxDamageSum = 0;
             // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
             bool guardPressed = (pressed & InputButtons.Guard) != 0;
             int sinceGuardPress = SimMath.Min(f.TicksSinceGuardPress + 1, FighterState.TimerCap);

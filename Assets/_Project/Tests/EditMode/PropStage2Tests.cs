@@ -462,8 +462,10 @@ namespace Knockbox.Tests.EditMode
                 int j = mirror[i];
                 if (j <= i || TiedToCenter(arena, mirror, i))
                     continue;
-                Push(w, i, new Vec2(5f, 3f), 2f);
-                Push(w, j, new Vec2(-5f, 3f), -2f);
+                // 바깥쪽으로 찬다(CP16, S-143): 양쪽에서 가운데 구조물(자기 자신이 짝)에 동시에 부딪히면 번호 순서 풀이가 한쪽을 먼저 처리해 어긋난다.
+                float outward = At(w, i).Position.X < 0f ? -1f : 1f;
+                Push(w, i, new Vec2(5f * outward, 3f), 2f * outward);
+                Push(w, j, new Vec2(-5f * outward, 3f), -2f * outward);
                 pairs++;
             }
             float worst = 0f;
@@ -476,7 +478,7 @@ namespace Knockbox.Tests.EditMode
                     var b = At(w, mirror[i]);
                     worst = System.Math.Max(worst, System.Math.Abs(a.Position.X + b.Position.X));
                     worst = System.Math.Max(worst, System.Math.Abs(a.Position.Y - b.Position.Y));
-                    worst = System.Math.Max(worst, System.Math.Abs(a.Rotation.Y + b.Rotation.Y));
+                    worst = System.Math.Max(worst, PropCollapseTests.MirrorRotationError(a.Rotation, b.Rotation));
                     Assert.AreEqual(a.Broken, b.Broken, $"{name} 틱 {t} 구조물 {i}");
                 }
             }

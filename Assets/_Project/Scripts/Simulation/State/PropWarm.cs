@@ -61,18 +61,56 @@ namespace Knockbox.Simulation
             }
         }
 
-        /// <summary>id의 지난 충격량. 없으면 0.</summary>
+        /// <summary>id의 지난 충격량. 없으면 0(자주 불려 칸을 switch 없이 바로 본다).</summary>
         public readonly bool Find(int id, out float normal, out float tangent)
         {
-            for (int i = 0; i < Capacity; i++)
+            if (W0.Id == id)
             {
-                ref readonly var slot = ref At(in this, i);
-                if (slot.Id == id)
-                {
-                    normal = slot.Normal;
-                    tangent = slot.Tangent;
-                    return true;
-                }
+                normal = W0.Normal;
+                tangent = W0.Tangent;
+                return true;
+            }
+            if (W1.Id == id)
+            {
+                normal = W1.Normal;
+                tangent = W1.Tangent;
+                return true;
+            }
+            if (W2.Id == id)
+            {
+                normal = W2.Normal;
+                tangent = W2.Tangent;
+                return true;
+            }
+            if (W3.Id == id)
+            {
+                normal = W3.Normal;
+                tangent = W3.Tangent;
+                return true;
+            }
+            if (W4.Id == id)
+            {
+                normal = W4.Normal;
+                tangent = W4.Tangent;
+                return true;
+            }
+            if (W5.Id == id)
+            {
+                normal = W5.Normal;
+                tangent = W5.Tangent;
+                return true;
+            }
+            if (W6.Id == id)
+            {
+                normal = W6.Normal;
+                tangent = W6.Tangent;
+                return true;
+            }
+            if (W7.Id == id)
+            {
+                normal = W7.Normal;
+                tangent = W7.Tangent;
+                return true;
             }
             normal = 0f;
             tangent = 0f;
