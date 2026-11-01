@@ -21,6 +21,19 @@ namespace Knockbox.Simulation
         /// <summary>관통·줄 늘어남 보정(서브스텝마다 오차의 이 비율을 속도로 되돌린다).</summary>
         public float Correction;
         public float Slop;
+        /// <summary>부드러운 접촉(CP16, Box2D v3의 soft step): 강성(Hz, 서브스텝 빈도의 1/4을 넘지 않게)과 감쇠비, 겹침을 밀어내는 최대 속도.</summary>
+        public float ContactHertz;
+        /// <summary>서브스텝마다 접촉을 푸는 횟수(연결 반복 Iterations의 마지막 몇 번에만, 그 뒤 이완 한 번). Box2D v3는 1이지만 1이면 같은 폭 6단 기둥 흔들림 0.014·거울 대칭 오차 0.045로 4를 쓴다(S-136).</summary>
+        public int ContactIterations;
+        public float ContactDampingRatio;
+        public float ContactPushMaxSpeed;
+        /// <summary>예측 접촉 거리(틱마다 한 번 찾을 때 속도 × 틱에 더하는 여유).</summary>
+        public float SpeculativeDistance;
+        /// <summary>이보다 빠르게 다가오던 접촉만 반발한다.</summary>
+        public float RestitutionThreshold;
+        /// <summary>상자(기둥·흩어진 상자)가 낀 접촉의 반발과 마찰(09 4절 "쌓인 기둥의 느낌": 0.05~0.1, 0.6~0.8).</summary>
+        public float BoxRestitution;
+        public float BoxFriction;
         /// <summary>잠들기: 속도·각속도가 이보다 작은 틱이 SleepTicks번 이어지면 잠든다(처음엔 잠든 채로 놓인다).</summary>
         public float SleepSpeed;
         public float SleepAngularSpeed;
@@ -69,6 +82,14 @@ namespace Knockbox.Simulation
             Iterations = 4,
             Correction = 0.2f,
             Slop = 0.005f,
+            ContactHertz = 30f,
+            ContactIterations = 4,
+            ContactDampingRatio = 10f,
+            ContactPushMaxSpeed = 3f,
+            SpeculativeDistance = 0.02f,
+            RestitutionThreshold = 1f,
+            BoxRestitution = 0.08f,
+            BoxFriction = 0.7f,
             SleepSpeed = 0.05f,
             SleepAngularSpeed = 0.05f,
             SleepTicks = 30,
@@ -109,6 +130,14 @@ namespace Knockbox.Simulation
             v.Value(nameof(Iterations), Iterations);
             v.Value(nameof(Correction), Correction);
             v.Value(nameof(Slop), Slop);
+            v.Value(nameof(ContactHertz), ContactHertz);
+            v.Value(nameof(ContactIterations), ContactIterations);
+            v.Value(nameof(ContactDampingRatio), ContactDampingRatio);
+            v.Value(nameof(ContactPushMaxSpeed), ContactPushMaxSpeed);
+            v.Value(nameof(SpeculativeDistance), SpeculativeDistance);
+            v.Value(nameof(RestitutionThreshold), RestitutionThreshold);
+            v.Value(nameof(BoxRestitution), BoxRestitution);
+            v.Value(nameof(BoxFriction), BoxFriction);
             v.Value(nameof(SleepSpeed), SleepSpeed);
             v.Value(nameof(SleepAngularSpeed), SleepAngularSpeed);
             v.Value(nameof(SleepTicks), SleepTicks);

@@ -1,23 +1,33 @@
 namespace Knockbox.Simulation
 {
-    /// <summary>접촉 하나(한 틱의 계산 결과, 상태 아님).</summary>
+    /// <summary>접촉점 하나(한 틱의 계산 결과, 상태 아님). 웜 스타트 충격량은 PropBody.Warm에서 읽고 틱 끝에 되돌려 쓴다.</summary>
     public struct PropContact
     {
         public int Body;
         /// <summary>상대 강체(-1이면 지형·경계). 법선은 상대 → Body.</summary>
         public int Other;
+        /// <summary>웜 스타트 번호(상대 × 64 + 접점 특징 + 1). 같은 두 면의 같은 끝이면 틱이 바뀌어도 같다.</summary>
+        public int Id;
         /// <summary>Body를 밀어내는 방향.</summary>
         public Vec2 Normal;
         public Vec2 Point;
-        public float Depth;
+        /// <summary>찾을 때의 틈(음수면 겹침). 서브스텝 동안은 두 접점의 이동량으로 갱신한다.</summary>
+        public float Separation;
+        /// <summary>접점의 몸 좌표(틈 갱신용)와, 찾을 때의 무게중심 → 접점(풀이에는 고정해서 쓴다, Box2D v3와 같음).</summary>
+        public Vec2 LocalBody;
+        public Vec2 LocalOther;
+        public Vec2 RBody;
+        public Vec2 ROther;
+        public float NormalMass;
+        public float TangentMass;
+        public float Friction;
         public float Restitution;
+        /// <summary>서브스텝 하나 분량의 누적 충격량(웜 스타트로 이어 쓴다).</summary>
         public float NormalImpulse;
         public float TangentImpulse;
-        public float TargetSpeed;
+        public float MaxNormalImpulse;
         /// <summary>찾을 때의 법선 방향 상대 속도(반발 계산용).</summary>
         public float Approach;
-        /// <summary>강체끼리의 접촉(예측 접촉 포함, Depth &lt; 0이면 아직 틈). 반발은 풀이 뒤에 따로 준다.</summary>
-        public bool Speculative;
     }
 
     /// <summary>구조물 물리의 작업 공간. SimWorld가 한 번 만들고 매 틱 다시 쓴다(할당 없음).</summary>
@@ -31,13 +41,39 @@ namespace Knockbox.Simulation
         /// <summary>이번 틱이 시작할 때의 위치·회전(잠들기 판정은 실제로 움직인 양으로 한다).</summary>
         public readonly Vec2[] StartPosition = new Vec2[PropState.Capacity];
         public readonly Vec2[] StartRotation = new Vec2[PropState.Capacity];
+        /// <summary>이번 틱 풀이의 역질량·역관성(잠든 몸은 0: 움직이지 않는 몸으로 다룬다).</summary>
+        public readonly float[] InvMass = new float[PropState.Capacity];
+        public readonly float[] InvInertia = new float[PropState.Capacity];
+        /// <summary>웜 스타트를 저장할 때 이 몸의 칸을 이번 틱에 비웠는지.</summary>
+        public readonly bool[] Rebuilt = new bool[PropState.Capacity];
+        /// <summary>틱 시작에 한 번 담는 몸 정보(쌍 훑기를 배열로만 하기 위해): 깨어 있음, 거의 멈춤, 위치, 반 크기, 축 정렬 외곽, 최대 점 속력.</summary>
+        public readonly bool[] Awake = new bool[PropState.Capacity];
+        public readonly bool[] Still = new bool[PropState.Capacity];
+        public readonly Vec2[] Center = new Vec2[PropState.Capacity];
+        public readonly Vec2[] Half = new Vec2[PropState.Capacity];
+        public readonly Vec2[] Reach = new Vec2[PropState.Capacity];
+        public readonly float[] Speed = new float[PropState.Capacity];
+        /// <summary>이번 틱에 깨어 있는 몸 중 연결(줄·축·경첩)이 있는 몸, 그중 줄인 몸(번호 순서).</summary>
+        public readonly int[] Jointed = new int[PropState.Capacity];
+        public int JointedCount;
+        public readonly int[] Roped = new int[PropState.Capacity];
+        public int RopedCount;
+        /// <summary>이번 틱에 깨어 있는 몸(번호 순서).</summary>
+        public readonly int[] AwakeList = new int[PropState.Capacity];
+        public int AwakeCount;
+        /// <summary>접촉 풀이 동안의 몸 상태(위치, 회전, 속도, 각속도). 풀이 앞뒤로 깨어 있는 몸만 PropState와 주고받는다(잠든 몸은 속도 0).</summary>
+        public readonly Vec2[] P = new Vec2[PropState.Capacity];
+        public readonly Vec2[] Q = new Vec2[PropState.Capacity];
+        public readonly Vec2[] V = new Vec2[PropState.Capacity];
+        public readonly float[] W = new float[PropState.Capacity];
     }
 
     /// <summary>
     /// 구조물 물리(09-props-physics.md 2절). 1단계(CP14): 회전하는 직사각형 강체, 줄(최대 거리), 축(점 고정),
     /// 고정 지형·임시 물체·화면 경계와의 충돌. 2단계(CP15): 경첩·시소(점 고정 + 각도 한계 + 복원 스프링), 몸-몸 줄(연결 구조),
     /// 강체끼리의 충돌(마찰 포함), 기준 충격 이상에서 끊어짐.
-    /// 서브스텝마다 접촉을 찾고, 연결과 접촉을 같은 반복에서 순차 충격량으로 푼다(Box2D v3의 접근을 참고, 코드는 직접 작성).
+    /// 3단계(CP16): 쌓인 상자를 위한 접촉 해법(틱마다 한 번 찾는 예측 접촉, 서브스텝 부드러운 제약, 웜 스타트, 이완, 반발 단계),
+    /// 잠든 몸은 풀이에서 움직이지 않는 몸으로 다루고 움직이는 몸이 닿으면 깬다.
     /// 회전은 (cos, sin)으로 적분해 정규화한다. 몸 번호·쌍 번호 순서대로 처리하고 반복 횟수가 고정이라 결정론적이다.
     /// </summary>
     public static class PropPhysics
@@ -127,7 +163,37 @@ namespace Knockbox.Simulation
             }
         }
 
-        /// <summary>한 틱. 히트스탑과 상관없이 계속 움직인다(09 4절 초기 결정).</summary>
+        /// <summary>
+        /// 실제로 밀고 있는(충격량 &gt; 0) 접촉으로 맞닿은 깨어 있는 몸끼리 잠들기 틱을 작은 쪽으로 맞춰 무리가 함께 잠들게 한다(CP16, Box2D의 섬 단위 잠들기와 같은 생각).
+        /// 쌓인 상자에서 아래 상자만 먼저 잠들면(움직이지 않는 몸이 되면) 위 상자들의 접촉 평형이 바뀌어 튀어 오르고 잠들기가 다시 0이 됐다.
+        /// 접촉 목록 순서로 정방향·역방향 두 번씩 훑는다.
+        /// </summary>
+        static void SyncTouchingSleep(ref PropState props, in PropParams c, PropScratch scratch)
+        {
+            for (int pass = 0; pass < 4; pass++)
+            {
+                for (int n = 0; n < scratch.ContactCount; n++)
+                {
+                    ref readonly var contact = ref scratch.Contacts[(pass & 1) == 0 ? n : scratch.ContactCount - 1 - n];
+                    if (contact.Other < 0 || contact.NormalImpulse <= 0f)
+                        continue;
+                    ref var a = ref PropState.Get(ref props, contact.Body);
+                    ref var b = ref PropState.Get(ref props, contact.Other);
+                    if (scratch.InvMass[contact.Body] == 0f || scratch.InvMass[contact.Other] == 0f)
+                        continue;
+                    int m = SimMath.Min(a.SleepTicks, b.SleepTicks);
+                    a.SleepTicks = m;
+                    b.SleepTicks = m;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 한 틱. 히트스탑과 상관없이 계속 움직인다(09 4절 초기 결정).
+        /// CP16: 접촉은 틱마다 한 번 찾고(예측 거리 = 속도 × 틱 + 여유), 서브스텝마다 속도 적분 → 웜 스타트 → 부드러운 접촉·연결 풀이 →
+        /// 위치 적분 → 줄 위치 보정 → 이완(밀어내기 속도 없이 한 번 더) 순서로 푼 뒤, 반발 단계와 충격량 저장으로 끝낸다
+        /// (Box2D v3 solver.c의 soft step 순서를 참고, MIT. 코드는 이 구조에 맞춰 직접 작성).
+        /// </summary>
         public static void Step(ref PropState props, ArenaDef arena, SimConfig config, PropScratch scratch, int tick, SimEventBuffer events)
         {
             if (props.Count == 0)
@@ -154,7 +220,38 @@ namespace Knockbox.Simulation
             }
             if (!anyAwake)
                 return;
+            CacheBodies(ref props, arena, c, scratch);
+            WakeTouched(ref props, arena, c, scratch);
             WakeLinked(ref props, arena);
+            scratch.JointedCount = 0;
+            scratch.RopedCount = 0;
+            scratch.AwakeCount = 0;
+            for (int i = 0; i < props.Count; i++)
+            {
+                ref readonly var body = ref PropState.At(in props, i);
+                scratch.Awake[i] = !Asleep(body, c);
+                scratch.P[i] = body.Position;
+                scratch.Q[i] = body.Rotation;
+                scratch.V[i] = Vec2.Zero;
+                scratch.W[i] = 0f;
+                if (!scratch.Awake[i])
+                {
+                    scratch.InvMass[i] = 0f;
+                    scratch.InvInertia[i] = 0f;
+                    continue;
+                }
+                scratch.AwakeList[scratch.AwakeCount++] = i;
+                InverseMass(arena, c, i, out scratch.InvMass[i], out scratch.InvInertia[i]);
+                var kind = arena.GetJoint(i).Kind;
+                if (kind != PropJointKind.None)
+                    scratch.Jointed[scratch.JointedCount++] = i;
+                if (kind == PropJointKind.Rope)
+                    scratch.Roped[scratch.RopedCount++] = i;
+            }
+            FindContacts(ref props, arena, c, scratch);
+            LoadBodies(in props, scratch);
+            PrepareContacts(ref props, arena, c, scratch);
+            var soft = Softness.Make(SimMath.Min(c.ContactHertz, 0.25f / h), c.ContactDampingRatio, h);
             for (int s = 0; s < substeps; s++)
             {
                 for (int i = 0; i < props.Count; i++)
@@ -167,29 +264,16 @@ namespace Knockbox.Simulation
                     b.AngularVelocity *= 1f / (1f + h * c.AngularDamping);
                     ApplyPivotSpring(ref b, arena, c, i, h);
                 }
-                FindContacts(ref props, arena, c, scratch, h);
+                WarmStart(ref props, scratch);
                 for (int it = 0; it < c.Iterations; it++)
                 {
                     // 연결은 정방향과 역방향으로 한 번씩(무거운 틀에 가벼운 사슬이 이어져도 덜 늘어난다).
-                    for (int i = 0; i < props.Count; i++)
-                    {
-                        if (!Asleep(PropState.At(in props, i), c))
-                            SolveJoint(ref props, arena, c, i, h);
-                    }
-                    for (int i = props.Count - 1; i >= 0; i--)
-                    {
-                        if (!Asleep(PropState.At(in props, i), c))
-                            SolveJoint(ref props, arena, c, i, h);
-                    }
-                    SolveContacts(ref props, arena, c, scratch);
-                }
-                ApplySpeculativeRestitution(ref props, arena, c, scratch);
-                for (int k = 0; k < scratch.ContactCount; k++)
-                {
-                    ref readonly var contact = ref scratch.Contacts[k];
-                    scratch.TickImpulse[contact.Body] += contact.NormalImpulse;
-                    if (contact.Other >= 0)
-                        scratch.TickImpulse[contact.Other] += contact.NormalImpulse;
+                    for (int k = 0; k < scratch.JointedCount; k++)
+                        SolveJoint(ref props, arena, c, scratch.Jointed[k], h);
+                    for (int k = scratch.JointedCount - 1; k >= 0; k--)
+                        SolveJoint(ref props, arena, c, scratch.Jointed[k], h);
+                    if (it >= c.Iterations - c.ContactIterations)
+                        SolveContacts(ref props, c, scratch, soft, h, true);
                 }
                 for (int i = 0; i < props.Count; i++)
                 {
@@ -202,10 +286,21 @@ namespace Knockbox.Simulation
                 // 늘어난 줄은 위치로 바로 되돌린다(반복 횟수만큼 정방향·역방향을 번갈아, 속도는 그대로라 에너지를 더하지 않는다).
                 for (int it = 0; it < c.Iterations; it++)
                 {
-                    for (int k = 0; k < props.Count; k++)
-                        ProjectRope(ref props, arena, c, (it & 1) == 0 ? k : props.Count - 1 - k);
+                    for (int k = 0; k < scratch.RopedCount; k++)
+                        ProjectRope(ref props, arena, c, scratch.Roped[(it & 1) == 0 ? k : scratch.RopedCount - 1 - k]);
+                }
+                // 이완: 밀어내기 속도 없이 한 번 더 풀어, 겹침을 밀어낸 속도가 튕김으로 남지 않게 한다.
+                SolveContacts(ref props, c, scratch, soft, h, false);
+                for (int k = 0; k < scratch.ContactCount; k++)
+                {
+                    ref readonly var contact = ref scratch.Contacts[k];
+                    scratch.TickImpulse[contact.Body] += contact.NormalImpulse;
+                    if (contact.Other >= 0)
+                        scratch.TickImpulse[contact.Other] += contact.NormalImpulse;
                 }
             }
+            ApplyRestitution(ref props, c, scratch);
+            StoreImpulses(ref props, c, scratch);
             for (int i = 0; i < props.Count; i++)
             {
                 ref var b = ref PropState.Get(ref props, i);
@@ -218,6 +313,7 @@ namespace Knockbox.Simulation
                 bool still = moved.LengthSquared < c.SleepSpeed * c.SleepSpeed && turned * turned < c.SleepAngularSpeed * c.SleepAngularSpeed;
                 b.SleepTicks = still ? b.SleepTicks + 1 : 0;
             }
+            SyncTouchingSleep(ref props, c, scratch);
             SyncLinkedSleep(ref props, arena);
             for (int i = 0; i < props.Count; i++)
             {
@@ -413,83 +509,149 @@ namespace Knockbox.Simulation
             || (arena.GetJoint(b).OtherBody == a && PropState.At(in props, b).Broken == 0);
 
         // 접촉 ----------------------------------------------------------------------
+        // CP16: 지형·경계·강체 접촉을 모두 같은 방식으로 푼다. 틱마다 한 번 찾은 접촉점을 서브스텝 동안 두 몸의 이동량으로 갱신하고,
+        // 겹쳐 있으면 부드러운 제약(강성 Hz·감쇠비), 틈이 있으면 그 틈만큼만 다가오게(예측 접촉) 막는다.
+        // 접촉점 계산(분리축 + 기준 면에 맞댄 면을 잘라 최대 2점)과 풀이 수식은 Box2D v3(manifold.c b2ClipPolygons,
+        // contact_solver.c, MIT License, Copyright (c) 2023 Erin Catto)를 참고해 이 구조에 맞춰 다시 썼다.
 
-        static void FindContacts(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch, float h)
+        /// <summary>몸 번호(0~47) 다음부터 지형 상자 번호, 그 다음이 화면 경계(웜 스타트 번호의 상대 부분).</summary>
+        const int TerrainKey = 64;
+        const int BoundaryKey = 4096;
+        /// <summary>기준 면을 고를 때 상대 쪽을 우선하는 여유(같은 폭의 상자를 쌓아도 기준 면이 틱마다 바뀌지 않게).</summary>
+        const float ReferenceTolerance = 0.0005f;
+
+        /// <summary>부드러운 제약 계수(Box2D v3 b2MakeSoft와 같은 식).</summary>
+        struct Softness
+        {
+            public float BiasRate;
+            public float MassScale;
+            public float ImpulseScale;
+
+            public static Softness Make(float hertz, float zeta, float h)
+            {
+                if (hertz <= 0f)
+                    return new Softness { BiasRate = 0f, MassScale = 1f, ImpulseScale = 0f };
+                float omega = 6.2831855f * hertz;
+                float a1 = 2f * zeta + h * omega;
+                float a2 = h * omega * a1;
+                float a3 = 1f / (1f + a2);
+                return new Softness { BiasRate = omega / a1, MassScale = a2 * a3, ImpulseScale = a3 };
+            }
+        }
+
+        public static bool IsBox(PropKind kind) => kind == PropKind.BoxPillar || kind == PropKind.LooseBox;
+
+        static bool IsBox(ArenaDef arena, int body) => IsBox(arena.GetProp(arena.DynamicProp(body)).Kind);
+
+        /// <summary>틱 시작에 몸 정보를 배열에 담는다(쌍 훑기는 이 배열로만 거른 뒤 가까운 쌍만 접촉을 계산한다).</summary>
+        static void CacheBodies(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch)
+        {
+            for (int i = 0; i < props.Count; i++)
+            {
+                ref readonly var b = ref PropState.At(in props, i);
+                var half = arena.GetProp(arena.DynamicProp(i)).HalfSize;
+                Extent(b, half, out float ex, out float ey);
+                scratch.Awake[i] = !Asleep(b, c);
+                scratch.Still[i] = Slow(b, c);
+                scratch.Center[i] = b.Position;
+                scratch.Half[i] = half;
+                scratch.Reach[i] = new Vec2(ex, ey);
+                scratch.Speed[i] = MaxPointSpeed(b, half);
+            }
+        }
+
+        /// <summary>두 몸이 이번 틱에 닿을 수 있을 만큼 가까운지(축 정렬 외곽 + 예측 거리, 틱 시작 정보로).</summary>
+        static bool NearCached(PropScratch scratch, int i, int j, in PropParams c)
+        {
+            float speculative = PairSpeculative(scratch, i, j, c);
+            var d = scratch.Center[i] - scratch.Center[j];
+            return SimMath.Abs(d.X) <= scratch.Reach[i].X + scratch.Reach[j].X + speculative
+                   && SimMath.Abs(d.Y) <= scratch.Reach[i].Y + scratch.Reach[j].Y + speculative;
+        }
+
+        static float PairSpeculative(PropScratch scratch, int i, int j, in PropParams c) =>
+            (scratch.Speed[i] + scratch.Speed[j]) * SimConfig.Dt + c.SpeculativeDistance;
+
+        /// <summary>
+        /// 잠든 몸이 움직이는 몸과 닿아 있으면 깨운다(틱 시작 상태로 판단해 한 틱에 한 칸씩 전해진다).
+        /// 거의 멈춘 몸끼리 맞닿아 있는 것은 깨우지 않는다(S-133: 서로 잠들기를 되돌리면 맞닿아 쉬는 상자가 영원히 잠들지 못한다).
+        /// 받침이 빠지면 빠지는 받침이 움직이므로 그 위 상자가 깬다.
+        /// </summary>
+        static void WakeTouched(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch)
         {
             scratch.ContactCount = 0;
             for (int i = 0; i < props.Count; i++)
             {
-                ref readonly var b = ref PropState.At(in props, i);
-                if (Asleep(b, c))
+                for (int j = i + 1; j < props.Count; j++)
+                {
+                    bool awakeA = scratch.Awake[i], awakeB = scratch.Awake[j];
+                    if (awakeA == awakeB || (awakeA ? scratch.Still[i] : scratch.Still[j]) || !NearCached(scratch, i, j, c)
+                        || Connected(arena, props, i, j))
+                        continue;
+                    ref var a = ref PropState.Get(ref props, i);
+                    ref var bb = ref PropState.Get(ref props, j);
+                    Collide(i, a, scratch.Half[i], j, j, bb, scratch.Half[j], PairSpeculative(scratch, i, j, c), -1f, scratch);
+                    bool touched = scratch.ContactCount > 0;
+                    scratch.ContactCount = 0;
+                    if (!touched)
+                        continue;
+                    // 깨어난 몸은 아직 멈춰 있으므로(속도 0) 이 틱에 다른 몸을 다시 깨우지 않는다(한 틱에 한 칸).
+                    int woken = awakeA ? j : i;
+                    PropState.Get(ref props, woken).SleepTicks = 0;
+                    scratch.Awake[woken] = true;
+                    scratch.Still[woken] = true;
+                }
+            }
+        }
+
+        /// <summary>깨어 있는 몸의 지형·경계 접촉, 적어도 하나가 깨어 있는 강체 쌍의 접촉을 몸 번호·쌍 번호 순서로 찾고, 웜 스타트 충격량을 읽는다.</summary>
+        static void FindContacts(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch)
+        {
+            scratch.ContactCount = 0;
+            for (int i = 0; i < props.Count; i++)
+            {
+                if (!scratch.Awake[i])
                     continue;
-                ref readonly var def = ref arena.GetProp(arena.DynamicProp(i));
-                var half = def.HalfSize;
-                Extent(b, half, out float ex, out float ey);
-                float margin = 0.05f;
+                ref readonly var b = ref PropState.At(in props, i);
+                var half = scratch.Half[i];
+                float ex = scratch.Reach[i].X, ey = scratch.Reach[i].Y;
+                float speculative = scratch.Speed[i] * SimConfig.Dt + c.SpeculativeDistance;
                 for (int k = 0; k < arena.BoxCount; k++)
                 {
                     ref readonly var box = ref arena.GetBox(k);
                     if (box.Kind == TerrainKind.Spike)
                         continue;
-                    if (b.Position.X + ex + margin < box.MinX || b.Position.X - ex - margin > box.MaxX
-                        || b.Position.Y + ey + margin < box.MinY || b.Position.Y - ey - margin > box.MaxY)
+                    if (b.Position.X + ex + speculative < box.MinX || b.Position.X - ex - speculative > box.MaxX
+                        || b.Position.Y + ey + speculative < box.MinY || b.Position.Y - ey - speculative > box.MaxY)
                         continue;
                     // 단방향 발판은 위에서 내려올 때만 막는다.
                     if (box.Kind == TerrainKind.OneWay && b.Position.Y - ey < box.MaxY - 0.25f)
                         continue;
-                    CollideBox(i, b, half, box, c.Restitution, scratch);
+                    var boxBody = new PropBody
+                    {
+                        Position = new Vec2((box.MinX + box.MaxX) * 0.5f, (box.MinY + box.MaxY) * 0.5f),
+                        Rotation = new Vec2(1f, 0f),
+                    };
+                    var boxHalf = new Vec2((box.MaxX - box.MinX) * 0.5f, (box.MaxY - box.MinY) * 0.5f);
+                    Collide(i, b, half, -1, TerrainKey + k, boxBody, boxHalf, speculative, -1f, scratch);
                 }
                 if (arena.HasBoundary)
-                    CollideBoundary(i, b, half, arena, c.BoundaryRestitution, scratch);
+                    CollideBoundary(i, b, half, arena, speculative, c.BoundaryRestitution, scratch);
             }
-            // 강체끼리(2단계). 움직이는 몸이 잠든 몸에 닿으면 깨운다. 거의 멈춘 몸끼리 맞닿아 있는 것은 깨우지 않는다
-            // (서로 잠들기 틱을 되돌리면 맞닿아 쉬는 구조물이 영원히 잠들지 못한다).
             for (int i = 0; i < props.Count; i++)
             {
                 for (int j = i + 1; j < props.Count; j++)
                 {
-                    ref var a = ref PropState.Get(ref props, i);
-                    ref var bb = ref PropState.Get(ref props, j);
-                    bool asleepA = Asleep(a, c), asleepB = Asleep(bb, c);
-                    if ((asleepA && asleepB) || Connected(arena, props, i, j))
+                    if ((!scratch.Awake[i] && !scratch.Awake[j]) || !NearCached(scratch, i, j, c) || Connected(arena, props, i, j))
                         continue;
-                    var halfA = arena.GetProp(arena.DynamicProp(i)).HalfSize;
-                    var halfB = arena.GetProp(arena.DynamicProp(j)).HalfSize;
-                    Extent(a, halfA, out float ax, out float ay);
-                    Extent(bb, halfB, out float bx, out float by);
-                    // 예측 거리: 이번 서브스텝에 두 몸이 가까워질 수 있는 최대 거리(빠른 몸이 파고들거나 지나치지 않게).
-                    float speculative = (MaxPointSpeed(a, halfA) + MaxPointSpeed(bb, halfB)) * h + 0.02f;
-                    if (SimMath.Abs(a.Position.X - bb.Position.X) > ax + bx + speculative || SimMath.Abs(a.Position.Y - bb.Position.Y) > ay + by + speculative)
-                        continue;
-                    int before = scratch.ContactCount;
-                    CollideBodies(i, a, halfA, j, bb, halfB, c.Restitution, speculative, scratch);
-                    if (scratch.ContactCount > before)
-                    {
-                        if (asleepA && !Slow(bb, c))
-                            a.SleepTicks = 0;
-                        else if (asleepB && !Slow(a, c))
-                            bb.SleepTicks = 0;
-                    }
+                    Collide(i, PropState.At(in props, i), scratch.Half[i], j, j, PropState.At(in props, j), scratch.Half[j], PairSpeculative(scratch, i, j, c), -1f, scratch);
                 }
             }
             for (int k = 0; k < scratch.ContactCount; k++)
             {
                 ref var contact = ref scratch.Contacts[k];
-                ref readonly var b = ref PropState.At(in props, contact.Body);
-                var v = b.PointVelocity(contact.Point);
-                if (contact.Other >= 0)
-                    v -= PropState.At(in props, contact.Other).PointVelocity(contact.Point);
-                float vn = Vec2.Dot(contact.Normal, v);
-                contact.Approach = vn;
-                if (contact.Speculative)
-                {
-                    // 틈이 있으면 그 틈만큼만 다가오게(음수 목표 속도), 닿아 있으면 파고든 만큼 밀어낸다.
-                    contact.TargetSpeed = contact.Depth < 0f ? contact.Depth / h : SimMath.Max(0f, contact.Depth - c.Slop) * (c.Correction / h);
-                    continue;
-                }
-                float bounce = vn < -1f ? -contact.Restitution * vn : 0f;
-                float push = SimMath.Max(0f, contact.Depth - c.Slop) * (c.Correction / h);
-                contact.TargetSpeed = SimMath.Max(bounce, push);
+                PropState.At(in props, contact.Body).Warm.Find(contact.Id, out contact.NormalImpulse, out contact.TangentImpulse);
+                contact.MaxNormalImpulse = 0f;
             }
         }
 
@@ -504,13 +666,14 @@ namespace Knockbox.Simulation
         static float MaxPointSpeed(in PropBody b, Vec2 half) =>
             SimMath.Sqrt(b.Velocity.LengthSquared) + SimMath.Abs(b.AngularVelocity) * SimMath.Sqrt(half.LengthSquared);
 
-        static void Add(PropScratch scratch, int body, int other, Vec2 normal, Vec2 point, float depth, float restitution, bool speculative = false)
+        /// <summary>restitution &lt; 0이면 준비 단계에서 몸 종류로 정한다.</summary>
+        static void Add(PropScratch scratch, int body, int other, int id, Vec2 normal, Vec2 point, float separation, float restitution)
         {
             if (scratch.ContactCount >= PropScratch.MaxContacts)
                 return;
             scratch.Contacts[scratch.ContactCount++] = new PropContact
             {
-                Body = body, Other = other, Normal = normal, Point = point, Depth = depth, Restitution = restitution, Speculative = speculative,
+                Body = body, Other = other, Id = id, Normal = normal, Point = point, Separation = separation, Restitution = restitution,
             };
         }
 
@@ -520,191 +683,374 @@ namespace Knockbox.Simulation
             corner = b.ToWorld(local);
         }
 
-        /// <summary>회전한 직사각형(몸)과 축 정렬 상자: 분리축으로 가장 얕은 축을 찾고, 그 면에 들어간 꼭짓점(최대 2개)을 접촉으로.</summary>
-        static void CollideBox(int body, in PropBody b, Vec2 half, in ArenaBox box, float restitution, PropScratch scratch)
-        {
-            var boxBody = new PropBody
-            {
-                Position = new Vec2((box.MinX + box.MaxX) * 0.5f, (box.MinY + box.MaxY) * 0.5f),
-                Rotation = new Vec2(1f, 0f),
-            };
-            var boxHalf = new Vec2((box.MaxX - box.MinX) * 0.5f, (box.MaxY - box.MinY) * 0.5f);
-            Collide(body, b, half, -1, boxBody, boxHalf, restitution, 0f, scratch);
-        }
-
-        static void CollideBodies(int i, in PropBody a, Vec2 halfA, int j, in PropBody b, Vec2 halfB, float restitution, float speculative, PropScratch scratch) =>
-            Collide(i, a, halfA, j, b, halfB, restitution, speculative, scratch);
-
-        /// <summary>
-        /// 회전한 직사각형 두 개(Body, 상대). 분리축 4개 중 가장 얕은 축의 면을 기준 면으로, 다른 쪽 꼭짓점 중 그 면에 들어간 것(최대 2개)을 접촉점으로.
-        /// 법선은 상대 → Body. 같은 깊이면 상대 쪽 축을 고른다(평평한 지형 위에서 흔들림이 적다).
-        /// speculative &gt; 0이면 그 거리 안의 틈도 예측 접촉(깊이 음수)으로 만든다(강체끼리).
-        /// </summary>
-        static void Collide(int body, in PropBody b, Vec2 half, int other, in PropBody o, Vec2 otherHalf, float restitution, float speculative, PropScratch scratch)
+        /// <summary>면 f의 바깥 법선: 0 +x, 1 +y, 2 −x, 3 −y(몸 좌표).</summary>
+        static Vec2 FaceNormal(in PropBody b, int f)
         {
             var u = b.Rotation;
-            var v = new Vec2(-u.Y, u.X);
-            var ou = o.Rotation;
-            var ov = new Vec2(-ou.Y, ou.X);
-            var delta = b.Position - o.Position;
-            float best = float.MaxValue;
-            var normal = Vec2.Zero;
-            bool bodyFace = false;
-            for (int axis = 0; axis < 4; axis++)
-            {
-                var a = axis == 0 ? ou : axis == 1 ? ov : axis == 2 ? u : v;
-                float rBody = half.X * SimMath.Abs(Vec2.Dot(a, u)) + half.Y * SimMath.Abs(Vec2.Dot(a, v));
-                float rOther = otherHalf.X * SimMath.Abs(Vec2.Dot(a, ou)) + otherHalf.Y * SimMath.Abs(Vec2.Dot(a, ov));
-                float d = Vec2.Dot(delta, a);
-                float overlap = rBody + rOther - SimMath.Abs(d);
-                if (overlap <= -speculative || (speculative <= 0f && overlap <= 0f))
-                    return;
-                if (overlap < best - 1e-5f)
-                {
-                    best = overlap;
-                    normal = d >= 0f ? a : -a;
-                    bodyFace = axis >= 2;
-                }
-            }
-            var tangent = new Vec2(-normal.Y, normal.X);
-            int added = 0;
-            if (!bodyFace)
-            {
-                // 상대의 면에 몸의 꼭짓점이 들어감.
-                float face = Vec2.Dot(o.Position, normal) + otherHalf.X * SimMath.Abs(Vec2.Dot(normal, ou)) + otherHalf.Y * SimMath.Abs(Vec2.Dot(normal, ov));
-                float lateral = otherHalf.X * SimMath.Abs(Vec2.Dot(tangent, ou)) + otherHalf.Y * SimMath.Abs(Vec2.Dot(tangent, ov)) + 0.05f;
-                for (int k = 0; k < 4 && added < 2; k++)
-                {
-                    Corner(b, half, k, out var corner);
-                    float depth = face - Vec2.Dot(corner, normal);
-                    if (depth > -speculative && (speculative > 0f || depth > 0f) && SimMath.Abs(Vec2.Dot(corner - o.Position, tangent)) <= lateral)
-                    {
-                        Add(scratch, body, other, normal, corner, depth, restitution, speculative > 0f);
-                        added++;
-                    }
-                }
-            }
-            else
-            {
-                // 몸의 면에 상대의 꼭짓점이 들어감.
-                float face = Vec2.Dot(b.Position, normal) - (half.X * SimMath.Abs(Vec2.Dot(normal, u)) + half.Y * SimMath.Abs(Vec2.Dot(normal, v)));
-                float lateral = half.X * SimMath.Abs(Vec2.Dot(tangent, u)) + half.Y * SimMath.Abs(Vec2.Dot(tangent, v)) + 0.05f;
-                for (int k = 0; k < 4 && added < 2; k++)
-                {
-                    Corner(o, otherHalf, k, out var corner);
-                    float depth = Vec2.Dot(corner, normal) - face;
-                    if (depth > -speculative && (speculative > 0f || depth > 0f) && SimMath.Abs(Vec2.Dot(corner - b.Position, tangent)) <= lateral)
-                    {
-                        Add(scratch, body, other, normal, corner, depth, restitution, speculative > 0f);
-                        added++;
-                    }
-                }
-            }
-            if (added == 0)
-                Add(scratch, body, other, normal, b.Position - normal * (best * 0.5f), best, restitution, speculative > 0f);
+            return f == 0 ? u : f == 1 ? new Vec2(-u.Y, u.X) : f == 2 ? -u : new Vec2(u.Y, -u.X);
         }
 
-        static void CollideBoundary(int body, in PropBody b, Vec2 half, ArenaDef arena, float restitution, PropScratch scratch)
+        /// <summary>기준 상자 r의 면 중 상자 i와의 틈이 가장 큰 면(분리축)과 그 틈(음수면 겹침).</summary>
+        static void MaxSeparation(in PropBody r, Vec2 halfR, in PropBody i, Vec2 halfI, out int face, out float separation)
+        {
+            var iu = i.Rotation;
+            var iv = new Vec2(-iu.Y, iu.X);
+            var delta = i.Position - r.Position;
+            face = 0;
+            separation = float.MinValue;
+            for (int f = 0; f < 4; f++)
+            {
+                var n = FaceNormal(r, f);
+                float reach = (f & 1) == 0 ? halfR.X : halfR.Y;
+                float s = Vec2.Dot(delta, n) - reach - (halfI.X * SimMath.Abs(Vec2.Dot(n, iu)) + halfI.Y * SimMath.Abs(Vec2.Dot(n, iv)));
+                if (s > separation + 1e-6f)
+                {
+                    separation = s;
+                    face = f;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 회전한 직사각형 두 개(Body, 상대). 분리축이 예측 거리보다 멀면 접촉 없음. 아니면 틈이 큰 쪽 면을 기준 면으로(비슷하면 상대 쪽),
+        /// 다른 상자에서 기준 면과 가장 마주 보는 면을 기준 면의 양 끝으로 잘라 남은 끝점(최대 2개) 중 틈이 예측 거리 안인 것을 접촉점으로.
+        /// 법선은 상대 → Body. 넓은 상자 위의 좁은 상자도 두 점으로 받친다(CP15의 꼭짓점 방식은 한 점만 남아 쌓기에 맞지 않았다).
+        /// </summary>
+        static void Collide(int body, in PropBody b, Vec2 half, int other, int key, in PropBody o, Vec2 otherHalf, float speculative, float restitution, PropScratch scratch)
+        {
+            MaxSeparation(o, otherHalf, b, half, out int faceO, out float sepO);
+            if (sepO > speculative)
+                return;
+            MaxSeparation(b, half, o, otherHalf, out int faceB, out float sepB);
+            if (sepB > speculative)
+                return;
+            if (sepB > sepO + ReferenceTolerance)
+                Clip(body, other, key, b, half, faceB, o, otherHalf, true, speculative, restitution, scratch);
+            else
+                Clip(body, other, key, o, otherHalf, faceO, b, half, false, speculative, restitution, scratch);
+        }
+
+        static void Clip(int body, int other, int key, in PropBody r, Vec2 halfR, int face, in PropBody inc, Vec2 halfI, bool bodyIsReference,
+            float speculative, float restitution, PropScratch scratch)
+        {
+            var n = FaceNormal(r, face);
+            var t = new Vec2(-n.Y, n.X);
+            float reach = (face & 1) == 0 ? halfR.X : halfR.Y;
+            float span = (face & 1) == 0 ? halfR.Y : halfR.X;
+            var center = r.Position + n * reach;
+            // 다른 상자에서 기준 면과 가장 마주 보는 면.
+            int incident = 0;
+            float facing = float.MaxValue;
+            for (int g = 0; g < 4; g++)
+            {
+                float d = Vec2.Dot(FaceNormal(inc, g), n);
+                if (d < facing - 1e-6f)
+                {
+                    facing = d;
+                    incident = g;
+                }
+            }
+            var ni = FaceNormal(inc, incident);
+            var ti = new Vec2(-ni.Y, ni.X);
+            float incReach = (incident & 1) == 0 ? halfI.X : halfI.Y;
+            float incSpan = (incident & 1) == 0 ? halfI.Y : halfI.X;
+            var mid = inc.Position + ni * incReach;
+            var v1 = mid - ti * incSpan;
+            var v2 = mid + ti * incSpan;
+            float s1 = Vec2.Dot(v1 - center, t), s2 = Vec2.Dot(v2 - center, t);
+            int e1 = 0, e2 = 1;
+            if (s1 > s2)
+            {
+                (v1, v2) = (v2, v1);
+                (s1, s2) = (s2, s1);
+                e1 = 1;
+                e2 = 0;
+            }
+            // 법선은 상대 → Body. 기준 면이 Body 쪽이면 반대.
+            var normal = bodyIsReference ? -n : n;
+            int feature = (bodyIsReference ? 32 : 0) | (face << 3) | (incident << 1);
+            if (s2 < -span || s1 > span)
+            {
+                // 면끼리 겹치는 구간이 없음(꼭짓점끼리 스침): 기준 면에 가까운 끝 하나만.
+                var v = s2 < -span ? v2 : v1;
+                int e = s2 < -span ? e2 : e1;
+                AddClipped(scratch, body, other, key, feature | e, n, normal, center, v, speculative, restitution);
+                return;
+            }
+            var p1 = s1 < -span ? v1 + (v2 - v1) * ((-span - s1) / (s2 - s1)) : v1;
+            var p2 = s2 > span ? v1 + (v2 - v1) * ((span - s1) / (s2 - s1)) : v2;
+            AddClipped(scratch, body, other, key, feature | e1, n, normal, center, p1, speculative, restitution);
+            AddClipped(scratch, body, other, key, feature | e2, n, normal, center, p2, speculative, restitution);
+        }
+
+        /// <summary>틈이 예측 거리 안이면 두 면의 가운데에 접촉점을 둔다.</summary>
+        static void AddClipped(PropScratch scratch, int body, int other, int key, int feature, Vec2 n, Vec2 normal, Vec2 center, Vec2 p,
+            float speculative, float restitution)
+        {
+            float separation = Vec2.Dot(p - center, n);
+            if (separation > speculative)
+                return;
+            Add(scratch, body, other, key * 64 + feature + 1, normal, p - n * (0.5f * separation), separation, restitution);
+        }
+
+        static void CollideBoundary(int body, in PropBody b, Vec2 half, ArenaDef arena, float speculative, float restitution, PropScratch scratch)
         {
             float bx = arena.BoundaryHalfWidth, by = arena.BoundaryHalfHeight;
             for (int k = 0; k < 4; k++)
             {
                 Corner(b, half, k, out var corner);
-                if (corner.X > bx)
-                    Add(scratch, body, -1, new Vec2(-1f, 0f), corner, corner.X - bx, restitution);
-                else if (corner.X < -bx)
-                    Add(scratch, body, -1, new Vec2(1f, 0f), corner, -bx - corner.X, restitution);
-                if (corner.Y > by)
-                    Add(scratch, body, -1, new Vec2(0f, -1f), corner, corner.Y - by, restitution);
-                else if (corner.Y < -by)
-                    Add(scratch, body, -1, new Vec2(0f, 1f), corner, -by - corner.Y, restitution);
+                if (corner.X > bx - speculative)
+                    Add(scratch, body, -1, (BoundaryKey + 0) * 64 + k + 1, new Vec2(-1f, 0f), corner, bx - corner.X, restitution);
+                else if (corner.X < -bx + speculative)
+                    Add(scratch, body, -1, (BoundaryKey + 1) * 64 + k + 1, new Vec2(1f, 0f), corner, corner.X + bx, restitution);
+                if (corner.Y > by - speculative)
+                    Add(scratch, body, -1, (BoundaryKey + 2) * 64 + k + 1, new Vec2(0f, -1f), corner, by - corner.Y, restitution);
+                else if (corner.Y < -by + speculative)
+                    Add(scratch, body, -1, (BoundaryKey + 3) * 64 + k + 1, new Vec2(0f, 1f), corner, corner.Y + by, restitution);
             }
         }
 
-        static void SolveContacts(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch)
+        /// <summary>접점의 몸 좌표, 고정 팔, 유효 질량, 마찰·반발, 찾을 때의 상대 속도.</summary>
+        static void PrepareContacts(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch)
         {
             for (int k = 0; k < scratch.ContactCount; k++)
             {
                 ref var contact = ref scratch.Contacts[k];
-                ref var b = ref PropState.Get(ref props, contact.Body);
-                InverseMass(arena, c, contact.Body, out float invM, out float invI);
+                ref readonly var b = ref PropState.At(in props, contact.Body);
+                float invM = scratch.InvMass[contact.Body], invI = scratch.InvInertia[contact.Body];
                 float invMO = 0f, invIO = 0f;
-                var rO = Vec2.Zero;
-                bool two = contact.Other >= 0;
-                if (two)
+                contact.RBody = contact.Point - b.Position;
+                contact.LocalBody = PropBody.InverseRotate(b.Rotation, contact.RBody);
+                bool box = IsBox(arena, contact.Body);
+                if (contact.Other >= 0)
                 {
-                    InverseMass(arena, c, contact.Other, out invMO, out invIO);
-                    rO = contact.Point - PropState.At(in props, contact.Other).Position;
+                    ref readonly var o = ref PropState.At(in props, contact.Other);
+                    invMO = scratch.InvMass[contact.Other];
+                    invIO = scratch.InvInertia[contact.Other];
+                    contact.ROther = contact.Point - o.Position;
+                    contact.LocalOther = PropBody.InverseRotate(o.Rotation, contact.ROther);
+                    box |= IsBox(arena, contact.Other);
                 }
-                var r = contact.Point - b.Position;
+                else
+                {
+                    contact.ROther = Vec2.Zero;
+                    contact.LocalOther = Vec2.Zero;
+                }
                 var n = contact.Normal;
-                float rn = PropBody.Cross(r, n), ron = PropBody.Cross(rO, n);
-                float kn = invM + invI * rn * rn + invMO + invIO * ron * ron;
-                float vn = Vec2.Dot(n, RelativeVelocity(props, contact));
-                float lambda = (contact.TargetSpeed - vn) / kn;
-                float total = SimMath.Max(contact.NormalImpulse + lambda, 0f);
-                lambda = total - contact.NormalImpulse;
-                contact.NormalImpulse = total;
-                Apply(ref props, contact, n * lambda, invM, invI, invMO, invIO, r, rO);
-
                 var t = new Vec2(-n.Y, n.X);
-                float rt = PropBody.Cross(r, t), rot = PropBody.Cross(rO, t);
+                float rn = PropBody.Cross(contact.RBody, n), ron = PropBody.Cross(contact.ROther, n);
+                float rt = PropBody.Cross(contact.RBody, t), rot = PropBody.Cross(contact.ROther, t);
+                float kn = invM + invI * rn * rn + invMO + invIO * ron * ron;
                 float kt = invM + invI * rt * rt + invMO + invIO * rot * rot;
-                float vt = Vec2.Dot(t, RelativeVelocity(props, contact));
-                float friction = c.Friction * contact.NormalImpulse;
-                float lambdaT = -vt / kt;
-                float totalT = SimMath.Clamp(contact.TangentImpulse + lambdaT, -friction, friction);
-                lambdaT = totalT - contact.TangentImpulse;
-                contact.TangentImpulse = totalT;
-                Apply(ref props, contact, t * lambdaT, invM, invI, invMO, invIO, r, rO);
+                contact.NormalMass = kn > 0f ? 1f / kn : 0f;
+                contact.TangentMass = kt > 0f ? 1f / kt : 0f;
+                contact.Friction = box ? c.BoxFriction : c.Friction;
+                if (contact.Restitution < 0f)
+                    contact.Restitution = box ? c.BoxRestitution : c.Restitution;
+                contact.Approach = Vec2.Dot(n, RelativeVelocity(scratch, contact));
             }
+        }
+
+        /// <summary>깨어 있는 몸의 위치·회전·속도를 풀이 배열로.</summary>
+        static void LoadBodies(in PropState props, PropScratch scratch)
+        {
+            for (int k = 0; k < scratch.AwakeCount; k++)
+            {
+                int i = scratch.AwakeList[k];
+                ref readonly var b = ref PropState.At(in props, i);
+                scratch.P[i] = b.Position;
+                scratch.Q[i] = b.Rotation;
+                scratch.V[i] = b.Velocity;
+                scratch.W[i] = b.AngularVelocity;
+            }
+        }
+
+        /// <summary>풀이 배열의 속도를 깨어 있는 몸에 되돌린다.</summary>
+        static void StoreBodies(ref PropState props, PropScratch scratch)
+        {
+            for (int k = 0; k < scratch.AwakeCount; k++)
+            {
+                int i = scratch.AwakeList[k];
+                ref var b = ref PropState.Get(ref props, i);
+                b.Velocity = scratch.V[i];
+                b.AngularVelocity = scratch.W[i];
+            }
+        }
+
+        static void WarmStart(ref PropState props, PropScratch scratch)
+        {
+            LoadBodies(in props, scratch);
+            for (int k = 0; k < scratch.ContactCount; k++)
+            {
+                ref readonly var contact = ref scratch.Contacts[k];
+                var n = contact.Normal;
+                var t = new Vec2(-n.Y, n.X);
+                Apply(scratch, contact, n * contact.NormalImpulse + t * contact.TangentImpulse);
+            }
+            StoreBodies(ref props, scratch);
         }
 
         /// <summary>
-        /// 강체끼리 접촉의 반발: 실제로 막힌(충격량 &gt; 0) 접촉 중 빠르게 다가오던 것만, 다가오던 속도 × 반발 계수로 되튕긴다
-        /// (Box2D v3의 반발 단계와 같은 생각).
+        /// 법선(부드러운 제약 또는 예측 접촉)과 마찰을 한 번 푼다. useBias가 false면 겹침을 밀어내지 않고 단단한 제약으로(이완 단계).
+        /// 틈은 찾을 때의 틈 + 두 접점이 법선 방향으로 움직인 양.
         /// </summary>
-        static void ApplySpeculativeRestitution(ref PropState props, ArenaDef arena, in PropParams c, PropScratch scratch)
+        static void SolveContacts(ref PropState props, in PropParams c, PropScratch scratch, in Softness soft, float h, bool useBias)
         {
+            float invH = 1f / h;
+            LoadBodies(in props, scratch);
+            var P = scratch.P;
+            var Q = scratch.Q;
+            var V = scratch.V;
+            var W = scratch.W;
+            var invMass = scratch.InvMass;
+            var invInertia = scratch.InvInertia;
+            // 가장 많이 도는 반복이라 Vec2 연산을 스칼라로 풀어 썼다(수식은 위 설명과 같다).
             for (int k = 0; k < scratch.ContactCount; k++)
             {
                 ref var contact = ref scratch.Contacts[k];
-                if (!contact.Speculative || contact.Approach > -1f || contact.NormalImpulse <= 0f || contact.Restitution <= 0f)
-                    continue;
-                InverseMass(arena, c, contact.Body, out float invM, out float invI);
-                InverseMass(arena, c, contact.Other, out float invMO, out float invIO);
-                var r = contact.Point - PropState.At(in props, contact.Body).Position;
-                var rO = contact.Point - PropState.At(in props, contact.Other).Position;
-                var n = contact.Normal;
-                float rn = PropBody.Cross(r, n), ron = PropBody.Cross(rO, n);
-                float kn = invM + invI * rn * rn + invMO + invIO * ron * ron;
-                float vn = Vec2.Dot(n, RelativeVelocity(props, contact));
-                float lambda = (-contact.Restitution * contact.Approach - vn) / kn;
-                float total = SimMath.Max(contact.NormalImpulse + lambda, 0f);
-                lambda = total - contact.NormalImpulse;
+                int i = contact.Body, j = contact.Other;
+                float nx = contact.Normal.X, ny = contact.Normal.Y;
+                float rbx = contact.RBody.X, rby = contact.RBody.Y;
+                float rox = contact.ROther.X, roy = contact.ROther.Y;
+                float qx = Q[i].X, qy = Q[i].Y, lx = contact.LocalBody.X, ly = contact.LocalBody.Y;
+                float pbx = P[i].X + qx * lx - qy * ly, pby = P[i].Y + qy * lx + qx * ly;
+                float pox = contact.Point.X, poy = contact.Point.Y;
+                float vox = 0f, voy = 0f, wo = 0f, imo = 0f, iio = 0f;
+                if (j >= 0)
+                {
+                    float ox = Q[j].X, oy = Q[j].Y, mx = contact.LocalOther.X, my = contact.LocalOther.Y;
+                    pox = P[j].X + ox * mx - oy * my;
+                    poy = P[j].Y + oy * mx + ox * my;
+                    vox = V[j].X;
+                    voy = V[j].Y;
+                    wo = W[j];
+                    imo = invMass[j];
+                    iio = invInertia[j];
+                }
+                float im = invMass[i], ii = invInertia[i];
+                float separation = (pbx - pox) * nx + (pby - poy) * ny + contact.Separation;
+                float bias = 0f, massScale = 1f, impulseScale = 0f;
+                if (separation > 0f)
+                {
+                    bias = separation * invH;
+                }
+                else if (useBias)
+                {
+                    bias = SimMath.Max(soft.BiasRate * SimMath.Min(0f, separation + c.Slop), -c.ContactPushMaxSpeed);
+                    massScale = soft.MassScale;
+                    impulseScale = soft.ImpulseScale;
+                }
+                float vbx = V[i].X, vby = V[i].Y, wb = W[i];
+                float dvx = vbx - wb * rby - (vox - wo * roy);
+                float dvy = vby + wb * rbx - (voy + wo * rox);
+                float vn = dvx * nx + dvy * ny;
+                float impulse = -contact.NormalMass * massScale * (vn + bias) - impulseScale * contact.NormalImpulse;
+                float total = SimMath.Max(contact.NormalImpulse + impulse, 0f);
+                impulse = total - contact.NormalImpulse;
                 contact.NormalImpulse = total;
-                Apply(ref props, contact, n * lambda, invM, invI, invMO, invIO, r, rO);
+                contact.MaxNormalImpulse = SimMath.Max(contact.MaxNormalImpulse, impulse);
+                float px = nx * impulse, py = ny * impulse;
+                vbx += px * im;
+                vby += py * im;
+                wb += ii * (rbx * py - rby * px);
+                vox -= px * imo;
+                voy -= py * imo;
+                wo -= iio * (rox * py - roy * px);
+
+                // 마찰: 접선 t = (−ny, nx).
+                float tx = -ny, ty = nx;
+                dvx = vbx - wb * rby - (vox - wo * roy);
+                dvy = vby + wb * rbx - (voy + wo * rox);
+                float vt = dvx * tx + dvy * ty;
+                float limit = contact.Friction * contact.NormalImpulse;
+                float totalT = SimMath.Clamp(contact.TangentImpulse - contact.TangentMass * vt, -limit, limit);
+                float impulseT = totalT - contact.TangentImpulse;
+                contact.TangentImpulse = totalT;
+                px = tx * impulseT;
+                py = ty * impulseT;
+                V[i] = new Vec2(vbx + px * im, vby + py * im);
+                W[i] = wb + ii * (rbx * py - rby * px);
+                if (j >= 0)
+                {
+                    V[j] = new Vec2(vox - px * imo, voy - py * imo);
+                    W[j] = wo - iio * (rox * py - roy * px);
+                }
+            }
+            StoreBodies(ref props, scratch);
+        }
+
+        /// <summary>
+        /// 반발: 실제로 막힌(충격량 &gt; 0) 접촉 중 기준보다 빠르게 다가오던 것만, 다가오던 속도 × 반발 계수로 되튕긴다
+        /// (Box2D v3 b2ApplyRestitution과 같은 생각. CP15에서는 강체끼리만, CP16부터 지형·경계 접촉도).
+        /// </summary>
+        static void ApplyRestitution(ref PropState props, in PropParams c, PropScratch scratch)
+        {
+            LoadBodies(in props, scratch);
+            for (int k = 0; k < scratch.ContactCount; k++)
+            {
+                ref var contact = ref scratch.Contacts[k];
+                if (contact.Restitution <= 0f || contact.Approach > -c.RestitutionThreshold || contact.MaxNormalImpulse <= 0f)
+                    continue;
+                var n = contact.Normal;
+                float vn = Vec2.Dot(n, RelativeVelocity(scratch, contact));
+                float impulse = -contact.NormalMass * (vn + contact.Restitution * contact.Approach);
+                float total = SimMath.Max(contact.NormalImpulse + impulse, 0f);
+                impulse = total - contact.NormalImpulse;
+                contact.NormalImpulse = total;
+                contact.MaxNormalImpulse = SimMath.Max(contact.MaxNormalImpulse, impulse);
+                Apply(scratch, contact, n * impulse);
+            }
+            StoreBodies(ref props, scratch);
+        }
+
+        /// <summary>
+        /// 이번 틱의 충격량을 다음 틱 웜 스타트용으로 몸 상태에 저장한다(접촉의 Body 쪽). 이번 틱에 접촉을 가진 몸과 깨어 있는 몸은 칸을 새로 채우고,
+        /// 접촉 없이 잠든 몸은 지난 값을 그대로 둔다(깨어나면 이어 쓴다).
+        /// </summary>
+        static void StoreImpulses(ref PropState props, in PropParams c, PropScratch scratch)
+        {
+            for (int i = 0; i < props.Count; i++)
+                scratch.Rebuilt[i] = false;
+            for (int k = 0; k < scratch.ContactCount; k++)
+            {
+                ref readonly var contact = ref scratch.Contacts[k];
+                ref var b = ref PropState.Get(ref props, contact.Body);
+                if (!scratch.Rebuilt[contact.Body])
+                {
+                    b.Warm = default;
+                    scratch.Rebuilt[contact.Body] = true;
+                }
+                if (contact.NormalImpulse != 0f || contact.TangentImpulse != 0f)
+                    PropWarm.Add(ref b.Warm, contact.Id, contact.NormalImpulse, contact.TangentImpulse);
+            }
+            for (int i = 0; i < props.Count; i++)
+            {
+                ref var b = ref PropState.Get(ref props, i);
+                if (!scratch.Rebuilt[i] && !Asleep(b, c))
+                    b.Warm = default;
             }
         }
 
-        static Vec2 RelativeVelocity(in PropState props, in PropContact contact)
+        /// <summary>찾을 때의 팔로 잰 접점 상대 속도(Body − 상대, 풀이 배열에서).</summary>
+        static Vec2 RelativeVelocity(PropScratch scratch, in PropContact contact)
         {
-            var v = PropState.At(in props, contact.Body).PointVelocity(contact.Point);
+            var v = scratch.V[contact.Body] + PropBody.Cross(scratch.W[contact.Body], contact.RBody);
             if (contact.Other >= 0)
-                v -= PropState.At(in props, contact.Other).PointVelocity(contact.Point);
+                v -= scratch.V[contact.Other] + PropBody.Cross(scratch.W[contact.Other], contact.ROther);
             return v;
         }
 
-        static void Apply(ref PropState props, in PropContact contact, Vec2 impulse, float invM, float invI, float invMO, float invIO, Vec2 r, Vec2 rO)
+        /// <summary>충격량을 Body에 +, 상대에 −로(잠든 몸과 지형은 역질량 0이라 움직이지 않는다).</summary>
+        static void Apply(PropScratch scratch, in PropContact contact, Vec2 impulse)
         {
-            ref var b = ref PropState.Get(ref props, contact.Body);
-            b.Velocity += impulse * invM;
-            b.AngularVelocity += invI * PropBody.Cross(r, impulse);
-            if (contact.Other < 0)
+            int i = contact.Body;
+            scratch.V[i] += impulse * scratch.InvMass[i];
+            scratch.W[i] += scratch.InvInertia[i] * PropBody.Cross(contact.RBody, impulse);
+            int j = contact.Other;
+            if (j < 0)
                 return;
-            ref var o = ref PropState.Get(ref props, contact.Other);
-            o.Velocity -= impulse * invMO;
-            o.AngularVelocity -= invIO * PropBody.Cross(rO, impulse);
+            scratch.V[j] -= impulse * scratch.InvMass[j];
+            scratch.W[j] -= scratch.InvInertia[j] * PropBody.Cross(contact.ROther, impulse);
         }
     }
 }

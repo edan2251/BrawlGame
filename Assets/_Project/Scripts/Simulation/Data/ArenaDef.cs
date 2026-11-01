@@ -123,7 +123,10 @@ namespace Knockbox.Simulation
         /// 같은 맵에 구조물을 더한 새 맵. 지금 구현된 물리 단계(PropPhysics.ImplementedStage) 이하의 종류는 강체가 되고,
         /// 나머지는 그 단계가 올 때까지 움직이지 않는 임시 물체 상자(TerrainKind.Prop)로 지형 뒤에 붙는다(D-030).
         /// </summary>
-        public ArenaDef WithProps(PropDef[] newProps)
+        public ArenaDef WithProps(PropDef[] newProps) => WithProps(newProps, PropPhysics.ImplementedStage);
+
+        /// <summary>maxStage 이하의 종류를 강체로(물리 단계를 맵보다 먼저 시험하는 테스트 장면용).</summary>
+        public ArenaDef WithProps(PropDef[] newProps, int maxStage)
         {
             int terrain = PropBoxStart;
             var all = new System.Collections.Generic.List<ArenaBox>(terrain + newProps.Length);
@@ -135,7 +138,7 @@ namespace Knockbox.Simulation
             for (int i = 0; i < newProps.Length; i++)
             {
                 ref readonly var p = ref newProps[i];
-                if (PropDef.Stage(p.Kind) <= PropPhysics.ImplementedStage)
+                if (PropDef.Stage(p.Kind) <= maxStage)
                 {
                     bodyOf[i] = dynamics.Count;
                     dynamics.Add(i);
