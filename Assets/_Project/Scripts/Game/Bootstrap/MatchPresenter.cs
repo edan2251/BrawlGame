@@ -27,6 +27,7 @@ namespace Knockbox.Game
         PostFx postFx;
         ArenaView arenaView;
         PropView propView;
+        PropShadowView propShadows;
         BoundaryView boundaryView;
         FighterView fighter0;
         FighterView fighter1;
@@ -106,6 +107,8 @@ namespace Knockbox.Game
             background = Create<BackgroundView>("Background");
             arenaView = Create<ArenaView>("Arena");
             propView = Create<PropView>("Props");
+            propShadows = Create<PropShadowView>("PropShadows");
+            propShadows.Setup(palette, ShapeLibrary.ActiveMaterial);
             fighter0 = CreateFighter(0);
             fighter1 = CreateFighter(1);
             dust = Create<DustPool>("Dust");
@@ -204,6 +207,7 @@ namespace Knockbox.Game
             background.ResetMotes();
             arenaView.Build(arena, CurrentTheme, palette, shapes);
             propView.Build(arena, CurrentTheme, shapes);
+            propShadows.SetArena(arena, LightPosition(arena));
             boundaryView.SetArena(arena);
             koShatter.BuildArena(arena);
             if (cameraRig != null)
@@ -298,6 +302,8 @@ namespace Knockbox.Game
                 shattered[0] = shattered[1] = false;
                 alpha = 1f;
             }
+            propView.Render(previous.Props, current.Props, alpha);
+            propShadows.Render(propView, current.Props);
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
             UpdateKnockout(current, world.Config);
@@ -516,6 +522,26 @@ namespace Knockbox.Game
                     sfxPlayer.Play(damage >= 15f ? Sfx.HitStrong : Sfx.HitWeak);
                     break;
                 }
+                case SimEventType.PropHit:
+                {
+                    // 구조물에 맞음(CP14): 명중과 같은 크기의 연출, 파편은 hit 빨강과 구조물 색.
+                    float damage = e.Strength;
+                    int shards = Mathf.Clamp(6 + Mathf.RoundToInt(damage / 4f), 6, 10);
+                    fx.Shards(onBody, V(e.Direction), 75f, shards - shards / 3, palette.hit, 8f + damage * 0.35f, 0.24f);
+                    fx.Shards(onBody, V(e.Direction), 60f, shards / 3, CurrentTheme.prop, 8f + damage * 0.35f, 0.24f);
+                    fx.RingBurst(onBody, palette.flash, 0.3f, 1.5f + damage * 0.04f);
+                    fx.Glow(onBody, palette.flash, 2.2f + damage * 0.06f, 0.45f, 0.2f);
+                    AddTrauma(0.2f + damage * 0.016f);
+                    sfxPlayer.Play(damage >= 15f ? Sfx.HitStrong : Sfx.HitWeak);
+                    break;
+                }
+                case SimEventType.PropStrike:
+                    // 돌진이 구조물을 침: 먼지, 작은 고리, 둔탁한 소리, 위력 비례 흔들림.
+                    dust.Burst(V(e.Position), 3, 1.6f, 0f);
+                    fx.RingBurst(V(e.Position), palette.energySoft, 0.22f, 0.9f + e.Strength * 0.02f, 0.16f);
+                    AddTrauma(0.06f + e.Strength * 0.006f);
+                    sfxPlayer.Play(Sfx.WallSplat, 0.5f);
+                    break;
                 case SimEventType.GuardHit:
                     fx.RingBurst(onBody, palette.uiSub, 0.25f, 0.9f, 0.15f);
                     fx.Shards(onBody, V(e.Direction), 60f, 3, palette.uiSub, 6f, 0.14f, 0.3f);

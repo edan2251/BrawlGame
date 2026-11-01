@@ -10,6 +10,6 @@
     {"kind": "hanging", "pos": [-11.0, 6.0], "size": [1.6, 1.6], "anchor": [-11.0, 10], "mirror": true},
     {"kind": "box", "pos": [0, -6.3], "size": [1.6, 1.4]},
     {"kind": "box", "pos": [-14.0, 2.6], "size": [1.2, 1.2], "mirror": true},
-    {"kind": "box", "pos": [-12.8, -4.3], "size": [1.4, 1.4], "mirror": true}
+    {"kind": "box", "pos": [-13.2, -4.3], "size": [1.4, 1.4], "mirror": true}
   ]
 }

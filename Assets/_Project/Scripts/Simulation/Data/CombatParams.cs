@@ -498,6 +498,8 @@ namespace Knockbox.Simulation
         public ChargeModeParams Charge;
         public SwingModeParams Swing;
         public GrabParams Grab;
+        /// <summary>구조물 물리와 캐릭터 상호작용(09-props-physics.md, CP14).</summary>
+        public PropParams Props;
 
         public static CombatParams Default => new CombatParams
         {
@@ -561,6 +563,7 @@ namespace Knockbox.Simulation
             Charge = ChargeModeParams.Default,
             Swing = SwingModeParams.Default,
             Grab = GrabParams.Default,
+            Props = PropParams.Default,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -623,6 +626,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Grab));
             Grab.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Props));
+            Props.Visit(ref v);
             v.End();
         }
     }

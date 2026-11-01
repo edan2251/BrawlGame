@@ -40,6 +40,10 @@ namespace Knockbox.Simulation
         Spike,
         /// <summary>경계 튕김(CR-002). Position은 닿은 점, Direction은 경계 안쪽 법선, Strength는 데미지(면역 중 0).</summary>
         BoundaryHit,
+        /// <summary>구조물에 맞음(CP14). Fighter는 맞은 쪽, Direction은 넉백 방향, Strength는 데미지.</summary>
+        PropHit,
+        /// <summary>돌진이 구조물을 침(CP14). Fighter는 친 쪽, Direction은 구조물 쪽, Strength는 위력.</summary>
+        PropStrike,
     }
 
     /// <summary>

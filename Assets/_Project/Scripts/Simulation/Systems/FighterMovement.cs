@@ -344,6 +344,8 @@ namespace Knockbox.Simulation
             if (!bounced && f.Velocity.Y <= 0f)
             {
                 ground = TerrainCollision.ProbeGround(f.Position, half, arena, m.GroundProbeDistance, f.DropThroughBox);
+                if (ground == FighterState.NoBox && f.OnProp > 0)
+                    ground = FighterState.OnPropBox;
                 if (ground == FighterState.NoBox && StandsOn(f.Position, other.Position, config))
                     ground = FighterState.OnFighter;
             }

@@ -81,12 +81,37 @@ namespace Knockbox.Tests.EditMode
             public float CenterY => (MinY + MaxY) * 0.5f;
         }
 
+        /// <summary>물체 하나: 고정 지형 상자(묶음 -1) 또는 구조물(처음 놓인 모양, 묶음 번호). CP14부터 일부 구조물은 상자가 아니라 강체다.</summary>
+        struct Item
+        {
+            public float MinX, MinY, MaxX, MaxY;
+            public int Group;
+            public bool Prop;
+        }
+
+        static List<Item> Items(ArenaDef arena)
+        {
+            var items = new List<Item>();
+            for (int i = 0; i < arena.PropBoxStart; i++)
+            {
+                var b = arena.GetBox(i);
+                items.Add(new Item { MinX = b.MinX, MinY = b.MinY, MaxX = b.MaxX, MaxY = b.MaxY, Group = -1 });
+            }
+            for (int i = 0; i < arena.PropCount; i++)
+            {
+                var p = arena.GetProp(i);
+                items.Add(new Item { MinX = p.MinX, MinY = p.MinY, MaxX = p.MaxX, MaxY = p.MaxY, Group = p.Group, Prop = true });
+            }
+            return items;
+        }
+
         /// <summary>
         /// 묶음: 닿거나 겹친 물체(고정 지형 상자, 구조물)와 같은 묶음 번호의 구조물(기둥, 연결 구조)을 하나로 센다. 줄은 잇지 않는다.
         /// </summary>
         static List<Cluster> Clusters(ArenaDef arena)
         {
-            int n = arena.BoxCount;
+            var items = Items(arena);
+            int n = items.Count;
             var parent = new int[n];
             for (int i = 0; i < n; i++)
                 parent[i] = i;
@@ -96,14 +121,13 @@ namespace Knockbox.Tests.EditMode
                     i = parent[i] = parent[parent[i]];
                 return i;
             }
-            int start = arena.PropBoxStart;
             for (int i = 0; i < n; i++)
             {
-                var a = arena.GetBox(i);
+                var a = items[i];
                 for (int j = i + 1; j < n; j++)
                 {
-                    var b = arena.GetBox(j);
-                    bool sameGroup = i >= start && j >= start && arena.GetProp(i - start).Group == arena.GetProp(j - start).Group;
+                    var b = items[j];
+                    bool sameGroup = a.Prop && b.Prop && a.Group == b.Group;
                     bool touch = a.MinX <= b.MaxX + 1e-3f && b.MinX <= a.MaxX + 1e-3f && a.MinY <= b.MaxY + 1e-3f && b.MinY <= a.MaxY + 1e-3f;
                     if (sameGroup || touch)
                         parent[Find(i)] = Find(j);
@@ -112,7 +136,7 @@ namespace Knockbox.Tests.EditMode
             var map = new Dictionary<int, Cluster>();
             for (int i = 0; i < n; i++)
             {
-                var b = arena.GetBox(i);
+                var b = items[i];
                 int root = Find(i);
                 float area = (b.MaxX - b.MinX) * (b.MaxY - b.MinY);
                 if (map.TryGetValue(root, out var c))
@@ -122,11 +146,11 @@ namespace Knockbox.Tests.EditMode
                     c.MaxX = System.Math.Max(c.MaxX, b.MaxX);
                     c.MaxY = System.Math.Max(c.MaxY, b.MaxY);
                     c.Area += area;
-                    c.HasProp |= i >= start;
+                    c.HasProp |= b.Prop;
                 }
                 else
                 {
-                    c = new Cluster { MinX = b.MinX, MinY = b.MinY, MaxX = b.MaxX, MaxY = b.MaxY, Area = area, HasProp = i >= start };
+                    c = new Cluster { MinX = b.MinX, MinY = b.MinY, MaxX = b.MaxX, MaxY = b.MaxY, Area = area, HasProp = b.Prop };
                 }
                 map[root] = c;
             }
@@ -143,16 +167,17 @@ namespace Knockbox.Tests.EditMode
             var arena = ArenaFiles.LoadByName(name);
             float area = 4f * arena.BoundaryHalfWidth * arena.BoundaryHalfHeight;
             float terrain = 0f, props = 0f, spikeWidth = 0f;
-            for (int i = 0; i < arena.BoxCount; i++)
+            for (int i = 0; i < arena.PropBoxStart; i++)
             {
                 var b = arena.GetBox(i);
-                float a = (b.MaxX - b.MinX) * (b.MaxY - b.MinY);
-                if (i < arena.PropBoxStart)
-                    terrain += a;
-                else
-                    props += a;
+                terrain += (b.MaxX - b.MinX) * (b.MaxY - b.MinY);
                 if (b.Kind == TerrainKind.Spike)
                     spikeWidth += b.MaxX - b.MinX;
+            }
+            for (int i = 0; i < arena.PropCount; i++)
+            {
+                var p = arena.GetProp(i);
+                props += 4f * p.HalfSize.X * p.HalfSize.Y;
             }
             var clusters = Clusters(arena);
             var bands = new int[6];
@@ -328,7 +353,7 @@ namespace Knockbox.Tests.EditMode
             var f = world.State.Fighter0;
             Assert.IsTrue(f.Grounded, "기둥 꼭대기 상자 위에 선다");
             Assert.AreEqual(box.MaxY + config.HalfBody, f.Position.Y, 1e-3f);
-            Assert.AreEqual(arena.PropBoxStart + pillarTop, f.GroundBox);
+            Assert.AreEqual(pillarTop, arena.PropOfBox(f.GroundBox), "임시 물체 상자(3단계 종류는 아직 강체가 아님)");
         }
 
         // CP12-2 (맵 교체, CP13에서 그대로 유지) ------------------------------------------
@@ -440,8 +465,8 @@ namespace Knockbox.Tests.EditMode
         {
             var config = Config();
             var arena = ArenaFiles.LoadByName(name);
-            int rounds = 0, fightingTicks = 0, outOfBounds = 0, wallSplats = 0, boundaryHits = 0;
-            double total = 0, boundary = 0, spike = 0, other = 0;
+            int rounds = 0, fightingTicks = 0, outOfBounds = 0, wallSplats = 0, boundaryHits = 0, propHits = 0;
+            double total = 0, boundary = 0, spike = 0, other = 0, prop = 0;
             for (uint seed = 1; seed <= 6; seed++)
             {
                 var world = TestWorlds.Create(MatchPhase.Countdown, seed, config, arena);
@@ -457,6 +482,7 @@ namespace Knockbox.Tests.EditMode
                     var known = new float[2];
                     var spiked = new float[2];
                     var bounded = new float[2];
+                    var propped = new float[2];
                     for (int i = 0; i < world.Events.Count; i++)
                     {
                         var e = world.Events[i];
@@ -473,6 +499,10 @@ namespace Knockbox.Tests.EditMode
                             case SimEventType.BoundaryHit:
                                 bounded[f] += e.Strength;
                                 boundaryHits++;
+                                break;
+                            case SimEventType.PropHit:
+                                propped[f] += e.Strength;
+                                propHits++;
                                 break;
                             case SimEventType.WallSplat:
                                 wallSplats++;
@@ -498,6 +528,9 @@ namespace Knockbox.Tests.EditMode
                         double s = System.Math.Min(rest, spiked[f]);
                         spike += s;
                         rest -= s;
+                        double pr = System.Math.Min(rest, propped[f]);
+                        prop += pr;
+                        rest -= pr;
                         rest -= System.Math.Min(rest, known[f]);
                         other += rest;
                     }
@@ -506,7 +539,7 @@ namespace Knockbox.Tests.EditMode
             float average = rounds > 0 ? fightingTicks / 60f / rounds : float.PositiveInfinity;
             double boundaryShare = total > 0 ? boundary / total : 0, spikeShare = total > 0 ? spike / total : 0;
             string report = $"[Knockbox][CP13-3] {name}: 라운드 {rounds}, 평균 {average:F1}초, 경계 튕김 데미지 {boundaryShare:P0}({boundaryHits}회), 가시 {spikeShare:P0}, "
-                            + $"벽꽝 등 지형 {(total > 0 ? other / total : 0):P0}(벽꽝 {wallSplats}), 경기장 이탈 {outOfBounds}";
+                            + $"구조물에 맞음 {(total > 0 ? prop / total : 0):P0}({propHits}회), 벽꽝 등 지형 {(total > 0 ? other / total : 0):P0}(벽꽝 {wallSplats}), 경기장 이탈 {outOfBounds}";
             TestContext.WriteLine(report);
             UnityEngine.Debug.Log(report);
             Assert.AreEqual(0, outOfBounds, "경기장 이탈");

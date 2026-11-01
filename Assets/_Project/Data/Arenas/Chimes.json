@@ -3,7 +3,7 @@
   "light": [0, 25],
   "rotation": true,
   "props": [
-    {"kind": "linked", "parts": [{"pos": [0, 7.0], "size": [1.6, 1.0], "anchor": [0, 10]}, {"pos": [0, 4.2], "size": [3.2, 1.0], "anchorPart": 0}, {"pos": [0, 1.6], "size": [2.2, 0.8], "anchorPart": 1}]},
+    {"kind": "linked", "parts": [{"pos": [0, 7.4], "size": [0.6, 1.0], "anchor": [0, 10]}, {"pos": [0, 4.6], "size": [2.6, 1.0], "anchorPart": 0}, {"pos": [0, 1.6], "size": [4.6, 0.7], "anchorPart": 1}]},
     {"kind": "hanging", "pos": [-5.8, 6.4], "size": [2.2, 1.8], "anchor": [-5.8, 10], "mirror": true},
     {"kind": "hanging", "pos": [-13.0, 5.4], "size": [2.6, 1.4], "anchor": [-13.0, 10], "mirror": true},
     {"kind": "box", "pos": [-12.2, -3.3], "size": [1.4, 1.4], "mirror": true},

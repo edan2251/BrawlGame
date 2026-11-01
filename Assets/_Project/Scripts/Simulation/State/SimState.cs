@@ -15,6 +15,8 @@ namespace Knockbox.Simulation
         public FighterState Fighter0;
         public FighterState Fighter1;
         public MatchState Match;
+        /// <summary>구조물 강체(CP14). 라운드가 시작될 때 맵의 처음 모양으로 놓인다.</summary>
+        public PropState Props;
 
         public readonly uint ComputeChecksum()
         {
@@ -35,6 +37,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Match));
             Match.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Props));
+            Props.Visit(ref v);
             v.End();
         }
 
@@ -78,6 +83,7 @@ namespace Knockbox.Simulation
             state.Match.Round = 1;
             state.Match.RoundWinner = -1;
             state.Match.SetPhase(startPhase);
+            PropPhysics.Init(ref state.Props, arena, config);
             return state;
         }
 
@@ -94,6 +100,7 @@ namespace Knockbox.Simulation
             state.Match.Round++;
             state.Match.RoundWinner = -1;
             state.Match.SetPhase(MatchPhase.Countdown);
+            PropPhysics.Init(ref state.Props, arena, config);
         }
 
         /// <summary>MatchEnd 뒤 새 경기: 점수를 지우고 1라운드 Countdown부터.</summary>

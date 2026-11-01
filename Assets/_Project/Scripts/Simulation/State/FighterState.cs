@@ -48,6 +48,8 @@ namespace Knockbox.Simulation
     {
         public const int NoBox = -1;
         public const int OnFighter = -2;
+        /// <summary>GroundBox: 구조물 강체 위(어느 구조물인지는 OnProp).</summary>
+        public const int OnPropBox = -3;
         public const int TimerCap = 1000;
 
         public Vec2 Position;
@@ -121,6 +123,8 @@ namespace Knockbox.Simulation
         public int SpikeImmunityTicks;
         /// <summary>남은 경계 튕김 면역 틱(CR-002). 면역 동안 경계는 피해 없이 반사 × 0.5.</summary>
         public int BoundaryImmunityTicks;
+        /// <summary>서 있는 구조물 강체: 0 없음, 1 + 몸 번호(CP14). 기본값 0이 "없음"이 되도록 1을 더한다.</summary>
+        public int OnProp;
 
         public const int NoAttack = -1;
 
@@ -197,6 +201,7 @@ namespace Knockbox.Simulation
             v.Value("ThrowDirection.Y", ThrowDirection.Y);
             v.Value(nameof(SpikeImmunityTicks), SpikeImmunityTicks);
             v.Value(nameof(BoundaryImmunityTicks), BoundaryImmunityTicks);
+            v.Value(nameof(OnProp), OnProp);
         }
     }
 }

@@ -8,7 +8,7 @@
     {"kind": "hanging", "pos": [-4.0, 6.8], "size": [1.8, 1.8], "anchor": [-4.0, 10], "mirror": true},
     {"kind": "hanging", "pos": [-11.0, 5.6], "size": [2.2, 1.0], "anchor": [-11.0, 10], "mirror": true},
     {"kind": "hanging", "pos": [-16.0, 7.6], "size": [0.8, 0.8], "anchor": [-16.0, 10], "mirror": true},
-    {"kind": "hinged", "pos": [-13.0, -2.0], "size": [3.2, 0.6], "anchor": [-14.5, -2.0], "mirror": true},
-    {"kind": "box", "pos": [-12.3, -4.2], "size": [1.6, 1.6], "mirror": true}
+    {"kind": "hinged", "pos": [-13.0, -1.6], "size": [3.2, 0.6], "anchor": [-14.5, -1.6], "mirror": true},
+    {"kind": "box", "pos": [-13.2, -4.4], "size": [1.6, 1.2], "mirror": true}
   ]
 }

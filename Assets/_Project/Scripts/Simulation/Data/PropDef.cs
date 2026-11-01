@@ -22,7 +22,27 @@ namespace Knockbox.Simulation
         LooseBox,
     }
 
-    /// <summary>구조물 하나(강체 하나). 각도는 CP13에서 모두 0(축 정렬). 회전 상태는 CP14부터 시뮬레이션 상태에 둔다.</summary>
+    /// <summary>강체 구조물의 연결: 줄(최대 거리) 또는 축(점 고정). CP14 1단계.</summary>
+    public enum PropJointKind : byte
+    {
+        None,
+        Rope,
+        Axis,
+    }
+
+    /// <summary>강체 구조물 하나의 고정 정보(맵에서 정해짐, 상태 아님).</summary>
+    public struct PropJoint
+    {
+        public PropJointKind Kind;
+        /// <summary>줄 고정점 또는 축의 월드 위치.</summary>
+        public Vec2 WorldAnchor;
+        /// <summary>몸 쪽 연결점(몸 좌표). 줄은 윗면 가운데, 축은 축 위치.</summary>
+        public Vec2 LocalAnchor;
+        /// <summary>줄의 최대 길이(처음 놓인 모양에서 잰 길이).</summary>
+        public float Length;
+    }
+
+    /// <summary>구조물 하나(강체 하나). 맵의 처음 각도는 모두 0(축 정렬). 회전 상태는 CP14부터 SimState.Props에 둔다.</summary>
     public struct PropDef
     {
         public const int KindCount = 7;

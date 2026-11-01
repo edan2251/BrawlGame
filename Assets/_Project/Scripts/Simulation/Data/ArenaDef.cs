@@ -51,6 +51,11 @@ namespace Knockbox.Simulation
 
         readonly ArenaBox[] boxes;
         readonly PropDef[] props = new PropDef[0];
+        /// <summary>강체로 움직이는 구조물(지금 구현된 단계 이하)의 번호와 연결. 나머지는 임시 물체 상자.</summary>
+        readonly int[] dynamicProps = new int[0];
+        readonly PropJoint[] joints = new PropJoint[0];
+        /// <summary>PropBoxStart 뒤 상자 k가 어느 구조물의 임시 물체인지.</summary>
+        readonly int[] staticProps = new int[0];
 
         /// <param name="spawnFoot0">P1 시작 칸의 가로 중심과 칸 바닥 높이. 파이터는 이 점 위에 선다.</param>
         public ArenaDef(string name, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1)
@@ -67,13 +72,17 @@ namespace Knockbox.Simulation
         /// 맵 v2(CR-002): 바깥 테두리 칸은 지형이 아니고, 테두리 안쪽 면이 경계 튕김(03-combat.md 3절)의 경계가 된다.
         /// </param>
         public ArenaDef(string name, int columns, int rows, bool hasBoundary, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1)
-            : this(name, columns, rows, hasBoundary, boxes, spawnFoot0, spawnFoot1, new PropDef[0])
+            : this(name, columns, rows, hasBoundary, boxes, spawnFoot0, spawnFoot1, new PropDef[0], new int[0], new int[0], new PropJoint[0])
         {
         }
 
-        ArenaDef(string name, int columns, int rows, bool hasBoundary, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1, PropDef[] props)
+        ArenaDef(string name, int columns, int rows, bool hasBoundary, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1, PropDef[] props,
+            int[] staticProps, int[] dynamicProps, PropJoint[] joints)
         {
             this.props = props;
+            this.staticProps = staticProps;
+            this.dynamicProps = dynamicProps;
+            this.joints = joints;
             Name = name;
             Columns = columns;
             Rows = rows;
@@ -100,23 +109,58 @@ namespace Knockbox.Simulation
         /// <summary>구조물(짝 파일, 09-props-physics.md 5절). 상자 목록의 PropBoxStart부터 같은 순서로 임시 물체 상자가 있다.</summary>
         public int PropCount => props.Length;
         public ref readonly PropDef GetProp(int index) => ref props[index];
-        public int PropBoxStart => boxes.Length - props.Length;
+        public int PropBoxStart => boxes.Length - staticProps.Length;
+
+        /// <summary>임시 물체 상자(PropBoxStart 이후)가 나타내는 구조물 번호.</summary>
+        public int PropOfBox(int boxIndex) => staticProps[boxIndex - PropBoxStart];
+
+        /// <summary>강체 구조물 수와 그 구조물 번호·연결. SimState.Props의 몸 순서와 같다.</summary>
+        public int DynamicPropCount => dynamicProps.Length;
+        public int DynamicProp(int body) => dynamicProps[body];
+        public ref readonly PropJoint GetJoint(int body) => ref joints[body];
 
         /// <summary>
-        /// 같은 맵에 구조물을 더한 새 맵. CP13: 구조물마다 움직이지 않는 임시 물체 상자(TerrainKind.Prop)를 지형 뒤에 붙인다.
+        /// 같은 맵에 구조물을 더한 새 맵. 지금 구현된 물리 단계(PropPhysics.ImplementedStage) 이하의 종류는 강체가 되고,
+        /// 나머지는 그 단계가 올 때까지 움직이지 않는 임시 물체 상자(TerrainKind.Prop)로 지형 뒤에 붙는다(D-030).
         /// </summary>
         public ArenaDef WithProps(PropDef[] newProps)
         {
             int terrain = PropBoxStart;
-            var all = new ArenaBox[terrain + newProps.Length];
+            var all = new System.Collections.Generic.List<ArenaBox>(terrain + newProps.Length);
             for (int i = 0; i < terrain; i++)
-                all[i] = boxes[i];
+                all.Add(boxes[i]);
+            var statics = new System.Collections.Generic.List<int>();
+            var dynamics = new System.Collections.Generic.List<int>();
+            var jointList = new System.Collections.Generic.List<PropJoint>();
             for (int i = 0; i < newProps.Length; i++)
             {
                 ref readonly var p = ref newProps[i];
-                all[terrain + i] = new ArenaBox(TerrainKind.Prop, p.MinX, p.MinY, p.MaxX, p.MaxY);
+                if (PropDef.Stage(p.Kind) <= PropPhysics.ImplementedStage)
+                {
+                    dynamics.Add(i);
+                    jointList.Add(JointOf(p));
+                    continue;
+                }
+                statics.Add(i);
+                all.Add(new ArenaBox(TerrainKind.Prop, p.MinX, p.MinY, p.MaxX, p.MaxY));
             }
-            return new ArenaDef(Name, Columns, Rows, HasBoundary, all, SpawnFoot0, SpawnFoot1, (PropDef[])newProps.Clone());
+            if (dynamics.Count > PropState.Capacity)
+                throw new System.InvalidOperationException($"{Name}: 강체 구조물 {dynamics.Count}개(용량 {PropState.Capacity})");
+            return new ArenaDef(Name, Columns, Rows, HasBoundary, all.ToArray(), SpawnFoot0, SpawnFoot1, (PropDef[])newProps.Clone(),
+                statics.ToArray(), dynamics.ToArray(), jointList.ToArray());
+        }
+
+        static PropJoint JointOf(in PropDef p)
+        {
+            if (!p.HasAnchor)
+                return new PropJoint { Kind = PropJointKind.None };
+            if (p.HangsByRope)
+            {
+                var local = new Vec2(0f, p.HalfSize.Y);
+                var d = p.Center + local - p.Anchor;
+                return new PropJoint { Kind = PropJointKind.Rope, WorldAnchor = p.Anchor, LocalAnchor = local, Length = SimMath.Sqrt(d.LengthSquared) };
+            }
+            return new PropJoint { Kind = PropJointKind.Axis, WorldAnchor = p.Anchor, LocalAnchor = p.Anchor - p.Center };
         }
 
         public ref readonly ArenaBox GetBox(int index) => ref boxes[index];

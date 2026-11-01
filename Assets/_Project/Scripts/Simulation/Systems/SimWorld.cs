@@ -36,6 +36,7 @@ namespace Knockbox.Simulation
             this.arenas = arenas;
             State = initial;
             Events = new SimEventBuffer(eventCapacity);
+            PropScratch = new PropScratch();
         }
 
         /// <summary>지금 라운드의 맵. 라운드가 바뀌면(RoundTransition → Countdown) 다른 맵일 수 있다.</summary>
@@ -49,6 +50,9 @@ namespace Knockbox.Simulation
         public SimConfig Config { get; private set; }
 
         public SimEventBuffer Events { get; }
+
+        /// <summary>구조물 물리의 작업 공간(상태 아님).</summary>
+        public PropScratch PropScratch { get; }
 
         SimState ISimStepper.State
         {
@@ -74,6 +78,10 @@ namespace Knockbox.Simulation
             s.Tick++;
             var phase = s.Match.Phase;
             s.Match.PhaseTick++;
+
+            // 구조물은 카운트다운·싸움·KO 동안 움직인다(히트스탑과 상관없이, 09 4절).
+            if (phase == MatchPhase.Countdown || phase == MatchPhase.Fighting || phase == MatchPhase.KO)
+                PropPhysics.Step(ref s.Props, Arena, Config, PropScratch);
 
             switch (phase)
             {
@@ -129,6 +137,9 @@ namespace Knockbox.Simulation
                 FighterCombat.Freeze(ref s.Fighter1, p2, Config);
             else
                 StepFighter(ref s.Fighter1, p2, 1, s.Tick, out scratch1);
+
+            // 구조물과의 상호작용(09 4절): 이동 직후, 캐릭터끼리 밀어내기 전.
+            PropInteraction.Resolve(ref s, Arena, Config, prev0, prev1, frozen0, frozen1, Events);
 
             // 몸 충돌 판정은 이동 직후(밀어내기 전) 스냅숏의 접촉과 법선으로 한다.
             var contact = BodyContact.Measure(s.Fighter0, s.Fighter1, Config);

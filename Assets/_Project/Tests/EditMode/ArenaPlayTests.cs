@@ -149,7 +149,9 @@ namespace Knockbox.Tests.EditMode
                 if (t >= macro.Length)
                 {
                     var f = Get(w.State, fighter);
-                    if (f.Grounded && f.GroundBox >= 0 && f.InMovementState && SimMath.Abs(f.Velocity.X) < 0.05f)
+                    // 구조물 강체 위에 선 것도 착지로 센다(CP14, 그 위에서 다음 입력 덩어리를 시작).
+                    bool onProp = f.GroundBox == FighterState.OnPropBox;
+                    if (f.Grounded && (f.GroundBox >= 0 || onProp) && f.InMovementState && (onProp || SimMath.Abs(f.Velocity.X) < 0.05f))
                     {
                         settled = w.State;
                         return true;
@@ -196,8 +198,9 @@ namespace Knockbox.Tests.EditMode
                     if (!Run(config, arena, s, fighter, macro, reached, out var settled))
                         continue;
                     var f = Get(settled, fighter);
-                    reached.Add(f.GroundBox);
-                    long key = ((long)f.GroundBox << 32) | (uint)SimMath.RoundToInt(f.Position.X / 1.5f);
+                    if (f.GroundBox >= 0)
+                        reached.Add(f.GroundBox);
+                    long key = ((long)(f.GroundBox == FighterState.OnPropBox ? 1000 + f.OnProp : f.GroundBox) << 32) | (uint)SimMath.RoundToInt(f.Position.X / 1.5f);
                     if (seen.Add(key))
                         queue.Enqueue(settled);
                 }

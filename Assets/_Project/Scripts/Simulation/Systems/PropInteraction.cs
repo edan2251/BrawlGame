@@ -1,0 +1,264 @@
+namespace Knockbox.Simulation
+{
+    /// <summary>
+    /// 캐릭터와 구조물 강체의 상호작용(09-props-physics.md 4절, CP14). 한 틱 순서(SimWorld.StepFighting):
+    /// 구조물 적분(PropPhysics) → 캐릭터 이동과 지형 충돌 → 이 단계(겹침 해소, 운동량 교환, 돌진·맞기·벽꽝) →
+    /// 캐릭터끼리 밀어내기 → 접지와 지형 반응 → 전투 판정.
+    /// 두 캐릭터를 같은 규칙으로 따로 계산하고, 구조물에 주는 충격량은 틱 시작 상태로 계산해 더한 뒤 한 번에 준다(번호 우선 없음).
+    /// 겹침은 캐릭터만 밀어낸다(구조물은 줄·축에 묶여 있어 속도로만 반응한다).
+    /// </summary>
+    public static class PropInteraction
+    {
+        public static void Resolve(ref SimState s, ArenaDef arena, SimConfig config, in FighterState prev0, in FighterState prev1,
+            bool frozen0, bool frozen1, SimEventBuffer events)
+        {
+            if (s.Props.Count == 0)
+            {
+                s.Fighter0.OnProp = 0;
+                s.Fighter1.OnProp = 0;
+                return;
+            }
+            var before = s.Props;
+            var impulses = new PropImpulses();
+            ResolveFighter(ref s.Fighter0, prev0, frozen0, 0, before, ref impulses, arena, config, s.Tick, events);
+            ResolveFighter(ref s.Fighter1, prev1, frozen1, 1, before, ref impulses, arena, config, s.Tick, events);
+            impulses.ApplyTo(ref s.Props, arena, config);
+        }
+
+        /// <summary>틱 동안 두 캐릭터가 구조물에 준 충격량의 합(몸마다 선·각 충격량). 할당 없이 PropState 모양을 빌린다.</summary>
+        struct PropImpulses
+        {
+            PropState sums;
+
+            public void Add(int body, Vec2 impulse, Vec2 point, in PropBody b, int toucher)
+            {
+                ref var sum = ref PropState.Get(ref sums, body);
+                sum.Velocity += impulse;
+                sum.AngularVelocity += PropBody.Cross(point - b.Position, impulse);
+                sum.LastToucher = toucher + 1;
+                if (body + 1 > sums.Count)
+                    sums.Count = body + 1;
+            }
+
+            public void Hit(int body, int fighter, int cooldown)
+            {
+                ref var sum = ref PropState.Get(ref sums, body);
+                sum.SetHitCooldown(fighter, cooldown);
+                if (body + 1 > sums.Count)
+                    sums.Count = body + 1;
+            }
+
+            public void Reflect(int body, Vec2 normal, float scale)
+            {
+                ref var sum = ref PropState.Get(ref sums, body);
+                sum.Position = normal;
+                sum.Rotation = new Vec2(scale, 1f);
+                if (body + 1 > sums.Count)
+                    sums.Count = body + 1;
+            }
+
+            public void ApplyTo(ref PropState props, ArenaDef arena, SimConfig config)
+            {
+                for (int i = 0; i < sums.Count; i++)
+                {
+                    ref readonly var sum = ref PropState.At(in sums, i);
+                    ref var b = ref PropState.Get(ref props, i);
+                    ref readonly var def = ref arena.GetProp(arena.DynamicProp(i));
+                    float m = PropPhysics.Mass(def, config.Combat.Props);
+                    // 패링: 구조물 속도를 접촉 법선 기준으로 반사 × 0.8(충격량보다 먼저).
+                    if (sum.Rotation.Y > 0f)
+                    {
+                        var n = sum.Position;
+                        b.Velocity = (b.Velocity - n * (2f * Vec2.Dot(b.Velocity, n))) * sum.Rotation.X;
+                        b.AngularVelocity *= -sum.Rotation.X;
+                    }
+                    b.Velocity += sum.Velocity / m;
+                    b.AngularVelocity += sum.AngularVelocity / PropPhysics.Inertia(def, m);
+                    // 충격을 받으면 깬다.
+                    if (sum.LastToucher > 0 || sum.Rotation.Y > 0f)
+                        b.SleepTicks = 0;
+                    if (sum.LastToucher > 0)
+                        b.LastToucher = sum.LastToucher - 1;
+                    if (sum.HitCooldown0 > 0)
+                        b.HitCooldown0 = sum.HitCooldown0;
+                    if (sum.HitCooldown1 > 0)
+                        b.HitCooldown1 = sum.HitCooldown1;
+                }
+            }
+        }
+
+        static void ResolveFighter(ref FighterState f, in FighterState prev, bool frozen, int index, in PropState props, ref PropImpulses impulses,
+            ArenaDef arena, SimConfig config, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat.Props;
+            float half = config.HalfBody;
+            int wasOn = f.OnProp;
+            f.OnProp = 0;
+            if (f.Action == ActionState.Held || f.Action == ActionState.KO)
+                return;
+
+            // 서 있던 구조물을 따라 움직인다(같이 흔들림).
+            if (wasOn > 0 && wasOn <= props.Count && !frozen)
+            {
+                ref readonly var under = ref PropState.At(in props, wasOn - 1);
+                var feet = new Vec2(f.Position.X, f.Position.Y - half);
+                Displace(ref f.Position, under.PointVelocity(feet) * SimConfig.Dt, half, arena, config);
+            }
+
+            int standing = 0;
+            for (int i = 0; i < props.Count; i++)
+            {
+                ref readonly var b = ref PropState.At(in props, i);
+                ref readonly var def = ref arena.GetProp(arena.DynamicProp(i));
+                if (!Overlap(f.Position, prev.Position, half, b, def.HalfSize, out var n, out float depth))
+                    continue;
+                var point = f.Position - n * half;
+                float m = PropPhysics.Mass(def, c);
+                float invI = 1f / PropPhysics.Inertia(def, m);
+                var r = point - b.Position;
+                float rn = PropBody.Cross(r, n);
+                float kProp = 1f / m + invI * rn * rn;
+                var vp = b.PointVelocity(point);
+                float vn = Vec2.Dot(f.Velocity - vp, n);
+                bool onThis = wasOn == i + 1;
+
+                // 1) 돌진이 구조물을 침: 공격성 위력 × 1.0을 충격량으로. 무거우면 지형처럼 반사 × 0.6, 가벼우면 계속 나아감.
+                float power = frozen ? 0f : FighterCombat.Power(f, -n, config);
+                if (f.Action == ActionState.Lunge && power > 0f)
+                {
+                    impulses.Add(i, -n * (power * c.LungeImpulseScale), point, b, index);
+                    if (m >= c.LungeHeavyMass)
+                        f.Velocity = (f.Velocity - n * (2f * Vec2.Dot(f.Velocity, n))) * c.LungeHeavyRestitution;
+                    events.Add(new SimEvent(tick, SimEventType.PropStrike, index, point, -n, power));
+                }
+                // 2) 구조물이 캐릭터를 침: 상대 법선 속도 10 이상, 구조물이 다가오는 쪽, 그 위에 서 있지 않음, 쌍마다 20틱.
+                else if (-vn >= c.HitMinSpeed && Vec2.Dot(vp, n) > Vec2.Dot(f.Velocity, -n) && !onThis
+                         && b.GetHitCooldown(index) == 0 && FighterCombat.CanBeHit(f, config))
+                {
+                    PropHit(ref f, -vn, m, n, point, index, i, b, ref impulses, config, tick, events);
+                }
+                // 3) 그 밖: 질량 비에 따른 운동량 교환(반발 0.15). 날아가던 캐릭터가 무거운 구조물에 세게 부딪히면 벽꽝.
+                else if (vn < 0f)
+                {
+                    float j = -(1f + c.FighterRestitution) * vn / (1f / c.FighterMass + kProp);
+                    bool splat = f.IsLaunched && m >= c.SplatMinMass && -vn >= config.Combat.WallSplatSpeed;
+                    if (!frozen)
+                        f.Velocity += n * (j / c.FighterMass);
+                    impulses.Add(i, -n * j, point, b, index);
+                    if (splat)
+                        Splat(ref f, n, -vn, point, index, config, tick, events);
+                }
+
+                // 겹침 해소: 캐릭터만 밀어낸다. 위쪽 50° 이내 법선이면 그 구조물 위에 선 것.
+                if (!frozen)
+                    Displace(ref f.Position, n * depth, half, arena, config);
+                if (n.Y >= c.StandCos && f.Velocity.Y <= vp.Y + 0.5f)
+                {
+                    standing = i + 1;
+                    if (f.Velocity.Y < vp.Y)
+                        f.Velocity.Y = vp.Y;
+                    // 캐릭터 무게만큼 누른다(밟으면 기운다).
+                    impulses.Add(i, new Vec2(0f, -c.FighterMass * c.Gravity * SimConfig.Dt), point, b, index);
+                }
+            }
+            f.OnProp = standing;
+        }
+
+        /// <summary>위치를 옮기되 지형(임시 물체 상자 포함)과 경계를 지나치지 않게 지형 충돌로 쓸어 간다(속도는 바꾸지 않음).</summary>
+        static void Displace(ref Vec2 position, Vec2 delta, float half, ArenaDef arena, SimConfig config)
+        {
+            var velocity = delta / SimConfig.Dt;
+            var contacts = default(MoveContacts);
+            TerrainCollision.Move(ref position, ref velocity, half, arena, config.Movement.SubstepMaxDistance, FighterState.NoBox, ref contacts);
+        }
+
+        /// <summary>구조물에 맞음(09 4절): 피해 clamp(round(속도 × 질량 × 0.15), 3, 18), 넉백 max(10, 속도 × 0.8), 경직은 공통 규칙. 가드·패링 적용.</summary>
+        static void PropHit(ref FighterState f, float speed, float mass, Vec2 n, Vec2 point, int index, int body, in PropBody b,
+            ref PropImpulses impulses, SimConfig config, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            ref readonly var p = ref c.Props;
+            impulses.Hit(body, index, p.HitCooldownTicks);
+            int damage = SimMath.Clamp(SimMath.RoundToInt(speed * mass * p.HitDamageScale), p.HitMinDamage, p.HitMaxDamage);
+            float knockback = SimMath.Max(p.HitKnockbackMin, speed * p.HitKnockbackScale);
+            if (f.Action == ActionState.Guard && f.ParryTicks > 0)
+            {
+                impulses.Reflect(body, n, p.ParryRestitution);
+                f.ParryTicks = 0;
+                f.HitstopTicks = c.ParryHitstop;
+                events.Add(new SimEvent(tick, SimEventType.Parry, index, point, n, damage));
+                return;
+            }
+            int hitstop = FighterCombat.HitstopFor(damage, c);
+            if (f.IsGuarding)
+            {
+                int chip = SimMath.Max(1, SimMath.RoundToInt(damage * c.GuardDamageMultiplier));
+                f.Health = SimMath.Max(0, f.Health - chip);
+                f.Velocity.X = n.X * knockback * c.GuardKnockbackMultiplier;
+                f.StunTicks = c.GuardStunTicks;
+                FighterCombat.EnterStun(ref f, ActionState.GuardStun);
+                f.HitstopTicks = SimMath.RoundToInt(hitstop * c.GuardHitstopMultiplier);
+                events.Add(new SimEvent(tick, SimEventType.GuardHit, index, point, n, chip));
+                return;
+            }
+            int combo = f.IsLaunched ? f.ComboHits : 0;
+            float scaled = knockback * SimMath.Pow(c.ComboKnockbackDecay, combo);
+            f.Velocity = n * scaled;
+            f.Health = SimMath.Max(0, f.Health - damage);
+            f.StunTicks = FighterCombat.HitstunFor(scaled, combo, c);
+            f.ComboHits = combo + 1;
+            FighterCombat.EnterStun(ref f, ActionState.Hitstun);
+            f.HitstopTicks = hitstop;
+            events.Add(new SimEvent(tick, SimEventType.PropHit, index, point, n, damage));
+        }
+
+        /// <summary>무거운 구조물에 벽꽝(03 3절과 같은 수치).</summary>
+        static void Splat(ref FighterState f, Vec2 n, float speed, Vec2 point, int index, SimConfig config, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            f.Health = SimMath.Max(0, f.Health - c.WallSplatDamage);
+            float along = Vec2.Dot(f.Velocity, n);
+            f.Velocity = (f.Velocity - n * (2f * SimMath.Min(along, 0f))) * c.WallSplatRestitution;
+            f.StunTicks += c.WallSplatHitstun;
+            f.HitstopTicks = SimMath.Max(f.HitstopTicks, c.WallSplatHitstop);
+            events.Add(new SimEvent(tick, SimEventType.WallSplat, index, point, n, speed));
+        }
+
+        /// <summary>
+        /// 캐릭터 몸(축 정렬 정사각형)과 회전한 구조물: 분리축으로 가장 얕은 축. 법선은 구조물 → 캐릭터.
+        /// 직전 틱 위치가 그 축에서 반대편이었다면(한 틱에 가운데를 지나침) 직전 쪽으로 밀어낸다(터널링 방지).
+        /// </summary>
+        public static bool Overlap(Vec2 position, Vec2 previous, float half, in PropBody b, Vec2 propHalf, out Vec2 normal, out float depth)
+        {
+            var u = b.Rotation;
+            var v = new Vec2(-u.Y, u.X);
+            var delta = position - b.Position;
+            normal = Vec2.Zero;
+            depth = float.MaxValue;
+            float bestR = 0f, bestD = 0f;
+            var bestAxis = Vec2.Zero;
+            for (int axis = 0; axis < 4; axis++)
+            {
+                var a = axis == 0 ? u : axis == 1 ? v : axis == 2 ? new Vec2(1f, 0f) : new Vec2(0f, 1f);
+                float rProp = propHalf.X * SimMath.Abs(Vec2.Dot(a, u)) + propHalf.Y * SimMath.Abs(Vec2.Dot(a, v));
+                float rBody = half * (SimMath.Abs(a.X) + SimMath.Abs(a.Y));
+                float d = Vec2.Dot(delta, a);
+                float overlap = rProp + rBody - SimMath.Abs(d);
+                if (overlap <= 0f)
+                    return false;
+                if (overlap < depth - 1e-5f)
+                {
+                    depth = overlap;
+                    bestAxis = a;
+                    bestR = rProp + rBody;
+                    bestD = d;
+                }
+            }
+            float before = Vec2.Dot(previous - b.Position, bestAxis);
+            float side = before > 0f ? 1f : before < 0f ? -1f : (bestD >= 0f ? 1f : -1f);
+            normal = bestAxis * side;
+            depth = bestR - side * bestD;
+            return true;
+        }
+    }
+}
