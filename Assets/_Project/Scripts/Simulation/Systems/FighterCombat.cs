@@ -647,8 +647,9 @@ namespace Knockbox.Simulation
             ApplyStrike(ref lunger, ref melee, snapLunger, snapMelee, strike, meleeIndex, config, tick, events);
             melee.AttackId = FighterState.NoAttack;
             melee.AttackHasHit = false;
-            lunger.ContactCooldown = p.ContactCooldownTicks;
-            melee.ContactCooldown = p.ContactCooldownTicks;
+            // 한 돌진은 이긴 상대를 다시 치지 않는다(계속 날아가도 같은 돌진으로 두 번 맞히지 않게, S-152).
+            lunger.ContactCooldown = SimMath.Max(p.ContactCooldownTicks, p.LungeMaxTicks);
+            melee.ContactCooldown = lunger.ContactCooldown;
         }
 
         static void HitboxStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, Vec2 point, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)

@@ -10,7 +10,9 @@ namespace Knockbox.Game
     public static class ScenarioConfig
     {
         public static SimConfig Create(ScenarioDef def, MovementTuning movement = null, CombatTuning combat = null) =>
-            Apply(SimConfigFactory.Create(movement, combat, ParseRules(def)), def.Tuning);
+            Apply(string.IsNullOrEmpty(def.Form)
+                ? SimConfigFactory.Create(movement, combat, ParseMode(def.Mode), def.Grab)
+                : SimConfigFactory.Create(movement, combat, ParseRules(def)), def.Tuning);
 
         /// <summary>"form"이 있으면 폼 규칙(가드·잡기·에너지는 시나리오 값), 없으면 mode·grab의 레거시 규칙.</summary>
         public static RuleSet ParseRules(ScenarioDef def)

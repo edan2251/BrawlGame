@@ -188,10 +188,19 @@ namespace Knockbox.Simulation
         {
         }
 
-        /// <summary>CP16까지의 생성자: 전역 모드를 시작 폼으로 바꾸고 레거시 스위치(가드 켬, 에너지 끔)를 쓴다.</summary>
+        /// <summary>
+        /// CP16까지의 생성자: 전역 모드를 시작 폼으로 바꾸고 레거시 규칙(가드 켬, 에너지 끔, 모드 B의 방향 휘두르기)을 쓴다.
+        /// 기존 테스트가 이 생성자로 (A) 기존 행동 회귀를 검사한다(10 문서 2절).
+        /// </summary>
         public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, CombatMode mode, bool grabEnabled = true)
-            : this(movement, match, combat, RuleSet.Legacy(mode, grabEnabled))
+            : this(movement, match, LegacyCombat(combat), RuleSet.Legacy(mode, grabEnabled))
         {
+        }
+
+        static CombatParams LegacyCombat(CombatParams combat)
+        {
+            combat.Swing.ForwardOnly = false;
+            return combat;
         }
 
         public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, in RuleSet rules)
