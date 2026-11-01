@@ -70,7 +70,7 @@ namespace Knockbox.Simulation
     {
         public sbyte MoveX;             // -1, 0, 1
         public sbyte MoveY;             // -1(아래), 0, 1(위)
-        public InputButtons Buttons;    // 비트 플래그: Jump, Attack, Dash, Guard, Grab
+        public InputButtons Buttons;    // 비트 플래그: Jump, Attack, Dash, Guard, Grab (+ 폼 전환, CP21)
     }
 
     public sealed class SimWorld
@@ -88,7 +88,7 @@ namespace Knockbox.Simulation
 
 - `SimState`는 **값 타입의 구조체**로, 배열이나 참조 필드 없이 `Fighter0`, `Fighter1`, `Match`, `Rng`, `Tick` 같은 필드로 구성한다. 그래서 `var snapshot = world.State;`가 곧 완전한 저장이다.
 - **구조물 상태도 시뮬레이션 상태다**(D-025, `09-props-physics.md`). 강체, 줄, 경첩의 위치·회전·속도·끊어짐 여부와 마지막 접촉자가 저장·복원·체크섬 대상이다. 용량은 고정(예: 강체 48, 연결 48)으로 미리 할당한다. 구조물 때문에 "대입이 곧 스냅숏"인 성질이 깨지면 명시적 복사(`CopyTo`)와 미리 할당한 스냅숏 버퍼로 대신하며, 어느 쪽이든 `Visit`(체크섬)와 `StateDiff`에 모든 필드가 들어가고 `Step`과 스냅숏 복사에 GC 할당이 없어야 한다.
-- 맵 상태(라운드마다 바뀌는 맵 순서와 현재 맵, D-024)도 `MatchState`에 들어간다.
+- 맵 상태(라운드마다 바뀌는 맵 순서와 현재 맵, D-024)도 `MatchState`에 들어간다. CR-003 이후에는 세트·경기 상태(라운드 점수, 세트스코어, 선택 단계, 맵 순환)도 여기에 든다(9절).
 - "이번 틱에 눌렀다/뗐다"는 시뮬레이션이 직접 계산한다. 이를 위해 각 파이터 상태에 직전 틱의 버튼 값을 저장한다.
 - 입력 장치의 아날로그 값은 Game 계층에서 **8방향으로 양자화**한 뒤 시뮬레이션에 넘긴다.
 - `SimEventBuffer`는 고정 용량(최소 32) 배열이며 상태에 포함하지 않는다. 이벤트 종류: `Jump`, `Land`, `WallSlideStart`, `WallJump`, `Dash`, `Hit`, `Clash`, `Parry`, `GuardHit`, `Grab`, `Throw`, `WallSplat`, `BounceRebound`, `KO`, `RoundStart`, `RoundEnd`. 각 이벤트는 틱, 파이터 번호, 위치, 방향, 세기를 가진다.
@@ -108,7 +108,7 @@ namespace Knockbox.Simulation
 7. **대칭성**: 두 파이터의 판정은 같은 이전 상태에서 동시에 계산하고 동시에 적용한다. 동률일 때 P1을 우선하는 식의 인덱스 기반 판정을 하지 않는다. 동률은 규칙으로 해소한다(예: 클래시).
 8. 체크섬은 `Hasher`(FNV-1a)로 모든 상태 필드를 명시적으로 순서대로 넣어 계산한다. float는 비트 패턴(`BitConverter.SingleToInt32Bits`)으로 넣는다. 리플렉션을 쓰지 않는다.
 
-숫자 표현은 프로토타입 동안 `float`를 쓴다. 같은 빌드와 같은 CPU 계열에서는 위 규칙만 지키면 대체로 일치하지만, 서로 다른 플랫폼이나 빌드 백엔드 사이에서는 보장되지 않는다. 고정소수점 전환 여부는 온라인 CP(CP18) 착수 전에 다시 판단한다(`DECISIONS.md`의 D-004).
+숫자 표현은 프로토타입 동안 `float`를 쓴다. 같은 빌드와 같은 CPU 계열에서는 위 규칙만 지키면 대체로 일치하지만, 서로 다른 플랫폼이나 빌드 백엔드 사이에서는 보장되지 않는다. 고정소수점 전환 여부는 온라인 CP(M3 이후, 번호 미정) 착수 전에 다시 판단한다(`DECISIONS.md`의 D-004).
 
 ## 5. 틱 실행기와 렌더링
 
@@ -136,3 +136,19 @@ namespace Knockbox.Simulation
 ## 8. 규칙 자동 점검
 
 `Tools/check-sim-rules` 스크립트(또는 동등한 EditMode 테스트)로 시뮬레이션 폴더의 소스에서 다음 문자열이 없는지 검사한다: `UnityEngine`, `System.Random`, `DateTime`, `Dictionary<`, `HashSet<`, `System.Linq`, `Math.Sin`, `Math.Cos`, `Math.Atan`, `Math.Tan`, `static` 가변 필드. `SimMath.cs`는 허용된 연산의 유일한 관문이므로 예외 목록을 명시한다.
+
+## 9. 폼, 투사체, 에너지, 세트 구조 (CR-003)
+
+`10-forms-and-growth.md`의 구조를 코드에 옮기는 규칙이다. 모든 새 필드는 체크섬(`Visit`), 저장·복원, `StateDiff`에 들어가고 `Step`에서 GC 할당이 없어야 한다(CP18-9의 체크섬 범위 테스트로 강제).
+
+| 구조 | 규칙 |
+|---|---|
+| **폼 상태** | 전역 `CombatMode` 분기를 **파이터별 폼**으로 옮긴다. 파이터 상태에 현재 폼, 보유 폼 비트마스크, 폼 번호로 색인한 폼별 상태(고정 크기 3칸)를 둔다. 폼별 상태는 전환해도 초기화하지 않고 라운드 시작 때 초기화한다(10 문서 4.5, 4.7) |
+| **기능 스위치** | `SimConfig`에 가드·잡기(기본 끔), 공격 에너지(기본 켬). 기존 `GrabEnabled`를 재사용한다. 꺼진 기능의 입력은 시뮬레이션이 무시한다. 연출 옵션(현재 폼 표시)은 시뮬레이션 밖에 둔다 |
+| **공격 에너지** | 파이터 상태에 에너지와 회복 지연 타이머. 공격 시작 지점은 **확인만**, 소비는 폼별 한 지점(가위 `Launch`, 바위 발사, 보·잡기 시작). 취소와 발사 시 부족은 소비 없음 + 이벤트(10 문서 4.4) |
+| **투사체 풀** | `SimState` 안의 파이터당 고정 용량 배열(값 타입 칸). 각 칸은 위치, 속도, 소유자, 속성(`Reflectable`, `PierceFighter`, `PierceProp`), 반사 횟수, 이미 맞힌 대상을 가진다. 지형·경계 충돌은 쓸고 지나가는(swept) 판정으로 터널링을 막는다 |
+| **속성 해석기** | 공격(돌진 몸, 보 활성 판정 원, 투사체)에 속성을 붙이고, 충돌 쌍의 결과를 속성 비교로 정한다. **폼 쌍별 분기를 두지 않는다.** 두 파이터의 판정은 같은 스냅숏에서 동시에 계산하고 동시에 적용한다(4절 7항) |
+| **증강** | 증강 데이터(수정자 묶음, `Priority`, `Targets`, `Removes`, 동작 슬롯)는 설정 데이터로 두고, 상태에는 파이터별 획득 목록(고정 크기)만 둔다. 적용 결과는 획득 목록과 설정에서 결정적으로 계산한다(획득 순서 무관, 10 문서 5.3) |
+| **입력** | 폼 전환은 남은 입력 비트(5개 사용, 3개 빔)를 쓴다. 선택 단계에서는 버튼 비트를 선택 번호로 해석한다. 선택도 입력이므로 리플레이·롤백에 포함된다. 입력 기록 형식이 바뀌면 버전을 올린다 |
+| **세트·경기 상태** | `MatchState`에 라운드 점수, 세트스코어, 단계(카운트다운, 전투, KO, 선택, 세트 종료, 경기 종료), 선택 횟수. 상태를 **전투 부분**과 **세트 부분**으로 나눠 비교할 수 있게 한다(CP22-5) |
+| **이벤트** | 새 이벤트 예: `EnergyShort`(발사 시 부족 취소), `ProjectileFire`, `ProjectileHit`, `ProjectileReflect`, `ProjectileCancel`, `Stun`, `AttackInterrupted`, `FormSwitch`, `Pick`, `AugmentTrigger`. 연출이 소비할 뿐 상태에 들어가지 않는다 |

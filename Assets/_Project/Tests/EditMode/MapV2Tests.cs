@@ -474,7 +474,7 @@ namespace Knockbox.Tests.EditMode
         {
             var config = Config();
             var arena = ArenaFiles.LoadByName(name);
-            int rounds = 0, fightingTicks = 0, outOfBounds = 0, wallSplats = 0, boundaryHits = 0, propHits = 0, boxHits = 0, knockouts = 0;
+            int rounds = 0, fightingTicks = 0, outOfBounds = 0, wallSplats = 0, boundaryHits = 0, propHits = 0, boxHits = 0, knockouts = 0, clashes = 0;
             double total = 0, boundary = 0, spike = 0, other = 0, prop = 0, boxed = 0;
             for (uint seed = 1; seed <= 6; seed++)
             {
@@ -524,6 +524,9 @@ namespace Knockbox.Tests.EditMode
                             case SimEventType.WallSplat:
                                 wallSplats++;
                                 break;
+                            case SimEventType.Clash:
+                                clashes++;
+                                break;
                             case SimEventType.RoundEnd:
                                 rounds++;
                                 break;
@@ -559,7 +562,8 @@ namespace Knockbox.Tests.EditMode
             float average = rounds > 0 ? fightingTicks / 60f / rounds : float.PositiveInfinity;
             double boundaryShare = total > 0 ? boundary / total : 0, spikeShare = total > 0 ? spike / total : 0;
             string report = $"[Knockbox][CP13-3] {name}: 라운드 {rounds}, 평균 {average:F1}초, 경계 튕김 데미지 {boundaryShare:P0}({boundaryHits}회), 가시 {spikeShare:P0}, "
-                            + $"구조물에 맞음 {(total > 0 ? prop / total : 0):P0}({propHits}회), 상자에 맞음 {(total > 0 ? boxed / total : 0):P0}({boxHits}회, 상자 쳐냄 {knockouts}), 벽꽝 등 지형 {(total > 0 ? other / total : 0):P0}(벽꽝 {wallSplats}), 경기장 이탈 {outOfBounds}";
+                            + $"구조물에 맞음 {(total > 0 ? prop / total : 0):P0}({propHits}회), 상자에 맞음 {(total > 0 ? boxed / total : 0):P0}({boxHits}회, 상자 쳐냄 {knockouts}), 벽꽝 등 지형 {(total > 0 ? other / total : 0):P0}(벽꽝 {wallSplats}), 경기장 이탈 {outOfBounds}"
+                            + $", 전투 {fightingTicks / 3600f:F1}분, 벽꽝/분 {wallSplats / (fightingTicks / 3600f):F1}, 클래시/분 {clashes / (fightingTicks / 3600f):F1}";
             TestContext.WriteLine(report);
             UnityEngine.Debug.Log(report);
             Assert.AreEqual(0, outOfBounds, "경기장 이탈");
