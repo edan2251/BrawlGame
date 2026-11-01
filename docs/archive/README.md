@@ -31,3 +31,4 @@
 | `logs/CP15.md` | CP15 로그 | `docs/progress/logs/` |
 | `logs/CP16.md` | CP16 로그 | `docs/progress/logs/` |
 | `logs/CP17.md` | CP17 로그(CR-003 준비) | `docs/progress/logs/` |
+| `logs/CP18.md` | CP18 로그(폼 기반, 에너지, 스위치) | `docs/progress/logs/` |

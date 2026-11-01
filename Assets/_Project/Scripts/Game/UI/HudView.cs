@@ -205,7 +205,7 @@ namespace Knockbox.Game
             float y = body.y + BarOffsetY - BarHeight * 0.5f - EnergyGap - EnergyHeight * 0.5f;
             Place(energyBack[i], body.x - BarWidth * 0.5f, y, BarWidth, EnergyHeight, 0f);
             Place(energyFill[i], body.x - BarWidth * 0.5f, y, BarWidth * fraction, EnergyHeight, 0f);
-            energyFill[i].color = f.Energy >= energy.CostOf(f.Form) ? palette.energy : palette.energySoft * new Color(1f, 1f, 1f, 0.45f);
+            energyFill[i].color = f.Energy >= energy.CostOf(f.Form) ? palette.energy : palette.uiSub;
         }
 
         void RenderBar(ref Bar bar, Vector2 body, float fraction, float dt)

@@ -376,7 +376,8 @@ namespace Knockbox.Tests.EditMode
         [Test]
         public void DashIntoStandingOpponent_Damages()
         {
-            var w = World(-2f, 0f);
+            // CR-003에서 대시 몸통 공격성 기본값이 0이 됐다(S-149). 가중치가 있을 때의 규칙은 CP16 값 0.6으로 확인한다.
+            var w = World(-2f, 0f, ChargeConfig(c => { c.Charge.DashAggression = 0.6f; return c; }));
             bool hit = false;
             for (int t = 0; t < 12 && !hit; t++)
             {

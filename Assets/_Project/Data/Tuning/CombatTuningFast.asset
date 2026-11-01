@@ -109,7 +109,7 @@ MonoBehaviour:
       LungeBounceRestitution: 0.6
       LungeMaxBounces: 2
       LungeAggression: 1
-      DashAggression: 0.6
+      DashAggression: 0
       PowerThreshold: 6
       ClashPowerMargin: 4
       ContactCooldownTicks: 8
