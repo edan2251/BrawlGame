@@ -133,7 +133,7 @@ namespace Knockbox.Simulation
                 AttackId = FighterState.NoAttack,
                 TicksSinceGuardPress = FighterState.TimerCap,
                 Form = config.StartFormOf(index),
-                OwnedForms = Forms.Bit(config.StartFormOf(index)),
+                OwnedForms = config.Rules.OwnedFormsOf(index),
                 Energy = config.Combat.Energy.Max,
             };
             f.GroundBox = TerrainCollision.ProbeGround(center, config.HalfBody, arena, m.GroundProbeDistance, FighterState.NoBox);

@@ -271,6 +271,7 @@ namespace Knockbox.Simulation
             v.End();
             v.Value(nameof(StartForm), (int)StartForm);
             v.Value("StartFormP2", (int)StartFormOf(1));
+            v.Value("OwnedForms", (int)Rules.OwnedForms);
             v.Value(nameof(GuardEnabled), GuardEnabled);
             v.Value(nameof(GrabEnabled), GrabEnabled);
             v.Value(nameof(EnergyEnabled), EnergyEnabled);

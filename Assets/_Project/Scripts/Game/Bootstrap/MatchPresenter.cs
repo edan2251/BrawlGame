@@ -76,6 +76,9 @@ namespace Knockbox.Game
         public CameraRig CameraRig => cameraRig;
         public SfxPlayer SfxPlayer => sfxPlayer;
         public bool OverlayVisible => overlay != null && overlay.gameObject.activeSelf;
+
+        /// <summary>현재 폼 표시 방식(10 문서 5.1, HOME). 연출만 바뀐다.</summary>
+        public FormDisplayMode FormDisplay { get; set; } = FormDisplayMode.Always;
         public SfxLibrary Library => sfx;
         public HudView Hud => hud;
         public HelpOverlay Help => help;
@@ -328,6 +331,9 @@ namespace Knockbox.Game
             boundaryView.Tick(dt);
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
                 world.Config.Match, world.Config.Combat.MaxHealth, world.Config.Combat.Energy, world.Config.EnergyEnabled, dt);
+            hud.RenderForms(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift), FormDisplay, world.Config);
+            projectileView.RenderWindup(current.Fighter0, 0, V(current.Fighter0.Position), world.Config);
+            projectileView.RenderWindup(current.Fighter1, 1, V(current.Fighter1.Position), world.Config);
             if (labels != null && labels.gameObject.activeSelf)
             {
                 bool recordingOrReplay = runner.Recording != null || runner.Playback != null;
@@ -486,6 +492,11 @@ namespace Knockbox.Game
                         fx.Shards(V(e.Position), -new Vector2(e.Direction.X, e.Direction.Y), 80f, 4, palette.FighterBody(e.Fighter), 6f, 0.12f, 0.3f);
                         sfxPlayer.Play(Sfx.Land, 0.35f, 1.3f);
                     }
+                    break;
+                case SimEventType.FormSwitch:
+                    // 전환: 새 폼 색은 쓰지 않고 짧은 흰 고리와 가벼운 소리.
+                    fx.RingBurst(V(e.Position), palette.flash, 0.4f, 1f, 0.12f);
+                    sfxPlayer.Play(Sfx.Jump, 0.35f, 1.6f);
                     break;
                 case SimEventType.ProjectileReflect:
                     // 보가 투사체를 되받아침(CP20): 반사한 쪽 색 고리와 패링 소리.

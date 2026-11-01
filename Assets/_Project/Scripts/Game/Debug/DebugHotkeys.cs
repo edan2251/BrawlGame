@@ -115,6 +115,12 @@ namespace Knockbox.Game
                     Debug.Log($"[Knockbox] 허수아비 행동: {current.Behavior}");
                 }
             }
+            if (k.homeKey.wasPressedThisFrame && presenter != null)
+            {
+                // 현재 폼 표시 방식 순환(10 문서 5.1). 연출 옵션이라 시뮬레이션에 영향이 없다.
+                presenter.FormDisplay = (FormDisplayMode)(((int)presenter.FormDisplay + 1) % 3);
+                Debug.Log($"[Knockbox] 폼 표시: {presenter.FormDisplay}");
+            }
             if (k.f7Key.wasPressedThisFrame && cameraRig != null)
             {
                 cameraRig.ReduceMotion = !cameraRig.ReduceMotion;

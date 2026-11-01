@@ -170,6 +170,18 @@ namespace Knockbox.Simulation
                 f.RestartAction(ActionState.Airborne);
             }
 
+            // 폼 전환(4.5): 지금 공격을 시작할 수 있는 자유 상태에서만 받는다(공격·후딜·경직·가드 중의 입력은 위에서 이미 돌아갔다).
+            // 즉시 바뀌고, 같은 틱에 누른 공격은 새 폼으로 시작한다. 에너지와 폼별 상태(날아가는 투사체)는 그대로.
+            if ((pressed & InputButtons.SwitchForm) != 0)
+            {
+                var next = Forms.NextOwned(f.Form, f.OwnedForms);
+                if (next != f.Form)
+                {
+                    events.Add(new SimEvent(tick, SimEventType.FormSwitch, index, f.Position, new Vec2((int)f.Form, 0f), (int)next));
+                    f.Form = next;
+                }
+            }
+
             int grabCost = SimMath.Max(c.Energy.GrabCost, 0);
             if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled && CanAfford(f, grabCost, config))
             {

@@ -12,14 +12,14 @@ namespace Knockbox.Game
         public const string Text =
             "KNOCKBOX  -  prototype controls\n" +
             "\n" +
-            "P1  WASD move   SPACE jump   F attack   LSHIFT dash   E guard   Q grab\n" +
-            "P2  ARROWS move   NUM0 jump   NUM1 attack   NUM2 dash   NUM3 guard   NUM4 grab\n" +
-            "PAD  stick/dpad   A jump   X attack   B/RT dash   LB/LT guard   Y grab\n" +
+            "P1  WASD move   SPACE jump   F attack   LSHIFT dash   R switch form   E guard   Q grab\n" +
+            "P2  ARROWS move   NUM0 jump   NUM1 attack   NUM2 dash   NUM5 switch form   NUM3 guard   NUM4 grab\n" +
+            "PAD  stick/dpad   A jump   X attack   B/RT dash   RB switch form   LB/LT guard   Y grab\n" +
             "\n" +
             "F1 start form (scissors / rock / paper)    F2 arena: rotation / lock one\n" +
             "F3 hitbox overlay    F4 guard+grab on/off    INS energy on/off    F5 reset round\n" +
             "F6 P2 input (keyboard / pad / dummy / bot)    [ ] dummy behavior\n" +
-            "F7 reduce shake    F8 sync test    F11 tuning preset (default / fast)\n" +
+            "F7 reduce shake    F8 sync test    F11 tuning preset (default / fast)    HOME form display\n" +
             "F9 start/stop input recording    F10 replay last recording\n" +
             "P pause    O step one tick    F12 debug text    ~ close this help";
 

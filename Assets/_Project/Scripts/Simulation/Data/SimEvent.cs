@@ -64,6 +64,8 @@ namespace Knockbox.Simulation
         LungeStun,
         /// <summary>근접공격이 위력 있는 돌진에 져서 중단됨(CP20). Fighter는 중단된 쪽, Strength는 돌진 위력.</summary>
         AttackInterrupted,
+        /// <summary>폼 전환(CP21). Fighter는 전환한 쪽, Direction.X는 이전 폼 번호, Strength는 새 폼 번호.</summary>
+        FormSwitch,
     }
 
     /// <summary>

@@ -42,6 +42,9 @@ namespace Knockbox.Game
         readonly Bar[] bars = new Bar[2];
         readonly SpriteRenderer[] energyBack = new SpriteRenderer[2];
         readonly SpriteRenderer[] energyFill = new SpriteRenderer[2];
+        readonly SpriteRenderer[] formIcons = new SpriteRenderer[2];
+        readonly SpriteRenderer[] formOutlines = new SpriteRenderer[2];
+        ShapeLibrary shapeLibrary;
         readonly SpriteRenderer[] slots0 = new SpriteRenderer[MaxSlots];
         readonly SpriteRenderer[] slots1 = new SpriteRenderer[MaxSlots];
         PaletteAsset palette;
@@ -63,8 +66,11 @@ namespace Knockbox.Game
         public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)
         {
             palette = paletteAsset;
+            shapeLibrary = shapes;
             for (int i = 0; i < 2; i++)
             {
+                formOutlines[i] = ShapeLibrary.Create(transform, $"Form{i}Outline", shapes.Square, SortingLayers.UI, 3, palette.ink);
+                formIcons[i] = ShapeLibrary.Create(transform, $"Form{i}Icon", shapes.Square, SortingLayers.UI, 4, palette.FighterBody(i));
                 bars[i].Back = ShapeLibrary.Create(transform, $"Bar{i}Back", shapes.Square, SortingLayers.UI, 0, palette.uiEmpty);
                 bars[i].Trail = ShapeLibrary.Create(transform, $"Bar{i}Trail", shapes.Square, SortingLayers.UI, 1, palette.hit);
                 bars[i].Fill = ShapeLibrary.Create(transform, $"Bar{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.FighterBody(i));
@@ -193,6 +199,34 @@ namespace Knockbox.Game
         }
 
         static float Health(in FighterState f, float maxHealth) => maxHealth > 0f ? f.Health / maxHealth : 0f;
+
+        /// <summary>현재 폼 표시(10 문서 5.1): 체력 바 위의 작은 모양. 방식은 FormDisplayMode.</summary>
+        public void RenderForms(in SimState state, Vector2 body0, Vector2 body1, FormDisplayMode mode, SimConfig config)
+        {
+            RenderForm(0, state.Fighter0, body0, mode, state.Match.Phase);
+            RenderForm(1, state.Fighter1, body1, mode, state.Match.Phase);
+        }
+
+        void RenderForm(int i, in FighterState f, Vector2 body, FormDisplayMode mode, MatchPhase phase)
+        {
+            bool acting = f.Action == ActionState.Charge || f.Action == ActionState.Lunge || f.Action == ActionState.Shoot || f.Action == ActionState.Attack;
+            bool shown = f.Action != ActionState.KO && phase != MatchPhase.MatchEnd && (mode != FormDisplayMode.OnAction || acting);
+            formIcons[i].enabled = shown;
+            formOutlines[i].enabled = shown && mode != FormDisplayMode.Minimal;
+            if (!shown)
+                return;
+            var sprite = f.Form == FighterForm.Scissors ? shapeLibrary.Triangle : f.Form == FighterForm.Rock ? shapeLibrary.Circle : shapeLibrary.Square;
+            formIcons[i].sprite = sprite;
+            formOutlines[i].sprite = sprite;
+            bool minimal = mode == FormDisplayMode.Minimal;
+            float size = minimal ? 0.14f : 0.3f;
+            var at = new Vector3(body.x, body.y + BarOffsetY + BarHeight + (minimal ? 0.14f : 0.24f), 0f);
+            formIcons[i].transform.localPosition = at;
+            formOutlines[i].transform.localPosition = at;
+            ShapeLibrary.SetSize(formIcons[i], size, size);
+            ShapeLibrary.SetSize(formOutlines[i], size + 0.08f, size + 0.08f);
+            formIcons[i].color = minimal ? palette.uiSub : palette.FighterBody(i);
+        }
 
         void RenderEnergy(int i, in FighterState f, Vector2 body, in EnergyParams energy, bool shown)
         {

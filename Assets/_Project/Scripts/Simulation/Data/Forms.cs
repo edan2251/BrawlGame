@@ -24,6 +24,22 @@ namespace Knockbox.Simulation
 
         public static bool Owns(byte mask, FighterForm form) => (mask & Bit(form)) != 0;
 
+        /// <summary>세 폼을 모두 가진 비트.</summary>
+        public const byte AllPlayable = (1 << 0) | (1 << 1) | (1 << 2);
+
+        /// <summary>보유한 다음 폼(가위 → 바위 → 보 → 가위 순서). 다른 폼이 없으면 지금 폼.</summary>
+        public static FighterForm NextOwned(FighterForm current, byte owned)
+        {
+            int start = current == FighterForm.Test ? -1 : (int)current;
+            for (int k = 1; k <= PlayableCount; k++)
+            {
+                int next = ((start + k) % PlayableCount + PlayableCount) % PlayableCount;
+                if (Owns(owned, (FighterForm)next) && next != (int)current)
+                    return (FighterForm)next;
+            }
+            return current;
+        }
+
         /// <summary>CR-003 전의 전역 모드 → 시작 폼.</summary>
         public static FighterForm FromMode(CombatMode mode)
         {
@@ -63,6 +79,8 @@ namespace Knockbox.Simulation
         /// <summary>참이면 P2는 StartFormP2로 시작한다(폼 쌍 시험·봇 매트릭스, CP20).</summary>
         public bool SeparateP2Form;
         public FighterForm StartFormP2;
+        /// <summary>시작할 때 보유하는 폼 비트(시작 폼은 항상 포함). 0이면 시작 폼 하나. CP22의 선택 전까지 전환을 시험하는 데 쓴다.</summary>
+        public byte OwnedForms;
         public FeatureSwitches Switches;
 
         public static RuleSet Default => new RuleSet { StartForm = FighterForm.Scissors, Switches = FeatureSwitches.Default };
@@ -71,6 +89,15 @@ namespace Knockbox.Simulation
             new RuleSet { StartForm = Forms.FromMode(mode), Switches = FeatureSwitches.Legacy(grabEnabled) };
 
         public readonly FighterForm StartFormOf(int fighter) => fighter == 1 && SeparateP2Form ? StartFormP2 : StartForm;
+
+        public readonly byte OwnedFormsOf(int fighter) => (byte)(OwnedForms | Forms.Bit(StartFormOf(fighter)));
+
+        public readonly RuleSet WithOwned(byte owned)
+        {
+            var r = this;
+            r.OwnedForms = owned;
+            return r;
+        }
 
         /// <summary>P1·P2의 시작 폼을 따로 정한 규칙.</summary>
         public readonly RuleSet WithForms(FighterForm p1, FighterForm p2)
@@ -84,9 +111,10 @@ namespace Knockbox.Simulation
             return r;
         }
 
-        /// <summary>예: "Scissors g0 r0 e1"(가드, 잡기, 에너지), 폼이 다르면 "Rock/Paper g0 r0 e1".</summary>
+        /// <summary>예: "Scissors g0 r0 e1"(가드, 잡기, 에너지), 폼이 다르면 "Rock/Paper g0 r0 e1", 보유 폼이 있으면 끝에 " o7".</summary>
         public readonly string Format() =>
-            $"{StartForm}{(SeparateP2Form ? "/" + StartFormP2 : "")} g{(Switches.GuardEnabled ? 1 : 0)} r{(Switches.GrabEnabled ? 1 : 0)} e{(Switches.EnergyEnabled ? 1 : 0)}";
+            $"{StartForm}{(SeparateP2Form ? "/" + StartFormP2 : "")} g{(Switches.GuardEnabled ? 1 : 0)} r{(Switches.GrabEnabled ? 1 : 0)} e{(Switches.EnergyEnabled ? 1 : 0)}"
+            + (OwnedForms != 0 ? $" o{OwnedForms}" : "");
 
         public static bool TryParse(string text, out RuleSet rules)
         {
@@ -94,7 +122,10 @@ namespace Knockbox.Simulation
             if (string.IsNullOrEmpty(text))
                 return false;
             string[] parts = text.Split(' ');
-            if (parts.Length != 4)
+            if (parts.Length != 4 && parts.Length != 5)
+                return false;
+            byte owned = 0;
+            if (parts.Length == 5 && (parts[4].Length < 2 || parts[4][0] != 'o' || !byte.TryParse(parts[4].Substring(1), out owned) || owned == 0))
                 return false;
             string[] forms = parts[0].Split('/');
             if (forms.Length > 2 || !ParseForm(forms[0], out var p1))
@@ -107,6 +138,7 @@ namespace Knockbox.Simulation
             rules = new RuleSet
             {
                 Switches = new FeatureSwitches { GuardEnabled = guard, GrabEnabled = grab, EnergyEnabled = energy },
+                OwnedForms = owned,
             }.WithForms(p1, p2);
             return true;
         }

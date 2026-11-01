@@ -16,7 +16,7 @@ namespace Knockbox.Game
         [Tooltip("F11로 순환하는 전투 튜닝 프리셋(기본, 더 빠르게)")]
         [SerializeField] CombatTuning[] combatPresets;
         [Tooltip("시작 폼과 기능 스위치(CR-003): F1 폼, F4 가드·잡기, Insert 에너지. 다음 StartNewMatch부터 적용")]
-        [SerializeField] RuleSet rules = RuleSet.Default;
+        [SerializeField] RuleSet rules = RuleSet.Default.WithOwned(Forms.AllPlayable);
         [SerializeField] TextAsset[] arenaFiles;
         [Tooltip("맵 짝 파일(<이름>.json): 테마, 광원, 순환 포함 여부")]
         [SerializeField] TextAsset[] arenaMetaFiles;

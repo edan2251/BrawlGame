@@ -11,7 +11,9 @@ namespace Knockbox.Simulation
         Dash = 1 << 2,
         Guard = 1 << 3,
         Grab = 1 << 4,
-        All = Jump | Attack | Dash | Guard | Grab,
+        /// <summary>폼 전환(CR-003 CP21): 누를 때마다 보유한 다음 폼(가위 → 바위 → 보 순서)으로.</summary>
+        SwitchForm = 1 << 5,
+        All = Jump | Attack | Dash | Guard | Grab | SwitchForm,
     }
 
     /// <summary>

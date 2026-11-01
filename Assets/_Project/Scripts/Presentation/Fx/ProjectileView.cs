@@ -15,6 +15,8 @@ namespace Knockbox.Presentation
         readonly SpriteRenderer[] cores = new SpriteRenderer[ProjectileState.Capacity];
         readonly SpriteRenderer[] outlines = new SpriteRenderer[ProjectileState.Capacity];
         readonly SpriteRenderer[] trails = new SpriteRenderer[ProjectileState.Capacity];
+        readonly SpriteRenderer[] windups = new SpriteRenderer[2];
+        readonly SpriteRenderer[] windupRings = new SpriteRenderer[2];
         PaletteAsset palette;
 
         public void Setup(PaletteAsset paletteAsset, ShapeLibrary shapes)
@@ -27,6 +29,33 @@ namespace Knockbox.Presentation
                 cores[i] = ShapeLibrary.Create(transform, $"Core{i}", shapes.Circle, SortingLayers.Fx, 2, palette.p1Body);
                 Hide(i);
             }
+            for (int i = 0; i < 2; i++)
+            {
+                windupRings[i] = ShapeLibrary.Create(transform, $"WindupRing{i}", shapes.Ring, SortingLayers.Fx, 3, palette.energy);
+                windups[i] = ShapeLibrary.Create(transform, $"Windup{i}", shapes.Circle, SortingLayers.Fx, 4, palette.p1Body);
+                windups[i].enabled = windupRings[i].enabled = false;
+            }
+        }
+
+        /// <summary>
+        /// 바위 선딜(CP21 폼별 선딜 구분): 몸 앞에 소유자 색 돌이 자라고 민트 고리가 조여든다. 가위(납작해지며 떨림)·보(무기를 뒤로)와 다르다.
+        /// </summary>
+        public void RenderWindup(in FighterState f, int i, Vector2 body, SimConfig config)
+        {
+            ref readonly var rock = ref config.Combat.Rock;
+            bool on = f.Action == ActionState.Shoot && f.ActionTick <= rock.StartupTicks && rock.StartupTicks > 0;
+            windups[i].enabled = windupRings[i].enabled = on;
+            if (!on)
+                return;
+            float k = Mathf.Clamp01((float)f.ActionTick / rock.StartupTicks);
+            var at = body + new Vector2(f.Facing * rock.SpawnOffset, 0.05f);
+            float d = rock.Radius * 2f * Mathf.Lerp(0.3f, 1f, k);
+            windups[i].color = palette.FighterBody(i);
+            windups[i].transform.localPosition = at;
+            ShapeLibrary.SetSize(windups[i], d, d);
+            float ring = Mathf.Lerp(1.2f, 0.5f, k);
+            windupRings[i].transform.localPosition = at;
+            ShapeLibrary.SetSize(windupRings[i], ring, ring);
         }
 
         void Hide(int i)

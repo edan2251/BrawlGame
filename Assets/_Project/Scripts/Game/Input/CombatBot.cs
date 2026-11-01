@@ -117,6 +117,10 @@ namespace Knockbox.Game
             }
             if (smart)
             {
+                // 폼 전환(CP21): 상대 폼을 이기는 폼을 가졌으면 자유 상태에서 가끔(틱마다 1/30) 그쪽으로 전환한다.
+                var counter = Counter(other.Form);
+                if (self.InMovementState && self.Form != counter && Forms.Owns(self.OwnedForms, counter) && rng.Range(0, 30) == 0)
+                    buttons |= InputButtons.SwitchForm;
                 float dy = other.Position.Y - self.Position.Y;
                 if (rock)
                     AimRock(self, toward, distance, dy, tick, ref moveX, ref moveY, ref buttons);
@@ -159,6 +163,10 @@ namespace Knockbox.Game
             int lo = distance < 2.2f ? 4 : 14;
             chargeTarget = rng.Range(lo, Math.Min(40, lo + (int)(distance * 4f) + 8));
         }
+
+        /// <summary>4.1의 의도된 상성: 바위는 가위를, 가위는 보를, 보는 바위를 이긴다.</summary>
+        public static FighterForm Counter(FighterForm form) =>
+            form == FighterForm.Scissors ? FighterForm.Rock : form == FighterForm.Rock ? FighterForm.Paper : FighterForm.Scissors;
 
         /// <summary>
         /// 바위: 너무 가까우면 물러나며 쏘고, 상대가 수평(높이 차 1.2 안)이나 대각선에 있으면 쏜다. 발사 틱의 입력이 방향이므로

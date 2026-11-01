@@ -37,6 +37,7 @@ namespace Knockbox.Game
             if (Held(left ? k.leftShiftKey : k.numpad2Key)) buttons |= InputButtons.Dash;
             if (Held(left ? k.eKey : k.numpad3Key)) buttons |= InputButtons.Guard;
             if (Held(left ? k.qKey : k.numpad4Key)) buttons |= InputButtons.Grab;
+            if (Held(left ? k.rKey : k.numpad5Key)) buttons |= InputButtons.SwitchForm;
             return new InputFrame(x, y, buttons);
         }
 
@@ -76,6 +77,7 @@ namespace Knockbox.Game
             if (pad.buttonEast.isPressed || pad.rightTrigger.isPressed) buttons |= InputButtons.Dash;
             if (pad.leftShoulder.isPressed || pad.leftTrigger.isPressed) buttons |= InputButtons.Guard;
             if (pad.buttonNorth.isPressed) buttons |= InputButtons.Grab;
+            if (pad.rightShoulder.isPressed) buttons |= InputButtons.SwitchForm;
             return new InputFrame(x, y, buttons);
         }
 
