@@ -110,6 +110,14 @@ namespace Knockbox.Simulation
                         return pressed;
                     Launch(ref f, input, config, index, tick, events);
                     return pressed;
+                case ActionState.Shoot:
+                    // 바위(CP19): 선딜이 끝나는 틱에 발사, 후딜이 끝나면 조작 가능.
+                    if (f.ActionTick == c.Rock.StartupTicks)
+                        Fire(ref f, input, config, index, tick, events);
+                    if (f.Action != ActionState.Shoot || f.ActionTick < c.Rock.TotalTicks)
+                        return pressed;
+                    f.RestartAction(ActionState.Airborne);
+                    break;
                 case ActionState.Grab:
                     // 시작 → 활성 → 헛잡기 후딜. 잡으면 상호작용 판정이 Holding으로 바꾼다.
                     if (f.ActionTick < c.Grab.TotalWhiffTicks)
@@ -185,7 +193,8 @@ namespace Knockbox.Simulation
                         Spend(ref f, cost, config);
                         break;
                     case FighterForm.Rock:
-                        // 바위의 투사체는 CP19.
+                        // 선딜 시작은 확인만, 소비는 발사할 때(Fire).
+                        StartShoot(ref f, input.MoveX);
                         break;
                     default:
                         StartAttack(ref f, input.MoveX, AttackIds.Test, index, tick, events);
@@ -198,7 +207,7 @@ namespace Knockbox.Simulation
         /// <summary>공격 행동(충전, 돌진, 선딜·활성·후딜, 잡기)인지. 이 동안 에너지 회복 지연이 처음으로 돌아간다.</summary>
         public static bool IsAttackAction(in FighterState f) =>
             f.Action == ActionState.Charge || f.Action == ActionState.Lunge || f.Action == ActionState.Attack
-            || f.Action == ActionState.Grab || f.Action == ActionState.Holding;
+            || f.Action == ActionState.Grab || f.Action == ActionState.Holding || f.Action == ActionState.Shoot;
 
         /// <summary>에너지 회복(4.4): 공격 행동 동안은 지연을 처음으로 돌리고, 끝난 뒤 지연이 지나면 틱마다 회복한다.</summary>
         static void TickEnergy(ref FighterState f, SimConfig config)
@@ -260,6 +269,36 @@ namespace Knockbox.Simulation
             f.ActionPaid = false;
             f.RestartAction(ActionState.Grab);
             events.Add(new SimEvent(tick, SimEventType.GrabStart, index, f.Position, new Vec2(f.Facing, 0f), 0f));
+        }
+
+        static void StartShoot(ref FighterState f, int moveX)
+        {
+            if (moveX != 0)
+                f.Facing = (sbyte)moveX;
+            f.DashTicksLeft = 0;
+            f.ActionPaid = false;
+            f.ShotPending = false;
+            f.RestartAction(ActionState.Shoot);
+        }
+
+        /// <summary>
+        /// 바위 발사 틱: 에너지가 모자라면 발사하지 않고 취소한다(4.4 규칙 4). 투사체는 이동이 끝난 뒤
+        /// Projectiles.SpawnPending이 풀에 넣는다(발사 방향은 이번 틱의 8방향 입력, 중립이면 바라보는 쪽).
+        /// </summary>
+        static void Fire(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            int cost = config.Combat.Energy.CostOf(FighterForm.Rock);
+            if (config.EnergyEnabled && !f.ActionPaid && f.Energy < cost)
+            {
+                f.RestartAction(ActionState.Airborne);
+                events.Add(new SimEvent(tick, SimEventType.EnergyShort, index, f.Position, new Vec2(f.Facing, 0f), f.Energy));
+                return;
+            }
+            Spend(ref f, cost, config);
+            f.ShotPending = true;
+            f.ShotDirection = input.MoveX == 0 && input.MoveY == 0
+                ? new Vec2(f.Facing, 0f)
+                : SimMath.Normalize(new Vec2(input.MoveX, input.MoveY));
         }
 
         static void StartCharge(ref FighterState f, int moveX)
@@ -753,6 +792,38 @@ namespace Knockbox.Simulation
                 Rebound(ref attacker, snapAttacker, config);
             events.Add(new SimEvent(tick, SimEventType.Hit, defenderIndex, strike.Point, strike.Direction, strike.Damage));
             return SimEventType.Hit;
+        }
+
+        /// <summary>
+        /// 투사체에 맞음(CP19): 공통 틀(가드면 가드 규칙, 아니면 명중·연속 명중 감쇠·경직). 쏜 쪽은 멀리 있으므로 히트스탑은 맞은 쪽만.
+        /// 패링 구간도 가드로 받는다(되돌려 비틀거리게 할 공격자가 곁에 없다).
+        /// </summary>
+        public static void ProjectileHit(ref FighterState defender, int defenderIndex, int damage, Vec2 direction, float knockback, Vec2 point,
+            SimConfig config, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            int hitstop = HitstopFor(damage, c);
+            if (defender.IsGuarding)
+            {
+                int guarded = SimMath.Max(1, SimMath.RoundToInt(damage * c.GuardDamageMultiplier));
+                defender.Health = SimMath.Max(0, defender.Health - guarded);
+                defender.Velocity.X = direction.X * (knockback * c.GuardKnockbackMultiplier);
+                defender.ParryTicks = 0;
+                defender.StunTicks = c.GuardStunTicks;
+                EnterStun(ref defender, ActionState.GuardStun);
+                defender.HitstopTicks = SimMath.RoundToInt(hitstop * c.GuardHitstopMultiplier);
+                events.Add(new SimEvent(tick, SimEventType.GuardHit, defenderIndex, point, direction, guarded));
+                return;
+            }
+            int n = defender.IsLaunched ? defender.ComboHits : 0;
+            float k = knockback * SimMath.Pow(c.ComboKnockbackDecay, n);
+            defender.Velocity = direction * k;
+            defender.Health = SimMath.Max(0, defender.Health - damage);
+            defender.StunTicks = HitstunFor(k, n, c);
+            defender.ComboHits = n + 1;
+            EnterStun(ref defender, ActionState.Hitstun);
+            defender.HitstopTicks = hitstop;
+            events.Add(new SimEvent(tick, SimEventType.Hit, defenderIndex, point, direction, damage));
         }
 
         /// <summary>몸 충돌에서 이긴 쪽: 속도 × -0.25로 살짝 튕겨 나오고 돌진(대시)이 끝난다.</summary>

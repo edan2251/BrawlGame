@@ -503,6 +503,8 @@ namespace Knockbox.Simulation
         public PropParams Props;
         /// <summary>공격 에너지(10-forms-and-growth.md 4.4, CP18).</summary>
         public EnergyParams Energy;
+        /// <summary>바위 폼의 투사체(CP19).</summary>
+        public RockParams Rock;
 
         public static CombatParams Default => new CombatParams
         {
@@ -568,6 +570,7 @@ namespace Knockbox.Simulation
             Grab = GrabParams.Default,
             Props = PropParams.Default,
             Energy = EnergyParams.Default,
+            Rock = RockParams.Default,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -636,6 +639,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Energy));
             Energy.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Rock));
+            Rock.Visit(ref v);
             v.End();
         }
     }

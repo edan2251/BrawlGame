@@ -37,6 +37,8 @@ namespace Knockbox.Simulation
         Held,
         /// <summary>던져진 상태. 피격 경직과 같은 규칙이고 벽꽝 기준이 낮다.</summary>
         Thrown,
+        /// <summary>바위 폼(CP19): 선딜 → 발사 틱 → 후딜. 선딜 동안 끊기면 발사하지 않는다.</summary>
+        Shoot,
     }
 
     /// <summary>
@@ -139,6 +141,9 @@ namespace Knockbox.Simulation
         public int EnergyRegenDelay;
         /// <summary>지금 행동이 이미 에너지를 소비했다(행동당 정확히 한 번, 4.4 규칙 1). 새 행동을 시작할 때 지운다.</summary>
         public bool ActionPaid;
+        /// <summary>이번 틱에 바위 투사체를 발사하기로 했다(CP19). 이동이 끝난 뒤 투사체 풀에 넣고 지운다.</summary>
+        public bool ShotPending;
+        public Vec2 ShotDirection;
 
         public const int NoAttack = -1;
 
@@ -223,6 +228,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(Energy), Energy);
             v.Value(nameof(EnergyRegenDelay), EnergyRegenDelay);
             v.Value(nameof(ActionPaid), ActionPaid);
+            v.Value(nameof(ShotPending), ShotPending);
+            v.Value("ShotDirection.X", ShotDirection.X);
+            v.Value("ShotDirection.Y", ShotDirection.Y);
         }
     }
 }

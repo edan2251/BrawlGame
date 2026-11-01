@@ -162,6 +162,7 @@ namespace Knockbox.Simulation
                     break;
                 case ActionState.Attack:
                 case ActionState.Grab:
+                case ActionState.Shoot:
                     if (f.Grounded)
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     else

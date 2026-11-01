@@ -17,6 +17,8 @@ namespace Knockbox.Simulation
         public MatchState Match;
         /// <summary>구조물 강체(CP14). 라운드가 시작될 때 맵의 처음 모양으로 놓인다.</summary>
         public PropState Props;
+        /// <summary>투사체 풀(CP19). 라운드가 시작될 때 비운다.</summary>
+        public ProjectileState Projectiles;
 
         public readonly uint ComputeChecksum()
         {
@@ -40,6 +42,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Props));
             Props.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Projectiles));
+            Projectiles.Visit(ref v);
             v.End();
         }
 
@@ -100,6 +105,7 @@ namespace Knockbox.Simulation
             state.Match.Round++;
             state.Match.RoundWinner = -1;
             state.Match.SetPhase(MatchPhase.Countdown);
+            state.Projectiles = default;
             PropPhysics.Init(ref state.Props, arena, config);
         }
 

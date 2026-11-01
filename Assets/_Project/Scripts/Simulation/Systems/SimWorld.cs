@@ -154,6 +154,9 @@ namespace Knockbox.Simulation
                 FighterMovement.ResolveContacts(ref s.Fighter1, s.Fighter0, scratch1, Config, Arena, 1, s.Tick, Events);
 
             FighterCombat.ResolveInteractions(ref s.Fighter0, ref s.Fighter1, frozen0, frozen1, contact, Config, Arena, s.Tick, Events);
+            // 투사체(CP19): 이번 틱의 발사를 넣고, 이동이 끝난 파이터와 지형에 대해 한 틱 움직인다.
+            Projectiles.SpawnPending(ref s, Config, s.Tick, Events);
+            Projectiles.Step(ref s, Arena, Config, prev0, prev1, s.Tick, Events);
             CheckKnockout(ref s);
         }
 

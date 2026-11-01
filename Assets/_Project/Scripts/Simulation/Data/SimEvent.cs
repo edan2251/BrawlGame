@@ -54,6 +54,10 @@ namespace Knockbox.Simulation
         PropImpact,
         /// <summary>발사 틱에 에너지가 비용보다 적어 행동을 취소함(CR-003 4.4 규칙 4). Fighter는 취소한 쪽, Strength는 그때 에너지.</summary>
         EnergyShort,
+        /// <summary>투사체 발사(CP19). Fighter는 소유자, Position은 생긴 곳, Direction은 진행 방향, Strength는 속력.</summary>
+        ProjectileFire,
+        /// <summary>투사체가 사라짐(CP19). Fighter는 소유자, Position은 사라진 곳. Strength는 이유(ProjectileEndReason).</summary>
+        ProjectileEnd,
     }
 
     /// <summary>
