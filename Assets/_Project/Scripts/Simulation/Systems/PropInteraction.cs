@@ -40,6 +40,14 @@ namespace Knockbox.Simulation
                     sums.Count = body + 1;
             }
 
+            public void Strike(int body, int fighter, int cooldown)
+            {
+                ref var sum = ref PropState.Get(ref sums, body);
+                sum.SetStrikeCooldown(fighter, cooldown);
+                if (body + 1 > sums.Count)
+                    sums.Count = body + 1;
+            }
+
             public void Hit(int body, int fighter, int cooldown)
             {
                 ref var sum = ref PropState.Get(ref sums, body);
@@ -83,6 +91,10 @@ namespace Knockbox.Simulation
                         b.HitCooldown0 = sum.HitCooldown0;
                     if (sum.HitCooldown1 > 0)
                         b.HitCooldown1 = sum.HitCooldown1;
+                    if (sum.StrikeCooldown0 > 0)
+                        b.StrikeCooldown0 = sum.StrikeCooldown0;
+                    if (sum.StrikeCooldown1 > 0)
+                        b.StrikeCooldown1 = sum.StrikeCooldown1;
                 }
             }
         }
@@ -124,9 +136,10 @@ namespace Knockbox.Simulation
 
                 // 1) 돌진이 구조물을 침: 공격성 위력 × 1.0을 충격량으로. 무거우면 지형처럼 반사 × 0.6, 가벼우면 계속 나아감.
                 float power = frozen ? 0f : FighterCombat.Power(f, -n, config);
-                if (f.Action == ActionState.Lunge && power > 0f)
+                if (f.Action == ActionState.Lunge && power > 0f && b.GetStrikeCooldown(index) == 0)
                 {
                     impulses.Add(i, -n * (power * c.LungeImpulseScale), point, b, index);
+                    impulses.Strike(i, index, c.StrikeCooldownTicks);
                     if (m >= c.LungeHeavyMass)
                         f.Velocity = (f.Velocity - n * (2f * Vec2.Dot(f.Velocity, n))) * c.LungeHeavyRestitution;
                     events.Add(new SimEvent(tick, SimEventType.PropStrike, index, point, -n, power));
@@ -149,9 +162,9 @@ namespace Knockbox.Simulation
                         Splat(ref f, n, -vn, point, index, config, tick, events);
                 }
 
-                // 겹침 해소: 캐릭터만 밀어낸다. 위쪽 50° 이내 법선이면 그 구조물 위에 선 것.
-                if (!frozen)
-                    Displace(ref f.Position, n * depth, half, arena, config);
+                // 겹침 해소: 캐릭터만 밀어낸다(히트스탑 중에도 위치는 밀어낸다: 구조물은 멈추지 않으므로 그대로 두면 몸을 지나간다).
+                // 위쪽 50° 이내 법선이면 그 구조물 위에 선 것.
+                Displace(ref f.Position, n * depth, half, arena, config);
                 if (n.Y >= c.StandCos && f.Velocity.Y <= vp.Y + 0.5f)
                 {
                     standing = i + 1;
@@ -225,40 +238,61 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>
-        /// 캐릭터 몸(축 정렬 정사각형)과 회전한 구조물: 분리축으로 가장 얕은 축. 법선은 구조물 → 캐릭터.
-        /// 직전 틱 위치가 그 축에서 반대편이었다면(한 틱에 가운데를 지나침) 직전 쪽으로 밀어낸다(터널링 방지).
+        /// 캐릭터 몸(축 정렬 정사각형)과 회전한 구조물: 분리축 검사. 법선은 구조물 → 캐릭터.
+        /// 직전 틱에 떨어져 있던 축 중 가장 늦게 겹친 축(들어온 방향)을 접촉 축으로 고르고, 그런 축이 없으면(이미 겹쳐 있었으면)
+        /// 가장 얕은 축. 방향은 직전 틱 위치 쪽(한 틱에 가운데를 지나쳐도 들어온 쪽으로 밀어낸다, 터널링 방지).
         /// </summary>
         public static bool Overlap(Vec2 position, Vec2 previous, float half, in PropBody b, Vec2 propHalf, out Vec2 normal, out float depth)
         {
             var u = b.Rotation;
             var v = new Vec2(-u.Y, u.X);
             var delta = position - b.Position;
+            var before = previous - b.Position;
             normal = Vec2.Zero;
-            depth = float.MaxValue;
-            float bestR = 0f, bestD = 0f;
-            var bestAxis = Vec2.Zero;
+            depth = 0f;
+            float shallow = float.MaxValue, latest = float.MinValue, enteredDepth = 0f;
+            int shallowAxis = -1, enteredAxis = -1;
             for (int axis = 0; axis < 4; axis++)
             {
-                var a = axis == 0 ? u : axis == 1 ? v : axis == 2 ? new Vec2(1f, 0f) : new Vec2(0f, 1f);
-                float rProp = propHalf.X * SimMath.Abs(Vec2.Dot(a, u)) + propHalf.Y * SimMath.Abs(Vec2.Dot(a, v));
-                float rBody = half * (SimMath.Abs(a.X) + SimMath.Abs(a.Y));
-                float d = Vec2.Dot(delta, a);
-                float overlap = rProp + rBody - SimMath.Abs(d);
-                if (overlap <= 0f)
+                var a = Axis(axis, u, v);
+                float reach = propHalf.X * SimMath.Abs(Vec2.Dot(a, u)) + propHalf.Y * SimMath.Abs(Vec2.Dot(a, v)) + half * (SimMath.Abs(a.X) + SimMath.Abs(a.Y));
+                float now = reach - SimMath.Abs(Vec2.Dot(delta, a));
+                if (now <= 0f)
                     return false;
-                if (overlap < depth - 1e-5f)
+                if (now < shallow - 1e-5f)
                 {
-                    depth = overlap;
-                    bestAxis = a;
-                    bestR = rProp + rBody;
-                    bestD = d;
+                    shallow = now;
+                    shallowAxis = axis;
+                }
+                float was = reach - SimMath.Abs(Vec2.Dot(before, a));
+                if (was <= 0f)
+                {
+                    // 이 축에서 겹치기 시작한 시점(0 직전 틱 … 1 지금). 가장 늦은 축이 들어온 면.
+                    float t = -was / (now - was);
+                    if (t > latest)
+                    {
+                        latest = t;
+                        enteredAxis = axis;
+                        enteredDepth = now;
+                    }
                 }
             }
-            float before = Vec2.Dot(previous - b.Position, bestAxis);
-            float side = before > 0f ? 1f : before < 0f ? -1f : (bestD >= 0f ? 1f : -1f);
-            normal = bestAxis * side;
-            depth = bestR - side * bestD;
+            // 구조물이 빠르게 돌면 직전 위치를 지금 모양에 대 본 "들어온 축"이 엉뚱할 수 있다. 한 틱 이동량보다 깊으면 가장 얕은 축으로.
+            int chosen = enteredAxis >= 0 && enteredDepth <= shallow + EntrySlack ? enteredAxis : shallowAxis;
+            var axisVector = Axis(chosen, u, v);
+            float r = propHalf.X * SimMath.Abs(Vec2.Dot(axisVector, u)) + propHalf.Y * SimMath.Abs(Vec2.Dot(axisVector, v)) + half * (SimMath.Abs(axisVector.X) + SimMath.Abs(axisVector.Y));
+            float d = Vec2.Dot(delta, axisVector);
+            float prior = Vec2.Dot(before, axisVector);
+            float side = prior > 0f ? 1f : prior < 0f ? -1f : (d >= 0f ? 1f : -1f);
+            normal = axisVector * side;
+            depth = r - side * d;
             return true;
         }
+
+        /// <summary>들어온 축을 믿는 깊이 차이 한계(최대 돌진 34 × 1틱 ≈ 0.57보다 작게, 회전하는 막대의 가짜 축을 거른다).</summary>
+        const float EntrySlack = 0.35f;
+
+        static Vec2 Axis(int axis, Vec2 u, Vec2 v) =>
+            axis == 0 ? u : axis == 1 ? v : axis == 2 ? new Vec2(1f, 0f) : new Vec2(0f, 1f);
     }
 }

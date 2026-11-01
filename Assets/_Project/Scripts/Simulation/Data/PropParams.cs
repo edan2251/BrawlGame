@@ -36,6 +36,8 @@ namespace Knockbox.Simulation
         /// <summary>돌진이 이 질량 이상의 구조물을 치면 지형처럼 반사(× LungeHeavyRestitution), 아래면 계속 나아간다.</summary>
         public float LungeHeavyMass;
         public float LungeHeavyRestitution;
+        /// <summary>같은 캐릭터의 돌진이 같은 구조물을 다시 칠 수 있을 때까지의 틱(그동안은 일반 운동량 교환).</summary>
+        public int StrikeCooldownTicks;
         /// <summary>구조물이 캐릭터를 침: 접촉점 상대 법선 속도 하한, 피해 clamp(round(속도 × 질량 × 배율), 최소, 최대).</summary>
         public float HitMinSpeed;
         public float HitDamageScale;
@@ -71,7 +73,8 @@ namespace Knockbox.Simulation
             LungeImpulseScale = 0.5f,
             LungeHeavyMass = 4f,
             LungeHeavyRestitution = 0.6f,
-            HitMinSpeed = 10f,
+            StrikeCooldownTicks = 12,
+            HitMinSpeed = 6f,
             HitDamageScale = 0.15f,
             HitMinDamage = 3,
             HitMaxDamage = 18,
@@ -104,6 +107,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(LungeImpulseScale), LungeImpulseScale);
             v.Value(nameof(LungeHeavyMass), LungeHeavyMass);
             v.Value(nameof(LungeHeavyRestitution), LungeHeavyRestitution);
+            v.Value(nameof(StrikeCooldownTicks), StrikeCooldownTicks);
             v.Value(nameof(HitMinSpeed), HitMinSpeed);
             v.Value(nameof(HitDamageScale), HitDamageScale);
             v.Value(nameof(HitMinDamage), HitMinDamage);

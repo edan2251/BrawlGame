@@ -71,6 +71,10 @@ namespace Knockbox.Simulation
                     b.HitCooldown0--;
                 if (b.HitCooldown1 > 0)
                     b.HitCooldown1--;
+                if (b.StrikeCooldown0 > 0)
+                    b.StrikeCooldown0--;
+                if (b.StrikeCooldown1 > 0)
+                    b.StrikeCooldown1--;
                 anyAwake |= !Asleep(b, c);
             }
             if (!anyAwake)

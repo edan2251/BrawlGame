@@ -8,7 +8,7 @@
     {"kind": "spinner", "pos": [-4.0, 4.2], "size": [3.2, 0.6], "mirror": true},
     {"kind": "spinner", "pos": [0, 6.8], "size": [2.0, 2.0]},
     {"kind": "spinner", "pos": [-13.0, 0.0], "size": [2.4, 0.6], "mirror": true},
-    {"kind": "box", "pos": [-12.4, -3.3], "size": [1.4, 1.4], "mirror": true},
+    {"kind": "box", "pos": [-13.2, -3.3], "size": [1.4, 1.4], "mirror": true},
     {"kind": "box", "pos": [-6.0, -6.4], "size": [1.2, 1.2], "mirror": true}
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "theme": "A",
+  "light": [0, 25],
+  "rotation": false,
+  "props": [
+    {"kind": "hanging", "pos": [0, -3.8], "size": [1.6, 1.2], "anchor": [0, 3]}
+  ]
+}

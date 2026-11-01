@@ -18,6 +18,9 @@ namespace Knockbox.Simulation
         /// <summary>이 구조물이 파이터 0·1을 다시 맞힐 수 있을 때까지 남은 틱(쌍마다 20틱).</summary>
         public int HitCooldown0;
         public int HitCooldown1;
+        /// <summary>파이터 0·1의 돌진이 이 구조물을 다시 칠 수 있을 때까지 남은 틱(돌진 한 번에 한 번).</summary>
+        public int StrikeCooldown0;
+        public int StrikeCooldown1;
         /// <summary>거의 움직이지 않은 연속 틱 수. PropParams.SleepTicks 이상이면 잠들어 적분을 건너뛴다(결정론적, 충격을 받으면 0).</summary>
         public int SleepTicks;
 
@@ -32,6 +35,15 @@ namespace Knockbox.Simulation
         public static float Cross(Vec2 a, Vec2 b) => a.X * b.Y - a.Y * b.X;
 
         public readonly int GetHitCooldown(int fighter) => fighter == 0 ? HitCooldown0 : HitCooldown1;
+        public readonly int GetStrikeCooldown(int fighter) => fighter == 0 ? StrikeCooldown0 : StrikeCooldown1;
+
+        public void SetStrikeCooldown(int fighter, int ticks)
+        {
+            if (fighter == 0)
+                StrikeCooldown0 = ticks;
+            else
+                StrikeCooldown1 = ticks;
+        }
 
         public void SetHitCooldown(int fighter, int ticks)
         {
@@ -53,6 +65,8 @@ namespace Knockbox.Simulation
             v.Value(nameof(LastToucher), LastToucher);
             v.Value(nameof(HitCooldown0), HitCooldown0);
             v.Value(nameof(HitCooldown1), HitCooldown1);
+            v.Value(nameof(StrikeCooldown0), StrikeCooldown0);
+            v.Value(nameof(StrikeCooldown1), StrikeCooldown1);
             v.Value(nameof(SleepTicks), SleepTicks);
         }
     }
