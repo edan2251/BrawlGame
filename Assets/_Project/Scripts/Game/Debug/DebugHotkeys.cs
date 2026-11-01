@@ -28,6 +28,9 @@ namespace Knockbox.Game
         {
             runner = GetComponent<MatchRunner>();
             presenter = GetComponent<MatchPresenter>();
+            // 명령줄 자동 진행(-autobots, -ticksperframe N). 인수가 없으면 스스로 꺼진다(CP24).
+            if (GetComponent<AutoPlayDebug>() == null)
+                gameObject.AddComponent<AutoPlayDebug>();
             bot = new BotInputSource(() => runner.World, 1, 0xB07u);
         }
 
