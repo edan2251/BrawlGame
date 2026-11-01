@@ -153,6 +153,10 @@ namespace Knockbox.Simulation
             }
 
             int standing = 0;
+            // 부분 붕괴는 한 번의 돌진에 상자 하나(캐릭터 중심 높이에 가장 가까운 상자)만 쳐낸다.
+            int knockout = -1;
+            float knockoutGap = float.MaxValue, knockoutPower = 0f;
+            var knockoutDirection = Vec2.Zero;
             for (int i = 0; i < props.Count; i++)
             {
                 ref readonly var b = ref PropState.At(in props, i);
@@ -175,10 +179,13 @@ namespace Knockbox.Simulation
                 {
                     impulses.Add(i, -n * (power * c.LungeImpulseScale), point, b, index);
                     impulses.Strike(i, index, c.StrikeCooldownTicks);
-                    if (power >= c.KnockoutPower && PropPhysics.IsBox(def.Kind))
+                    float gap = SimMath.Abs(b.Position.Y - f.Position.Y);
+                    if (power >= c.KnockoutPower && PropPhysics.IsBox(def.Kind) && gap < knockoutGap)
                     {
-                        impulses.Knockout(i, -n);
-                        events.Add(new SimEvent(tick, SimEventType.BoxKnockout, index, b.Position, -n, power));
+                        knockout = i;
+                        knockoutGap = gap;
+                        knockoutPower = power;
+                        knockoutDirection = -n;
                     }
                     if (m >= c.LungeHeavyMass)
                         f.Velocity = (f.Velocity - n * (2f * Vec2.Dot(f.Velocity, n))) * c.LungeHeavyRestitution;
@@ -225,6 +232,11 @@ namespace Knockbox.Simulation
                     else if (!PropPhysics.Asleep(b, c))
                         impulses.Press(i, weight, point, b);
                 }
+            }
+            if (knockout >= 0)
+            {
+                impulses.Knockout(knockout, knockoutDirection);
+                events.Add(new SimEvent(tick, SimEventType.BoxKnockout, index, PropState.At(in props, knockout).Position, knockoutDirection, knockoutPower));
             }
             // 서 있던 구조물에 겹치지 않고 딱 맞닿아 있으면(잠든 상자는 내려앉지 않는다) 지형처럼 접지 탐지 거리만큼 아래를 더듬어 계속 선 것으로 본다.
             if (standing == 0 && wasOn > 0 && wasOn <= props.Count && f.Velocity.Y <= 0f)
