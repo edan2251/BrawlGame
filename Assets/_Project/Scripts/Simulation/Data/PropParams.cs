@@ -68,7 +68,7 @@ namespace Knockbox.Simulation
             FighterMass = 1f,
             FighterRestitution = 0.15f,
             StandCos = 0.6427876f,
-            LungeImpulseScale = 1f,
+            LungeImpulseScale = 0.5f,
             LungeHeavyMass = 4f,
             LungeHeavyRestitution = 0.6f,
             HitMinSpeed = 10f,

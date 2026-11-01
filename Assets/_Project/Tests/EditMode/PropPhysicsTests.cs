@@ -334,6 +334,129 @@ namespace Knockbox.Tests.EditMode
             }
         }
 
+        /// <summary>던져진 캐릭터는 구조물과 운동량을 주고받고, 질량 4 이상 구조물에 세게 부딪히면 벽꽝.</summary>
+        [Test]
+        public void ThrownFighter_ExchangesMomentum_AndSplatsOnHeavyBlock()
+        {
+            foreach (bool heavy in new[] { false, true })
+            {
+                var block = new PropDef
+                {
+                    Kind = PropKind.Hanging, Group = 0, Center = new Vec2(0f, 3f), HalfSize = heavy ? new Vec2(1.5f, 1f) : new Vec2(1f, 0.5f),
+                    HasAnchor = true, Anchor = new Vec2(0f, 8f), AnchorProp = -1,
+                };
+                var arena = BoundaryTests.Open().WithProps(new[] { block });
+                var w = World(arena, new Vec2(-2.0f, 3f), new Vec2(14f, -8f));
+                var s = w.State;
+                s.Fighter0.Velocity = new Vec2(24f, 0f);
+                s.Fighter0.StunTicks = 30;
+                s.Fighter0.SetAction(ActionState.Thrown);
+                s.Fighter0.Grounded = false;
+                w.State = s;
+                bool splat = false;
+                for (int t = 0; t < 12; t++)
+                {
+                    w.Step(default, default);
+                    for (int e = 0; e < w.Events.Count; e++)
+                        splat |= w.Events[e].Type == SimEventType.WallSplat;
+                }
+                var b = PropState.At(w.State.Props, 0);
+                Assert.Greater(b.Velocity.X, 0.5f, $"무거움 {heavy}: 구조물이 밀려남");
+                Assert.Less(w.State.Fighter0.Position.X, b.Position.X, $"무거움 {heavy}: 캐릭터는 구조물 앞쪽에 남음");
+                Assert.AreEqual(heavy, splat, $"무거움 {heavy}: 벽꽝은 질량 4 이상에서만");
+            }
+        }
+
+        /// <summary>
+        /// 원칙 9 확인(CP13 S-117의 ±30° 가정): 맵의 매달린 블록을 가장 센 돌진(위력 34 × 배율)으로 쳐도 30° 넘게 흔들리지 않는다.
+        /// </summary>
+        [TestCaseSource(typeof(MapV2Tests), nameof(MapV2Tests.NewMaps))]
+        public void StrongestLunge_SwingStaysWithinDesignAngle(string name)
+        {
+            var config = Config();
+            var arena = ArenaFiles.LoadByName(name);
+            float power = config.Combat.Charge.LungeMaxSpeed * config.Combat.Charge.LungeAggression * config.Combat.Props.LungeImpulseScale;
+            for (int i = 0; i < arena.DynamicPropCount; i++)
+            {
+                var joint = arena.GetJoint(i);
+                if (joint.Kind != PropJointKind.Rope)
+                    continue;
+                var def = arena.GetProp(arena.DynamicProp(i));
+                var w = World(arena, new Vec2(-16f, -8f), new Vec2(16f, -8f));
+                float m = PropPhysics.Mass(def, config.Combat.Props);
+                Push(w, i, new Vec2((def.Center.X >= 0f ? -1f : 1f) * power / m, 0f), 0f);
+                float worst = 0f;
+                for (int t = 0; t < 240; t++)
+                {
+                    w.Step(default, default);
+                    var d = PropState.At(w.State.Props, i).Position - joint.WorldAnchor;
+                    worst = System.Math.Max(worst, (float)(System.Math.Atan2(System.Math.Abs(d.X), -d.Y) * 180.0 / System.Math.PI));
+                }
+                TestContext.WriteLine($"[Knockbox][CP14-4] {name} 매달린 블록 x {def.Center.X:F1}: 질량 {m:F1}, 최대 {worst:F0}°");
+                Assert.LessOrEqual(worst, 30.5f, $"{name} 블록 {def.Center}");
+            }
+        }
+
+        // CP14-6 ----------------------------------------------------------------------
+
+        /// <summary>맵 6개, 봇 경기 3600틱: Step 평균 0.25 ms 이하, 롤백 8틱(복원 + 다시 계산) 2 ms 이하, Step GC 할당 0.</summary>
+        [TestCaseSource(typeof(MapV2Tests), nameof(MapV2Tests.NewMaps))]
+        public void StepAndRollback_WithinBudget(string name)
+        {
+            var config = Config();
+            var arena = ArenaFiles.LoadByName(name);
+            var w = new SimWorld(config, arena, SimState.CreateRound(config, arena, 7, MatchPhase.Fighting));
+            var bot1 = new BotInputSource(() => w, 0, 77u);
+            var bot2 = new BotInputSource(() => w, 1, 99u);
+            const int ticks = 3600;
+            var in1 = new InputFrame[ticks];
+            var in2 = new InputFrame[ticks];
+            var history = new SimState[ticks];
+            double stepMs = 0, worstRollback = 0;
+            long allocated = 0;
+            int awakeTicks = 0;
+            var watch = new System.Diagnostics.Stopwatch();
+            for (int t = 0; t < ticks; t++)
+            {
+                int tick = w.State.Tick;
+                in1[t] = bot1.Poll(tick);
+                in2[t] = bot2.Poll(tick);
+                history[t] = w.State;
+                long before = System.GC.GetAllocatedBytesForCurrentThread();
+                watch.Restart();
+                w.Step(in1[t], in2[t]);
+                watch.Stop();
+                allocated += System.GC.GetAllocatedBytesForCurrentThread() - before;
+                stepMs += watch.Elapsed.TotalMilliseconds;
+                for (int i = 0; i < w.State.Props.Count; i++)
+                {
+                    if (!PropPhysics.Asleep(PropState.At(w.State.Props, i), config.Combat.Props))
+                    {
+                        awakeTicks++;
+                        break;
+                    }
+                }
+                if (t >= 8 && t % 60 == 0)
+                {
+                    var keep = w.State;
+                    watch.Restart();
+                    w.State = history[t - 7];
+                    for (int k = t - 7; k <= t; k++)
+                        w.Step(in1[k], in2[k]);
+                    watch.Stop();
+                    worstRollback = System.Math.Max(worstRollback, watch.Elapsed.TotalMilliseconds);
+                    Assert.AreEqual(keep.ComputeChecksum(), w.State.ComputeChecksum(), $"틱 {t}: 되감아 다시 계산한 결과");
+                }
+            }
+            double average = stepMs / ticks;
+            string report = $"[Knockbox][CP14-6] {name}: 강체 {w.State.Props.Count}, 깨어 있는 틱 {awakeTicks}/{ticks}, Step 평균 {average:F4} ms, 롤백 8틱 최대 {worstRollback:F3} ms, Step 할당 {allocated} B";
+            TestContext.WriteLine(report);
+            UnityEngine.Debug.Log(report);
+            Assert.LessOrEqual(average, 0.25, report);
+            Assert.LessOrEqual(worstRollback, 2.0, report);
+            Assert.AreEqual(0, allocated, report);
+        }
+
         // CP14-5 ----------------------------------------------------------------------
 
         /// <summary>오른쪽 막대를 오른쪽에서 들이받은 결과와 왼쪽 막대를 왼쪽에서 들이받은 결과가 거울처럼 같다.</summary>
