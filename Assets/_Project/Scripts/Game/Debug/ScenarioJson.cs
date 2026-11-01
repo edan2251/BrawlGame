@@ -43,6 +43,8 @@ namespace Knockbox.Game
                 Arena = GetString(root, "arena", "Box"),
                 Mode = GetString(root, "mode", ""),
                 Form = GetString(root, "form", ""),
+                Form2 = GetString(root, "form2", ""),
+                Owned = GetInt(root, "owned", 0),
                 Grab = GetBool(root, "grab", !root.ContainsKey("form")),
                 Guard = GetBool(root, "guard", false),
                 Energy = GetBool(root, "energy", true),
@@ -145,8 +147,9 @@ namespace Knockbox.Game
                     case "Dash": buttons |= InputButtons.Dash; break;
                     case "Guard": buttons |= InputButtons.Guard; break;
                     case "Grab": buttons |= InputButtons.Grab; break;
+                    case "Switch": buttons |= InputButtons.SwitchForm; break;
                     default:
-                        throw new FormatException($"{where}: 알 수 없는 입력 이름 \"{item}\" (Left, Right, Up, Down, Jump, Attack, Dash, Guard, Grab)");
+                        throw new FormatException($"{where}: 알 수 없는 입력 이름 \"{item}\" (Left, Right, Up, Down, Jump, Attack, Dash, Guard, Grab, Switch)");
                 }
             }
         }

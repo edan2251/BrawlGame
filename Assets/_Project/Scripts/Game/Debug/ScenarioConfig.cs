@@ -19,13 +19,22 @@ namespace Knockbox.Game
         {
             if (string.IsNullOrEmpty(def.Form))
                 return RuleSet.Legacy(ParseMode(def.Mode), def.Grab);
-            if (!Enum.TryParse(def.Form, false, out FighterForm form) || !Enum.IsDefined(typeof(FighterForm), form))
-                throw new FormatException($"\"form\": 알 수 없는 폼 \"{def.Form}\" (가능: {string.Join(", ", Enum.GetNames(typeof(FighterForm)))})");
+            var form = ParseForm(def.Form, "form");
+            var form2 = string.IsNullOrEmpty(def.Form2) ? form : ParseForm(def.Form2, "form2");
+            if (def.Owned < 0 || def.Owned > Forms.AllPlayable)
+                throw new FormatException($"\"owned\": 0~{Forms.AllPlayable} 사이 비트여야 함");
             return new RuleSet
             {
-                StartForm = form,
                 Switches = new FeatureSwitches { GuardEnabled = def.Guard, GrabEnabled = def.Grab, EnergyEnabled = def.Energy },
-            };
+                OwnedForms = (byte)def.Owned,
+            }.WithForms(form, form2);
+        }
+
+        static FighterForm ParseForm(string text, string key)
+        {
+            if (!Enum.TryParse(text, false, out FighterForm form) || !Enum.IsDefined(typeof(FighterForm), form))
+                throw new FormatException($"\"{key}\": 알 수 없는 폼 \"{text}\" (가능: {string.Join(", ", Enum.GetNames(typeof(FighterForm)))})");
+            return form;
         }
 
         /// <summary>빈 문자열이면 테스트 모드.</summary>

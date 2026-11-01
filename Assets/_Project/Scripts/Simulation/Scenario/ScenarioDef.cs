@@ -10,6 +10,10 @@ namespace Knockbox.Simulation
         public string Mode = "";
         /// <summary>폼 규칙(CR-003): 비어 있으면 mode·grab의 레거시 규칙(가드 켬, 에너지 끔). 있으면 Scissors·Rock·Paper.</summary>
         public string Form = "";
+        /// <summary>폼 규칙에서 P2의 시작 폼(비우면 P1과 같음).</summary>
+        public string Form2 = "";
+        /// <summary>폼 규칙에서 시작 보유 폼 비트(1 가위, 2 바위, 4 보). 0이면 시작 폼만.</summary>
+        public int Owned;
         public bool Grab = true;
         /// <summary>폼 규칙일 때만 쓴다. 기본 끔(D-043).</summary>
         public bool Guard;

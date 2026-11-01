@@ -216,6 +216,50 @@ namespace Knockbox.Tests.PlayMode
             Debug.Log($"[Knockbox][CP3-6] 연출을 켠 Sandbox에서 showcase {played}개 재생, 최종 체크섬이 헤드리스 실행과 모두 같음");
         }
 
+        /// <summary>
+        /// CP21-5: 현재 폼 표시 세 방식 모두 시뮬레이션 체크섬에 영향이 없다(연출을 켠 재생 = 헤드리스 재생).
+        /// CP21-7: 렌더링 오류 확인용 캡처를 처음 방식에서만 960×540으로 남긴다(Captures/CP21, Git 제외).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator FormDisplayModes_DoNotChangeChecksum()
+        {
+            yield return LoadSandbox();
+            var def = ScenarioJson.LoadByName("showcase_cp21_forms");
+            var headless = ScenarioRun.Run(def, ScenarioConfig.Create(def), ArenaFiles.LoadByName(def.Arena));
+            Directory.CreateDirectory(ScenarioPlayer.CaptureFolder("CP21"));
+            foreach (FormDisplayMode mode in Enum.GetValues(typeof(FormDisplayMode)))
+            {
+                presenter.FormDisplay = mode;
+                player.Play(def);
+                double deadline = Time.realtimeSinceStartupAsDouble + def.Ticks / 60.0 + 5.0;
+                bool captured0 = false, captured1 = false;
+                while (!player.Finished && Time.realtimeSinceStartupAsDouble < deadline)
+                {
+                    if (mode == FormDisplayMode.Always)
+                    {
+                        int tick = runner.World.State.Tick;
+                        if (!captured0 && tick >= def.Captures[0].Tick)
+                        {
+                            presenter.RenderFrame();
+                            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(ScenarioPlayer.CaptureFolder("CP21"), $"{def.Captures[0].Name}.png"), 960, 540);
+                            captured0 = true;
+                        }
+                        if (!captured1 && tick >= def.Captures[1].Tick)
+                        {
+                            presenter.RenderFrame();
+                            ScenarioPlayer.SaveCameraImage(camera, Path.Combine(ScenarioPlayer.CaptureFolder("CP21"), $"{def.Captures[1].Name}.png"), 960, 540);
+                            captured1 = true;
+                        }
+                    }
+                    yield return null;
+                }
+                Assert.IsTrue(player.Finished, $"{mode}");
+                Assert.AreEqual(headless.FinalChecksum, runner.World.ComputeChecksum(), $"{mode}: 표시 방식이 시뮬레이션을 바꿈");
+            }
+            presenter.FormDisplay = FormDisplayMode.Always;
+            LogAssert.NoUnexpectedReceived();
+        }
+
         [UnityTest]
         public IEnumerator FrameTimeAndPresentationAllocations()
         {
