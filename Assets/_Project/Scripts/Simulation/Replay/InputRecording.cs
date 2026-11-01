@@ -12,7 +12,8 @@ namespace Knockbox.Simulation
     public sealed class InputRecording
     {
         public const uint Magic = 0x5052424B; // "KBRP"
-        public const ushort FormatVersion = 3;
+        /// <summary>4: CR-003(CP18). Mode 칸에 규칙(RuleSet.Format)을 쓰고 상태에 폼·에너지가 들어갔다. 3 이하 기록은 설정 체크섬이 달라 재생할 수 없다.</summary>
+        public const ushort FormatVersion = 4;
         public const char ArenaSeparator = ',';
 
         readonly List<InputFrame> p1 = new List<InputFrame>();
@@ -167,8 +168,10 @@ namespace Knockbox.Simulation
             if (r.ReadUInt32() != Magic)
                 throw new InvalidDataException("입력 기록 파일이 아님");
             ushort version = r.ReadUInt16();
-            if (version != FormatVersion && version != 2)
-                throw new InvalidDataException($"지원하지 않는 입력 기록 버전: {version}");
+            if (version != FormatVersion)
+                throw new InvalidDataException(version < FormatVersion
+                    ? $"CR-003(폼 전투) 전의 입력 기록(버전 {version})은 호환되지 않음"
+                    : $"지원하지 않는 입력 기록 버전: {version}");
 
             var rec = new InputRecording
             {
@@ -184,8 +187,6 @@ namespace Knockbox.Simulation
                 HasFinalChecksum = r.ReadBoolean(),
                 FinalChecksum = r.ReadUInt32(),
             };
-            // 버전 2: 맵 하나, 순환 상태 없음.
-            if (version >= 3)
             {
                 rec.Rotation = new ArenaRotation
                 {

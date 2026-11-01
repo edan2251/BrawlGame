@@ -126,6 +126,9 @@ namespace Knockbox.Simulation
                 Health = config.Combat.MaxHealth,
                 AttackId = FighterState.NoAttack,
                 TicksSinceGuardPress = FighterState.TimerCap,
+                Form = config.StartForm,
+                OwnedForms = Forms.Bit(config.StartForm),
+                Energy = config.Combat.Energy.Max,
             };
             f.GroundBox = TerrainCollision.ProbeGround(center, config.HalfBody, arena, m.GroundProbeDistance, FighterState.NoBox);
             f.Grounded = f.GroundBox != FighterState.NoBox;

@@ -74,6 +74,7 @@ namespace Knockbox.Simulation
                 f.BoundaryImmunityTicks--;
             if (f.BoxDamageTicks > 0 && --f.BoxDamageTicks == 0)
                 f.BoxDamageSum = 0;
+            TickEnergy(ref f, config);
             // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
             bool guardPressed = (pressed & InputButtons.Guard) != 0;
             int sinceGuardPress = SimMath.Min(f.TicksSinceGuardPress + 1, FighterState.TimerCap);
@@ -136,15 +137,16 @@ namespace Knockbox.Simulation
                 // 모드 B: 대시 시작 4틱 이후에는 공격으로 캔슬할 수 있다(대시 속도를 그대로 실은 공격).
                 ref readonly var swing = ref c.Swing;
                 int elapsed = config.Movement.DashTicks - f.DashTicksLeft;
-                if (config.Mode == CombatMode.Swing && swing.DashAttackCancelEnabled && (pressed & InputButtons.Attack) != 0
-                    && elapsed >= swing.DashAttackCancelMinTicks)
+                if (f.Form == FighterForm.Paper && swing.DashAttackCancelEnabled && (pressed & InputButtons.Attack) != 0
+                    && elapsed >= swing.DashAttackCancelMinTicks && CanAfford(f, c.Energy.CostOf(FighterForm.Paper), config))
                 {
                     StartAttack(ref f, input.MoveX, SwingAttack(f, input), index, tick, events);
+                    Spend(ref f, c.Energy.CostOf(FighterForm.Paper), config);
                 }
                 return pressed;
             }
 
-            if (input.Held(InputButtons.Guard))
+            if (config.GuardEnabled && input.Held(InputButtons.Guard))
             {
                 f.SetAction(ActionState.Guard);
                 if (guardPressed && sinceGuardPress >= c.ParryCooldownTicks)
@@ -160,21 +162,30 @@ namespace Knockbox.Simulation
                 f.RestartAction(ActionState.Airborne);
             }
 
-            if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled)
+            int grabCost = SimMath.Max(c.Energy.GrabCost, 0);
+            if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled && CanAfford(f, grabCost, config))
             {
                 StartGrab(ref f, input.MoveX, index, tick, events);
+                Spend(ref f, grabCost, config);
                 return pressed;
             }
 
-            if ((pressed & InputButtons.Attack) != 0)
+            // 에너지가 모자라면 확인에서 막혀 공격이 시작되지 않는다. 입력은 버려지고 대기하지 않는다(4.4).
+            int cost = c.Energy.CostOf(f.Form);
+            if ((pressed & InputButtons.Attack) != 0 && CanAfford(f, cost, config))
             {
-                switch (config.Mode)
+                switch (f.Form)
                 {
-                    case CombatMode.Charge:
+                    case FighterForm.Scissors:
+                        // 충전은 확인만 하고, 소비는 발사할 때(Launch).
                         StartCharge(ref f, input.MoveX);
                         break;
-                    case CombatMode.Swing:
+                    case FighterForm.Paper:
                         StartAttack(ref f, input.MoveX, SwingAttack(f, input), index, tick, events);
+                        Spend(ref f, cost, config);
+                        break;
+                    case FighterForm.Rock:
+                        // 바위의 투사체는 CP19.
                         break;
                     default:
                         StartAttack(ref f, input.MoveX, AttackIds.Test, index, tick, events);
@@ -182,6 +193,38 @@ namespace Knockbox.Simulation
                 }
             }
             return pressed;
+        }
+
+        /// <summary>공격 행동(충전, 돌진, 선딜·활성·후딜, 잡기)인지. 이 동안 에너지 회복 지연이 처음으로 돌아간다.</summary>
+        public static bool IsAttackAction(in FighterState f) =>
+            f.Action == ActionState.Charge || f.Action == ActionState.Lunge || f.Action == ActionState.Attack
+            || f.Action == ActionState.Grab || f.Action == ActionState.Holding;
+
+        /// <summary>에너지 회복(4.4): 공격 행동 동안은 지연을 처음으로 돌리고, 끝난 뒤 지연이 지나면 틱마다 회복한다.</summary>
+        static void TickEnergy(ref FighterState f, SimConfig config)
+        {
+            if (!config.EnergyEnabled)
+                return;
+            ref readonly var e = ref config.Combat.Energy;
+            if (IsAttackAction(f))
+                f.EnergyRegenDelay = e.RegenDelayTicks;
+            else if (f.EnergyRegenDelay > 0)
+                f.EnergyRegenDelay--;
+            else if (f.Energy < e.Max)
+                f.Energy = SimMath.Min(e.Max, f.Energy + e.RegenPerTick);
+        }
+
+        /// <summary>시작 확인(차감 없음). 스위치가 꺼져 있으면 항상 된다.</summary>
+        public static bool CanAfford(in FighterState f, int cost, SimConfig config) => !config.EnergyEnabled || f.Energy >= cost;
+
+        /// <summary>행동당 한 번만 소비한다(4.4 규칙 1).</summary>
+        static void Spend(ref FighterState f, int cost, SimConfig config)
+        {
+            if (!config.EnergyEnabled || f.ActionPaid)
+                return;
+            f.Energy -= cost;
+            f.ActionPaid = true;
+            f.EnergyRegenDelay = config.Combat.Energy.RegenDelayTicks;
         }
 
         /// <summary>모드 B 기술 고르기: 위 → 위 휘두르기, 공중에서 아래 → 내려찍기, 그 외(중립·좌우·지상 아래) → 앞 휘두르기.</summary>
@@ -201,6 +244,7 @@ namespace Knockbox.Simulation
                 f.Facing = (sbyte)moveX;
             f.AttackId = attackId;
             f.AttackHasHit = false;
+            f.ActionPaid = false;
             f.AttackFromAir = !f.Grounded;
             f.DashTicksLeft = 0;
             f.RestartAction(ActionState.Attack);
@@ -213,6 +257,7 @@ namespace Knockbox.Simulation
                 f.Facing = (sbyte)moveX;
             f.DashTicksLeft = 0;
             f.ThrowPending = false;
+            f.ActionPaid = false;
             f.RestartAction(ActionState.Grab);
             events.Add(new SimEvent(tick, SimEventType.GrabStart, index, f.Position, new Vec2(f.Facing, 0f), 0f));
         }
@@ -222,6 +267,7 @@ namespace Knockbox.Simulation
             if (moveX != 0)
                 f.Facing = (sbyte)moveX;
             f.DashTicksLeft = 0;
+            f.ActionPaid = false;
             f.RestartAction(ActionState.Charge);
         }
 
@@ -230,6 +276,15 @@ namespace Knockbox.Simulation
         /// </summary>
         static void Launch(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
         {
+            // 소비는 발사할 때 한 번. 발사 틱에 모자라면 발사하지 않고 취소하며 소비하지 않는다(4.4 규칙 4).
+            int cost = config.Combat.Energy.CostOf(FighterForm.Scissors);
+            if (config.EnergyEnabled && !f.ActionPaid && f.Energy < cost)
+            {
+                f.RestartAction(ActionState.Airborne);
+                events.Add(new SimEvent(tick, SimEventType.EnergyShort, index, f.Position, new Vec2(f.Facing, 0f), f.Energy));
+                return;
+            }
+            Spend(ref f, cost, config);
             float speed = config.Combat.Charge.LungeSpeed(f.ActionTick);
             var direction = input.MoveX == 0 && input.MoveY == 0
                 ? new Vec2(f.Facing, 0f)
@@ -267,10 +322,10 @@ namespace Knockbox.Simulation
             return new Vec2(f.Position.X + offset.X * f.Facing, f.Position.Y + offset.Y);
         }
 
-        /// <summary>몸 충돌의 공격성 가중치: 모드 A에서 돌진 1.0, 대시 0.6, 그 외 0.</summary>
+        /// <summary>몸 충돌의 공격성 가중치: 가위 폼에서 돌진 1.0, 대시는 튜닝 값(CR-003 기본 0), 그 외 0.</summary>
         public static float Aggression(in FighterState f, SimConfig config)
         {
-            if (config.Mode != CombatMode.Charge)
+            if (f.Form != FighterForm.Scissors)
                 return 0f;
             if (f.Action == ActionState.Lunge)
                 return config.Combat.Charge.LungeAggression;

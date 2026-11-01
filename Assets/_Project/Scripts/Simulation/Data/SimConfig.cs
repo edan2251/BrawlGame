@@ -179,9 +179,8 @@ namespace Knockbox.Simulation
         public readonly MovementParams Movement;
         public readonly MatchParams Match;
         public readonly CombatParams Combat;
-        public readonly CombatMode Mode;
-        /// <summary>잡기 켜기/끄기(F4). 꺼져 있으면 잡기 입력을 무시한다.</summary>
-        public readonly bool GrabEnabled;
+        /// <summary>시작 폼과 기능 스위치(CR-003, 10 문서 5.1).</summary>
+        public readonly RuleSet Rules;
         public readonly float HalfBody;
 
         public SimConfig(in MovementParams movement, in MatchParams match)
@@ -189,9 +188,14 @@ namespace Knockbox.Simulation
         {
         }
 
+        /// <summary>CP16까지의 생성자: 전역 모드를 시작 폼으로 바꾸고 레거시 스위치(가드 켬, 에너지 끔)를 쓴다.</summary>
         public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, CombatMode mode, bool grabEnabled = true)
+            : this(movement, match, combat, RuleSet.Legacy(mode, grabEnabled))
         {
-            GrabEnabled = grabEnabled;
+        }
+
+        public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, in RuleSet rules)
+        {
             Movement = movement;
             Match = match;
             Combat = combat;
@@ -200,9 +204,19 @@ namespace Knockbox.Simulation
             Combat.Swing.Up = Prepare(combat.Swing.Up);
             Combat.Swing.Down = Prepare(combat.Swing.Down);
             Combat.Grab.NeutralThrowDirection = SimMath.Normalize(combat.Grab.NeutralThrowDirection);
-            Mode = mode;
+            Rules = rules;
             HalfBody = movement.BodySize * 0.5f;
         }
+
+        public FighterForm StartForm => Rules.StartForm;
+        public bool GuardEnabled => Rules.Switches.GuardEnabled;
+        /// <summary>잡기 켜기/끄기. 꺼져 있으면 잡기 입력을 무시한다.</summary>
+        public bool GrabEnabled => Rules.Switches.GrabEnabled;
+        public bool EnergyEnabled => Rules.Switches.EnergyEnabled;
+
+        /// <summary>CR-003 전의 전역 모드에 해당하는 값(시작 폼 기준). 시뮬레이션은 파이터의 폼을 읽는다.</summary>
+        public CombatMode Mode =>
+            StartForm == FighterForm.Scissors ? CombatMode.Charge : StartForm == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
 
         public static SimConfig CreateDefault() => new SimConfig(MovementParams.Default, MatchParams.Default);
 
@@ -245,8 +259,10 @@ namespace Knockbox.Simulation
             v.Begin(nameof(Combat));
             Combat.Visit(ref v);
             v.End();
-            v.Value(nameof(Mode), (int)Mode);
+            v.Value(nameof(StartForm), (int)StartForm);
+            v.Value(nameof(GuardEnabled), GuardEnabled);
             v.Value(nameof(GrabEnabled), GrabEnabled);
+            v.Value(nameof(EnergyEnabled), EnergyEnabled);
         }
     }
 }

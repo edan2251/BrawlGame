@@ -25,12 +25,15 @@ namespace Knockbox.Game
         /// <summary>튜닝 에셋이 없으면 명세 초기값으로 만든다.</summary>
         public static SimConfig Create(MovementTuning tuning) => Create(tuning, null, CombatMode.Test);
 
+        /// <summary>CP16까지의 규칙(전역 모드, 가드 켬, 에너지 끔). 기존 테스트와 기록 재생용.</summary>
         public static SimConfig Create(MovementTuning movement, CombatTuning combat, CombatMode mode, bool grabEnabled = true) =>
+            Create(movement, combat, RuleSet.Legacy(mode, grabEnabled));
+
+        public static SimConfig Create(MovementTuning movement, CombatTuning combat, in RuleSet rules) =>
             new SimConfig(
                 movement != null ? movement.Movement : MovementParams.Default,
                 movement != null ? movement.Match : MatchParams.Default,
                 combat != null ? combat.Combat : CombatParams.Default,
-                mode,
-                grabEnabled);
+                rules);
     }
 }

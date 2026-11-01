@@ -14,6 +14,9 @@ namespace Knockbox.Game
         const float BarWidth = 1.2f;
         const float BarHeight = 0.12f;
         const float BarOffsetY = 1.05f;
+        /// <summary>에너지 줄(CR-003 4.4): 체력 바 바로 아래의 얇은 민트 줄. 다음 공격 비용보다 적으면 흐린 색.</summary>
+        const float EnergyHeight = 0.05f;
+        const float EnergyGap = 0.04f;
         const float TrailHold = 0.4f;
         const float TrailSpeed = 2.5f;
         const float SlotSize = 0.24f;
@@ -37,6 +40,8 @@ namespace Knockbox.Game
         }
 
         readonly Bar[] bars = new Bar[2];
+        readonly SpriteRenderer[] energyBack = new SpriteRenderer[2];
+        readonly SpriteRenderer[] energyFill = new SpriteRenderer[2];
         readonly SpriteRenderer[] slots0 = new SpriteRenderer[MaxSlots];
         readonly SpriteRenderer[] slots1 = new SpriteRenderer[MaxSlots];
         PaletteAsset palette;
@@ -65,6 +70,8 @@ namespace Knockbox.Game
                 bars[i].Fill = ShapeLibrary.Create(transform, $"Bar{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.FighterBody(i));
                 bars[i].Shown = 1f;
                 bars[i].Trailing = 1f;
+                energyBack[i] = ShapeLibrary.Create(transform, $"Energy{i}Back", shapes.Square, SortingLayers.UI, 0, palette.uiEmpty);
+                energyFill[i] = ShapeLibrary.Create(transform, $"Energy{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.energy);
             }
             bannerShadow = CreateText("BannerShadow", 128, 0.2f, palette.ink, 10);
             banner = CreateText("Banner", 128, 0.2f, palette.flash, 11);
@@ -155,12 +162,18 @@ namespace Knockbox.Game
             sub.transform.localPosition = new Vector3(0f, SubY, 0f);
         }
 
-        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, float dt)
+        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, float dt) =>
+            Render(state, body0, body1, match, maxHealth, default, false, dt);
+
+        /// <param name="energyShown">에너지 스위치가 켜져 있을 때만 줄을 그린다.</param>
+        public void Render(in SimState state, Vector2 body0, Vector2 body1, in MatchParams match, float maxHealth, in EnergyParams energy, bool energyShown, float dt)
         {
             int roundsToWin = match.RoundsToWin;
             RenderBanner(state, match, dt);
             RenderBar(ref bars[0], body0, Health(state.Fighter0, maxHealth), dt);
             RenderBar(ref bars[1], body1, Health(state.Fighter1, maxHealth), dt);
+            RenderEnergy(0, state.Fighter0, body0, energy, energyShown);
+            RenderEnergy(1, state.Fighter1, body1, energy, energyShown);
 
             int count = Mathf.Clamp(roundsToWin, 0, MaxSlots);
             for (int k = 0; k < MaxSlots; k++)
@@ -180,6 +193,20 @@ namespace Knockbox.Game
         }
 
         static float Health(in FighterState f, float maxHealth) => maxHealth > 0f ? f.Health / maxHealth : 0f;
+
+        void RenderEnergy(int i, in FighterState f, Vector2 body, in EnergyParams energy, bool shown)
+        {
+            shown &= energy.Max > 0;
+            energyBack[i].enabled = shown;
+            energyFill[i].enabled = shown;
+            if (!shown)
+                return;
+            float fraction = Mathf.Clamp01((float)f.Energy / energy.Max);
+            float y = body.y + BarOffsetY - BarHeight * 0.5f - EnergyGap - EnergyHeight * 0.5f;
+            Place(energyBack[i], body.x - BarWidth * 0.5f, y, BarWidth, EnergyHeight, 0f);
+            Place(energyFill[i], body.x - BarWidth * 0.5f, y, BarWidth * fraction, EnergyHeight, 0f);
+            energyFill[i].color = f.Energy >= energy.CostOf(f.Form) ? palette.energy : palette.energySoft * new Color(1f, 1f, 1f, 0.45f);
+        }
 
         void RenderBar(ref Bar bar, Vector2 body, float fraction, float dt)
         {

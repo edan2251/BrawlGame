@@ -396,7 +396,7 @@ namespace Knockbox.Simulation
             }
 
             // 모드 B: 공중에서 시작한 공격 도중 착지하면 공격이 끝나고 착지 경직.
-            if (f.Action == ActionState.Attack && f.AttackFromAir && f.Grounded && !scratch.WasGrounded && config.Mode == CombatMode.Swing)
+            if (f.Action == ActionState.Attack && f.AttackFromAir && f.Grounded && !scratch.WasGrounded && f.Form == FighterForm.Paper)
             {
                 f.RestartAction(ActionState.LandingLag);
                 f.StunTicks = config.Combat.Swing.LandingLagTicks;

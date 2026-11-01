@@ -8,7 +8,13 @@ namespace Knockbox.Simulation
         public string Name = "";
         public string Arena = "Box";
         public string Mode = "";
+        /// <summary>폼 규칙(CR-003): 비어 있으면 mode·grab의 레거시 규칙(가드 켬, 에너지 끔). 있으면 Scissors·Rock·Paper.</summary>
+        public string Form = "";
         public bool Grab = true;
+        /// <summary>폼 규칙일 때만 쓴다. 기본 끔(D-043).</summary>
+        public bool Guard;
+        /// <summary>폼 규칙일 때만 쓴다. 기본 켬.</summary>
+        public bool Energy = true;
         /// <summary>캡처할 때 F3 판정 오버레이를 켠다(연출 전용, 시뮬레이션과 무관).</summary>
         public bool Overlay;
         /// <summary>캡처할 때 `~` 단축키 도움말을 연다(연출 전용).</summary>

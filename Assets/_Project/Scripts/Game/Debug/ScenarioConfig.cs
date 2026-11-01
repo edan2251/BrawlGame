@@ -10,7 +10,21 @@ namespace Knockbox.Game
     public static class ScenarioConfig
     {
         public static SimConfig Create(ScenarioDef def, MovementTuning movement = null, CombatTuning combat = null) =>
-            Apply(SimConfigFactory.Create(movement, combat, ParseMode(def.Mode), def.Grab), def.Tuning);
+            Apply(SimConfigFactory.Create(movement, combat, ParseRules(def)), def.Tuning);
+
+        /// <summary>"form"이 있으면 폼 규칙(가드·잡기·에너지는 시나리오 값), 없으면 mode·grab의 레거시 규칙.</summary>
+        public static RuleSet ParseRules(ScenarioDef def)
+        {
+            if (string.IsNullOrEmpty(def.Form))
+                return RuleSet.Legacy(ParseMode(def.Mode), def.Grab);
+            if (!Enum.TryParse(def.Form, false, out FighterForm form) || !Enum.IsDefined(typeof(FighterForm), form))
+                throw new FormatException($"\"form\": 알 수 없는 폼 \"{def.Form}\" (가능: {string.Join(", ", Enum.GetNames(typeof(FighterForm)))})");
+            return new RuleSet
+            {
+                StartForm = form,
+                Switches = new FeatureSwitches { GuardEnabled = def.Guard, GrabEnabled = def.Grab, EnergyEnabled = def.Energy },
+            };
+        }
 
         /// <summary>빈 문자열이면 테스트 모드.</summary>
         public static CombatMode ParseMode(string mode)
@@ -42,7 +56,7 @@ namespace Knockbox.Game
                     default: throw new FormatException($"tuning.{t.Path}: \"{parts[0]}\"는 Movement, Match, Combat 중 하나여야 함");
                 }
             }
-            return new SimConfig((MovementParams)movement, (MatchParams)match, (CombatParams)combat, source.Mode, source.GrabEnabled);
+            return new SimConfig((MovementParams)movement, (MatchParams)match, (CombatParams)combat, source.Rules);
         }
 
         static object SetPath(object boxed, string[] parts, int index, in ScenarioTuning t)

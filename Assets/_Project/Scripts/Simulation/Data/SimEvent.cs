@@ -52,6 +52,8 @@ namespace Knockbox.Simulation
         BoxKnockout,
         /// <summary>구조물이 지형·다른 구조물에 세게 부딪힘(CP16 연출용). Fighter는 NoFighter, Position은 접촉점, Direction은 법선, Strength는 다가온 속도. 몸마다 틱에 한 번.</summary>
         PropImpact,
+        /// <summary>발사 틱에 에너지가 비용보다 적어 행동을 취소함(CR-003 4.4 규칙 4). Fighter는 취소한 쪽, Strength는 그때 에너지.</summary>
+        EnergyShort,
     }
 
     /// <summary>

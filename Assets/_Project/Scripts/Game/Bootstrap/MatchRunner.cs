@@ -15,10 +15,8 @@ namespace Knockbox.Game
         [SerializeField] CombatTuning combatTuning;
         [Tooltip("F11로 순환하는 전투 튜닝 프리셋(기본, 더 빠르게)")]
         [SerializeField] CombatTuning[] combatPresets;
-        [Tooltip("전투 모드. 확정 방향은 Charge(모드 A, D-017). Swing은 동결(D-018), Test는 에디터 전용")]
-        [SerializeField] CombatMode mode = CombatMode.Charge;
-        [Tooltip("잡기 켜기/끄기(F4). 다음 StartNewMatch부터 적용")]
-        [SerializeField] bool grabEnabled = true;
+        [Tooltip("시작 폼과 기능 스위치(CR-003): F1 폼, F4 가드·잡기, Insert 에너지. 다음 StartNewMatch부터 적용")]
+        [SerializeField] RuleSet rules = RuleSet.Default;
         [SerializeField] TextAsset[] arenaFiles;
         [Tooltip("맵 짝 파일(<이름>.json): 테마, 광원, 순환 포함 여부")]
         [SerializeField] TextAsset[] arenaMetaFiles;
@@ -123,14 +121,11 @@ namespace Knockbox.Game
         {
             if (recording == null)
                 return false;
-            CombatMode recordedMode;
-            if (!System.Enum.TryParse(recording.Mode, out recordedMode))
-                recordedMode = mode;
-            var config = FindRecordedConfig(recording, recordedMode);
+            var config = FindRecordedConfig(recording);
             if (config == null)
             {
                 Debug.LogWarning("[Knockbox] 기록과 같은 튜닝 설정을 찾지 못해 재생 결과가 다를 수 있음");
-                config = SimConfigFactory.Create(movementTuning, combatTuning, recordedMode, grabEnabled);
+                config = SimConfigFactory.Create(movementTuning, combatTuning, RecordedRuleCandidates(recording.Mode)[0]);
             }
             string[] names = recording.ArenaNames;
             var arenas = new ArenaDef[names.Length];
@@ -155,17 +150,18 @@ namespace Knockbox.Game
             return true;
         }
 
-        /// <summary>지금 프리셋들과 잡기 켬·끔 중에서 기록의 설정 체크섬과 같은 설정을 찾는다. 없으면 null.</summary>
-        SimConfig FindRecordedConfig(InputRecording recording, CombatMode recordedMode)
+        /// <summary>지금 프리셋들과 기록의 규칙 후보 중에서 기록의 설정 체크섬과 같은 설정을 찾는다. 없으면 null.</summary>
+        SimConfig FindRecordedConfig(InputRecording recording)
         {
+            var candidates = RecordedRuleCandidates(recording.Mode);
             for (int p = -1; p < (combatPresets != null ? combatPresets.Length : 0); p++)
             {
                 var tuning = p < 0 ? combatTuning : combatPresets[p];
                 if (p >= 0 && (tuning == null || tuning == combatTuning))
                     continue;
-                for (int g = 0; g < 2; g++)
+                foreach (var candidate in candidates)
                 {
-                    var config = SimConfigFactory.Create(movementTuning, tuning, recordedMode, g == 0 ? grabEnabled : !grabEnabled);
+                    var config = SimConfigFactory.Create(movementTuning, tuning, candidate);
                     if (config.ComputeChecksum() == recording.ConfigChecksum)
                         return config;
                 }
@@ -173,18 +169,36 @@ namespace Knockbox.Game
             return null;
         }
 
-        /// <summary>다음 StartNewMatch부터 적용된다.</summary>
+        /// <summary>
+        /// 기록의 규칙 문자열(RuleSet.Format) → 후보 하나. CP16까지의 모드 이름("Charge" 등)이면 레거시 규칙의 잡기 켬·끔 두 후보.
+        /// </summary>
+        RuleSet[] RecordedRuleCandidates(string recorded)
+        {
+            if (RuleSet.TryParse(recorded, out var parsed))
+                return new[] { parsed };
+            var legacy = System.Enum.TryParse(recorded, out CombatMode recordedMode) ? recordedMode : Mode;
+            return new[] { RuleSet.Legacy(legacy, rules.Switches.GrabEnabled), RuleSet.Legacy(legacy, !rules.Switches.GrabEnabled) };
+        }
+
+        /// <summary>시작 폼과 기능 스위치. 다음 StartNewMatch부터 적용된다.</summary>
+        public RuleSet Rules
+        {
+            get => rules;
+            set => rules = value;
+        }
+
+        /// <summary>CP16까지의 전역 모드(레거시 테스트용). 설정하면 레거시 스위치(가드 켬, 에너지 끔)로 바뀐다.</summary>
         public CombatMode Mode
         {
-            get => mode;
-            set => mode = value;
+            get => rules.StartForm == FighterForm.Scissors ? CombatMode.Charge : rules.StartForm == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
+            set => rules = RuleSet.Legacy(value, rules.Switches.GrabEnabled);
         }
 
         /// <summary>다음 StartNewMatch부터 적용된다.</summary>
         public bool GrabEnabled
         {
-            get => grabEnabled;
-            set => grabEnabled = value;
+            get => rules.Switches.GrabEnabled;
+            set => rules.Switches.GrabEnabled = value;
         }
 
         public int InputDelayTicks
@@ -316,7 +330,7 @@ namespace Knockbox.Game
 #endif
         }
 
-        public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, mode, grabEnabled);
+        public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, rules);
 
         /// <summary>등록된 맵 텍스트에서 찾고, 에디터에서는 없으면 디스크에서 읽는다.</summary>
         public ArenaDef ResolveArena(string name)

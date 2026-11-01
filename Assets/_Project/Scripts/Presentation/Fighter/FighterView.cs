@@ -308,7 +308,7 @@ namespace Knockbox.Presentation
             Vector2 hip1 = pose.TransformPoint(new Vector3(0.17f, 0.04f, 0f));
             Vector2 shoulder0 = pose.TransformPoint(new Vector3(-0.46f, 0.5f, 0f));
             Vector2 shoulder1 = pose.TransformPoint(new Vector3(0.46f, 0.5f, 0f));
-            bool swing = config.Mode == CombatMode.Swing && current.Action != ActionState.KO;
+            bool swing = current.Form == FighterForm.Paper && current.Action != ActionState.KO;
             Vector2 grip = default, tip = default;
             bool tipFixed = swing && SwingWeaponPose(current, position, alpha, config, out grip, out tip);
             if (tipFixed)

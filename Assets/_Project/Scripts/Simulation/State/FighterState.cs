@@ -129,6 +129,17 @@ namespace Knockbox.Simulation
         public int BoxDamageTicks;
         public int BoxDamageSum;
 
+        /// <summary>현재 폼(CR-003). 공격 버튼이 무엇을 하는지 정한다.</summary>
+        public FighterForm Form;
+        /// <summary>보유 폼 비트(Forms.Bit). 전환은 보유한 폼 사이에서만(CP21).</summary>
+        public byte OwnedForms;
+        /// <summary>공격 에너지(10 문서 4.4). 스위치가 꺼져 있으면 쓰지 않는다.</summary>
+        public int Energy;
+        /// <summary>남은 회복 지연 틱. 공격 행동 동안 RegenDelayTicks로 유지되고, 행동이 끝난 뒤부터 줄어든다.</summary>
+        public int EnergyRegenDelay;
+        /// <summary>지금 행동이 이미 에너지를 소비했다(행동당 정확히 한 번, 4.4 규칙 1). 새 행동을 시작할 때 지운다.</summary>
+        public bool ActionPaid;
+
         public const int NoAttack = -1;
 
         /// <summary>이동 규칙이 행동을 정하는 상태(조작 가능).</summary>
@@ -207,6 +218,11 @@ namespace Knockbox.Simulation
             v.Value(nameof(OnProp), OnProp);
             v.Value(nameof(BoxDamageTicks), BoxDamageTicks);
             v.Value(nameof(BoxDamageSum), BoxDamageSum);
+            v.Value(nameof(Form), (int)Form);
+            v.Value(nameof(OwnedForms), (int)OwnedForms);
+            v.Value(nameof(Energy), Energy);
+            v.Value(nameof(EnergyRegenDelay), EnergyRegenDelay);
+            v.Value(nameof(ActionPaid), ActionPaid);
         }
     }
 }

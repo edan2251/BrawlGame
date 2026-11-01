@@ -198,7 +198,8 @@ namespace Knockbox.Simulation
             LungeBounceRestitution = 0.6f,
             LungeMaxBounces = 2,
             LungeAggression = 1f,
-            DashAggression = 0.6f,
+            // CR-003 4.4: 이동 대시의 몸통 공격성은 끈다(에너지 없이 피해를 주는 구멍). CP16까지 0.6.
+            DashAggression = 0f,
             PowerThreshold = 6f,
             ClashPowerMargin = 4f,
             ContactCooldownTicks = 10,
@@ -500,6 +501,8 @@ namespace Knockbox.Simulation
         public GrabParams Grab;
         /// <summary>구조물 물리와 캐릭터 상호작용(09-props-physics.md, CP14).</summary>
         public PropParams Props;
+        /// <summary>공격 에너지(10-forms-and-growth.md 4.4, CP18).</summary>
+        public EnergyParams Energy;
 
         public static CombatParams Default => new CombatParams
         {
@@ -564,6 +567,7 @@ namespace Knockbox.Simulation
             Swing = SwingModeParams.Default,
             Grab = GrabParams.Default,
             Props = PropParams.Default,
+            Energy = EnergyParams.Default,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -629,6 +633,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Props));
             Props.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Energy));
+            Energy.Visit(ref v);
             v.End();
         }
     }

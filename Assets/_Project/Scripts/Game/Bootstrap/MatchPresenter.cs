@@ -56,10 +56,9 @@ namespace Knockbox.Game
         // 디버그 글자 아래줄: 바뀔 때만 새로 만든다.
         string footer;
         string footerArena;
-        CombatMode footerMode;
+        SimConfig footerConfig;
         IInputSource footerP2;
         DummyBehavior footerDummy;
-        bool footerGrab;
         string footerPreset;
         bool footerRecording;
         bool footerPlayback;
@@ -324,7 +323,7 @@ namespace Knockbox.Game
             boundaryView.Render(V(current.Fighter0.Position), V(current.Fighter1.Position), world.Config.HalfBody);
             boundaryView.Tick(dt);
             hud.Render(current, body0 + new Vector2(0f, FighterView.VisualLift), body1 + new Vector2(0f, FighterView.VisualLift),
-                world.Config.Match, world.Config.Combat.MaxHealth, dt);
+                world.Config.Match, world.Config.Combat.MaxHealth, world.Config.Combat.Energy, world.Config.EnergyEnabled, dt);
             if (labels != null && labels.gameObject.activeSelf)
             {
                 bool recordingOrReplay = runner.Recording != null || runner.Playback != null;
@@ -383,19 +382,19 @@ namespace Knockbox.Game
             var dummy = p2 is DummyInputSource d ? d.Behavior : DummyBehavior.Idle;
             bool recording = runner.Recording != null;
             bool playback = runner.Playback != null;
-            if (footer == null || !ReferenceEquals(world.Arena.Name, footerArena) || world.Config.Mode != footerMode
-                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy || world.Config.GrabEnabled != footerGrab
+            if (footer == null || !ReferenceEquals(world.Arena.Name, footerArena) || !ReferenceEquals(world.Config, footerConfig)
+                || !ReferenceEquals(p2, footerP2) || dummy != footerDummy
                 || !ReferenceEquals(runner.PresetName, footerPreset) || recording != footerRecording || playback != footerPlayback)
             {
                 footerPreset = runner.PresetName;
                 footerRecording = recording;
                 footerPlayback = playback;
                 footerArena = world.Arena.Name;
-                footerMode = world.Config.Mode;
+                footerConfig = world.Config;
                 footerP2 = p2;
                 footerDummy = dummy;
-                footerGrab = world.Config.GrabEnabled;
-                footer = $"{footerArena} / mode {footerMode}{(footerMode == CombatMode.Swing ? " [frozen]" : "")}{(world.Config.GrabEnabled ? "" : " (no grab)")} / {footerPreset} / P2 {InputSourceName(p2)}"
+                var sw = world.Config.Rules.Switches;
+                footer = $"{footerArena} / {world.Config.StartForm}{(sw.GuardEnabled ? " +guard" : "")}{(sw.GrabEnabled ? " +grab" : "")}{(sw.EnergyEnabled ? "" : " (no energy)")} / {footerPreset} / P2 {InputSourceName(p2)}"
                          + (recording ? " / REC" : "") + (playback ? " / REPLAY" : "");
             }
             return footer;

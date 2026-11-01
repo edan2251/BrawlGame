@@ -204,14 +204,16 @@ namespace Knockbox.Game
             if (w == null)
                 return default;
             var config = w.Config;
-            if (!created || botGrabs != config.GrabEnabled || botMode != config.Mode)
+            ref readonly var self = ref fighter == 0 ? ref w.State.Fighter0 : ref w.State.Fighter1;
+            // 봇은 자기 파이터의 폼으로 싸운다(CR-003). 바위 봇은 CP20.
+            var mode = self.Form == FighterForm.Scissors ? CombatMode.Charge : self.Form == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
+            if (!created || botGrabs != config.GrabEnabled || botMode != mode)
             {
-                bot = CombatBot.Smart(seed, config.GrabEnabled, config.Mode);
+                bot = CombatBot.Smart(seed, config.GrabEnabled, mode);
                 botGrabs = config.GrabEnabled;
-                botMode = config.Mode;
+                botMode = mode;
                 created = true;
             }
-            ref readonly var self = ref fighter == 0 ? ref w.State.Fighter0 : ref w.State.Fighter1;
             ref readonly var other = ref fighter == 0 ? ref w.State.Fighter1 : ref w.State.Fighter0;
             var input = bot.Next(self, other, tick);
             input = AvoidBoundaryLunge(self, other, w.Arena, input);

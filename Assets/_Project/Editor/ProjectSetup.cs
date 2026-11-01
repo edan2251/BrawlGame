@@ -177,11 +177,11 @@ namespace Knockbox.EditorTools
                 runnerFlags.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }
-            // 직접 플레이하는 Main 씬은 테스트 공격 대신 실제 전투 모드(CP5부터 모드 A)로 시작한다.
-            var modeProperty = runnerFlags.FindProperty("mode");
-            if (localPlay && modeProperty.enumValueIndex == (int)CombatMode.Test)
+            // 직접 플레이하는 Main 씬은 시험 공격 폼 대신 가위 폼으로 시작한다(CR-003).
+            var formProperty = runnerFlags.FindProperty("rules.StartForm");
+            if (localPlay && formProperty.enumValueIndex == (int)FighterForm.Test)
             {
-                modeProperty.enumValueIndex = (int)CombatMode.Charge;
+                formProperty.enumValueIndex = (int)FighterForm.Scissors;
                 runnerFlags.ApplyModifiedPropertiesWithoutUndo();
                 changed = true;
             }

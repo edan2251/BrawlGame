@@ -21,8 +21,8 @@ namespace Knockbox.Game
         CameraRig cameraRig;
         readonly DummyInputSource dummy = new DummyInputSource();
         BotInputSource bot;
-        /// <summary>빌드의 F1 순환: 모드 A와 동결된 모드 B만(테스트 공격 모드는 에디터 전용, CP10).</summary>
-        static readonly CombatMode[] BuildModes = { CombatMode.Charge, CombatMode.Swing };
+        /// <summary>빌드의 F1 순환: 가위·바위·보(시험 공격 폼은 에디터 전용).</summary>
+        static readonly FighterForm[] BuildForms = { FighterForm.Scissors, FighterForm.Rock, FighterForm.Paper };
 
         void Awake()
         {
@@ -50,11 +50,13 @@ namespace Knockbox.Game
 
             if (k.f1Key.wasPressedThisFrame)
             {
-                var modes = Application.isEditor ? (CombatMode[])System.Enum.GetValues(typeof(CombatMode)) : BuildModes;
-                int next = (System.Array.IndexOf(modes, runner.Mode) + 1) % modes.Length;
-                runner.Mode = modes[next];
+                // 시작 폼 순환(CR-003). 전투 중 전환은 CP21.
+                var forms = Application.isEditor ? (FighterForm[])System.Enum.GetValues(typeof(FighterForm)) : BuildForms;
+                var rules = runner.Rules;
+                rules.StartForm = forms[(System.Array.IndexOf(forms, rules.StartForm) + 1) % forms.Length];
+                runner.Rules = rules;
                 RestartKeepingDummy();
-                Debug.Log($"[Knockbox] 전투 모드: {runner.Mode}");
+                Debug.Log($"[Knockbox] 시작 폼: {rules.StartForm}");
             }
             if (k.f12Key.wasPressedThisFrame && presenter != null)
                 presenter.SetDebugText(!presenter.DebugTextVisible);
@@ -81,9 +83,22 @@ namespace Knockbox.Game
                 PlayLatestRecording();
             if (k.f4Key.wasPressedThisFrame)
             {
-                runner.GrabEnabled = !runner.GrabEnabled;
+                // 가드·잡기 한 스위치(10 문서 5.1, D-043).
+                var rules = runner.Rules;
+                bool on = !(rules.Switches.GuardEnabled && rules.Switches.GrabEnabled);
+                rules.Switches.GuardEnabled = on;
+                rules.Switches.GrabEnabled = on;
+                runner.Rules = rules;
                 RestartKeepingDummy();
-                Debug.Log($"[Knockbox] 잡기 {(runner.GrabEnabled ? "켬" : "끔")}");
+                Debug.Log($"[Knockbox] 가드·잡기 {(on ? "켬" : "끔")}");
+            }
+            if (k.insertKey.wasPressedThisFrame)
+            {
+                var rules = runner.Rules;
+                rules.Switches.EnergyEnabled = !rules.Switches.EnergyEnabled;
+                runner.Rules = rules;
+                RestartKeepingDummy();
+                Debug.Log($"[Knockbox] 공격 에너지 {(rules.Switches.EnergyEnabled ? "켬" : "끔")}");
             }
             if (k.f3Key.wasPressedThisFrame && presenter != null)
                 presenter.SetOverlay(!presenter.OverlayVisible);
@@ -125,7 +140,7 @@ namespace Knockbox.Game
             if (runner.Recording == null)
             {
                 RestartKeepingDummy();
-                runner.StartRecording(runner.Mode.ToString());
+                runner.StartRecording(runner.Rules.Format());
                 Debug.Log(runner.Recording != null ? "[Knockbox] 입력 기록 시작" : "[Knockbox] 입력 기록을 시작하지 못함");
                 return;
             }
