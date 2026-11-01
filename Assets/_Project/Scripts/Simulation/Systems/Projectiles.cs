@@ -57,6 +57,17 @@ namespace Knockbox.Simulation
                 End(ref ProjectileState.Get(ref pool, slot), ProjectileEndReason.Replaced, tick, events);
             }
             var dir = f.ShotDirection;
+            // 철갑탄 같은 증강은 최종 속성(Reflectable)을 바꾼다. 해석기는 이 값만 본다(4.1, 5.3).
+            bool reflectable = rock.Reflectable;
+            if (f.Augments.Count > 0)
+            {
+                var aug = Augments.Compute(f.Augments, config);
+                if (aug.Reflectable >= 0)
+                {
+                    reflectable = aug.Reflectable == 1;
+                    events.Add(new SimEvent(tick, SimEventType.AugmentActive, owner, f.Position, dir, AugmentCatalog.ArmorPiercing));
+                }
+            }
             ref var n = ref ProjectileState.Get(ref pool, slot);
             n = new Projectile
             {
@@ -64,7 +75,7 @@ namespace Knockbox.Simulation
                 Owner = owner,
                 Position = f.Position + dir * rock.SpawnOffset,
                 Velocity = dir * rock.Speed,
-                Reflectable = rock.Reflectable,
+                Reflectable = reflectable,
                 PierceFighter = rock.PierceFighter,
                 PierceProp = rock.PierceProp,
                 SpawnTick = tick,

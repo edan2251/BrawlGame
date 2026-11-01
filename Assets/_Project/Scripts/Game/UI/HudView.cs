@@ -44,6 +44,11 @@ namespace Knockbox.Game
         readonly SpriteRenderer[] energyFill = new SpriteRenderer[2];
         readonly SpriteRenderer[] formIcons = new SpriteRenderer[2];
         readonly SpriteRenderer[] formOutlines = new SpriteRenderer[2];
+        // 증강 발동 표시(CP23): 머리 위에 이름을 잠깐(AugmentShowSeconds) 띄운다. 평소에는 표시하지 않는다.
+        const float AugmentShowSeconds = 0.7f;
+        readonly TextMesh[] augmentTexts = new TextMesh[2];
+        readonly SpriteRenderer[] augmentRings = new SpriteRenderer[2];
+        readonly float[] augmentTimers = new float[2];
         ShapeLibrary shapeLibrary;
         readonly SpriteRenderer[] slots0 = new SpriteRenderer[MaxSlots];
         readonly SpriteRenderer[] slots1 = new SpriteRenderer[MaxSlots];
@@ -81,6 +86,12 @@ namespace Knockbox.Game
                 bars[i].Trailing = 1f;
                 energyBack[i] = ShapeLibrary.Create(transform, $"Energy{i}Back", shapes.Square, SortingLayers.UI, 0, palette.uiEmpty);
                 energyFill[i] = ShapeLibrary.Create(transform, $"Energy{i}Fill", shapes.Square, SortingLayers.UI, 2, palette.energy);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                augmentRings[i] = ShapeLibrary.Create(transform, $"Augment{i}Ring", shapes.Ring, SortingLayers.UI, 5, palette.energy);
+                augmentTexts[i] = CreateText($"Augment{i}Text", 48, 0.08f, palette.energy, 6);
+                augmentRings[i].enabled = false;
             }
             bannerShadow = CreateText("BannerShadow", 128, 0.2f, palette.ink, 10);
             banner = CreateText("Banner", 128, 0.2f, palette.flash, 11);
@@ -214,11 +225,39 @@ namespace Knockbox.Game
 
         static float Health(in FighterState f, float maxHealth) => maxHealth > 0f ? f.Health / maxHealth : 0f;
 
+        /// <summary>증강이 발동한 순간(CP23) 머리 위에 이름을 잠깐 띄운다.</summary>
+        public void ShowAugment(int fighter, string name)
+        {
+            augmentTimers[fighter] = AugmentShowSeconds;
+            augmentTexts[fighter].text = name;
+        }
+
+        /// <summary>지금 띄운 증강 이름(없으면 빈 문자열). 테스트·캡처 확인용.</summary>
+        public string AugmentShown(int fighter) => augmentTimers[fighter] > 0f ? augmentTexts[fighter].text : "";
+
+        void RenderAugment(int i, Vector2 body, float dt)
+        {
+            bool on = augmentTimers[i] > 0f;
+            augmentRings[i].enabled = on;
+            augmentTexts[i].gameObject.SetActive(on);
+            if (!on)
+                return;
+            augmentTimers[i] -= dt;
+            float k = Mathf.Clamp01(augmentTimers[i] / AugmentShowSeconds);
+            var at = new Vector3(body.x, body.y + BarOffsetY + 0.95f + (1f - k) * 0.3f, 0f);
+            augmentTexts[i].transform.localPosition = at;
+            augmentRings[i].transform.localPosition = at;
+            float ring = Mathf.Lerp(1.4f, 0.9f, k);
+            ShapeLibrary.SetSize(augmentRings[i], ring, ring * 0.45f);
+        }
+
         /// <summary>현재 폼 표시(10 문서 5.1): 체력 바 위의 작은 모양. 방식은 FormDisplayMode.</summary>
         public void RenderForms(in SimState state, Vector2 body0, Vector2 body1, FormDisplayMode mode, SimConfig config)
         {
             RenderForm(0, state.Fighter0, body0, mode, state.Match.Phase);
             RenderForm(1, state.Fighter1, body1, mode, state.Match.Phase);
+            RenderAugment(0, body0, Time.deltaTime);
+            RenderAugment(1, body1, Time.deltaTime);
         }
 
         void RenderForm(int i, in FighterState f, Vector2 body, FormDisplayMode mode, MatchPhase phase)

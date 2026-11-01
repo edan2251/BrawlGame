@@ -72,6 +72,8 @@ namespace Knockbox.Simulation
         PickStart,
         /// <summary>한 선수가 선택을 마침(비공개: 무엇을 골랐는지는 담지 않는다). Strength는 시간 초과로 정해졌으면 1.</summary>
         Picked,
+        /// <summary>증강이 발동함(CP23). Fighter는 가진 쪽, Strength는 증강 번호. 연출이 이름 아이콘을 잠깐 띄운다.</summary>
+        AugmentActive,
     }
 
     /// <summary>

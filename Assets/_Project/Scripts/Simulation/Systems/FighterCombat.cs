@@ -112,9 +112,10 @@ namespace Knockbox.Simulation
                     return pressed;
                 case ActionState.Shoot:
                     // 바위(CP19): 선딜이 끝나는 틱에 발사, 후딜이 끝나면 조작 가능.
-                    if (f.ActionTick == c.Rock.StartupTicks)
+                    int startup = ShotStartup(f, config);
+                    if (f.ActionTick == startup)
                         Fire(ref f, input, config, index, tick, events);
-                    if (f.Action != ActionState.Shoot || f.ActionTick < c.Rock.TotalTicks)
+                    if (f.Action != ActionState.Shoot || f.ActionTick < startup + c.Rock.RecoveryTicks)
                         return pressed;
                     f.RestartAction(ActionState.Airborne);
                     break;
@@ -146,10 +147,10 @@ namespace Knockbox.Simulation
                 ref readonly var swing = ref c.Swing;
                 int elapsed = config.Movement.DashTicks - f.DashTicksLeft;
                 if (f.Form == FighterForm.Paper && swing.DashAttackCancelEnabled && (pressed & InputButtons.Attack) != 0
-                    && elapsed >= swing.DashAttackCancelMinTicks && CanAfford(f, c.Energy.CostOf(FighterForm.Paper), config))
+                    && elapsed >= swing.DashAttackCancelMinTicks && CanAfford(f, CostFor(f, FighterForm.Paper, config), config))
                 {
                     StartAttack(ref f, input.MoveX, SwingAttack(f, input, c.Swing), index, tick, events);
-                    Spend(ref f, c.Energy.CostOf(FighterForm.Paper), config);
+                    Spend(ref f, CostFor(f, FighterForm.Paper, config), config);
                 }
                 return pressed;
             }
@@ -191,14 +192,16 @@ namespace Knockbox.Simulation
             }
 
             // 에너지가 모자라면 확인에서 막혀 공격이 시작되지 않는다. 입력은 버려지고 대기하지 않는다(4.4).
-            int cost = c.Energy.CostOf(f.Form);
+            int cost = CostFor(f, f.Form, config);
             if ((pressed & InputButtons.Attack) != 0 && CanAfford(f, cost, config))
             {
                 switch (f.Form)
                 {
                     case FighterForm.Scissors:
-                        // 충전은 확인만 하고, 소비는 발사할 때(Launch).
+                        // 충전은 확인만 하고, 소비는 발사할 때(Launch). 즉발 돌진 증강이면 누른 틱에 바로 발사(시작 = 발사).
                         StartCharge(ref f, input.MoveX);
+                        if (Augments.Compute(f.Augments, config).InstantLunge)
+                            Launch(ref f, input, config, index, tick, events);
                         break;
                     case FighterForm.Paper:
                         StartAttack(ref f, input.MoveX, SwingAttack(f, input, c.Swing), index, tick, events);
@@ -233,6 +236,26 @@ namespace Knockbox.Simulation
                 f.EnergyRegenDelay--;
             else if (f.Energy < e.Max)
                 f.Energy = SimMath.Min(e.Max, f.Energy + e.RegenPerTick);
+        }
+
+        /// <summary>증강을 적용한 폼의 공격 비용(하한 0, 5.3).</summary>
+        public static int CostFor(in FighterState f, FighterForm form, SimConfig config)
+        {
+            int cost = config.Combat.Energy.CostOf(form);
+            if (f.Augments.Count == 0)
+                return cost;
+            var e = Augments.Compute(f.Augments, config);
+            int add = form == FighterForm.Scissors ? e.LungeCostAdd : form == FighterForm.Rock ? e.ShotCostAdd : form == FighterForm.Paper ? e.SwingCostAdd : 0;
+            return SimMath.Max(0, cost + add);
+        }
+
+        /// <summary>증강을 적용한 바위 선딜(하한 1틱, 5.3).</summary>
+        public static int ShotStartup(in FighterState f, SimConfig config)
+        {
+            int startup = config.Combat.Rock.StartupTicks;
+            if (f.Augments.Count > 0)
+                startup += Augments.Compute(f.Augments, config).ShotStartupAdd;
+            return SimMath.Max(1, startup);
         }
 
         /// <summary>시작 확인(차감 없음). 스위치가 꺼져 있으면 항상 된다.</summary>
@@ -301,7 +324,7 @@ namespace Knockbox.Simulation
         /// </summary>
         static void Fire(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
         {
-            int cost = config.Combat.Energy.CostOf(FighterForm.Rock);
+            int cost = CostFor(f, FighterForm.Rock, config);
             if (config.EnergyEnabled && !f.ActionPaid && f.Energy < cost)
             {
                 f.RestartAction(ActionState.Airborne);
@@ -330,7 +353,7 @@ namespace Knockbox.Simulation
         static void Launch(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
         {
             // 소비는 발사할 때 한 번. 발사 틱에 모자라면 발사하지 않고 취소하며 소비하지 않는다(4.4 규칙 4).
-            int cost = config.Combat.Energy.CostOf(FighterForm.Scissors);
+            int cost = CostFor(f, FighterForm.Scissors, config);
             if (config.EnergyEnabled && !f.ActionPaid && f.Energy < cost)
             {
                 f.RestartAction(ActionState.Airborne);
@@ -338,7 +361,13 @@ namespace Knockbox.Simulation
                 return;
             }
             Spend(ref f, cost, config);
-            float speed = config.Combat.Charge.LungeSpeed(f.ActionTick);
+            // 증강(5.4): 즉발 돌진은 고정 속도, 속도 배율은 충전형·즉발 모두에 곱한다.
+            var aug = Augments.Compute(f.Augments, config);
+            float speed = (aug.InstantLunge ? config.Combat.Charge.InstantLungeSpeed : config.Combat.Charge.LungeSpeed(f.ActionTick)) * aug.LungeSpeedMul;
+            if (aug.InstantLunge)
+                events.Add(new SimEvent(tick, SimEventType.AugmentActive, index, f.Position, Vec2.Zero, aug.LaunchSlotOwner));
+            if (aug.LungeSpeedMul != 1f)
+                events.Add(new SimEvent(tick, SimEventType.AugmentActive, index, f.Position, Vec2.Zero, AugmentCatalog.LungeSpeed));
             var direction = input.MoveX == 0 && input.MoveY == 0
                 ? new Vec2(f.Facing, 0f)
                 : SimMath.Normalize(new Vec2(input.MoveX, input.MoveY));
@@ -677,6 +706,9 @@ namespace Knockbox.Simulation
                 Point = point,
             };
             var outcome = ApplyStrike(ref attacker, ref defender, snapAttacker, snapDefender, strike, defenderIndex, config, tick, events);
+            // 적중 트리거 증강(5.4, 보의 에너지 환급).
+            if (outcome == SimEventType.Hit && attacker.Augments.Count > 0)
+                Augments.RunTriggers(ref attacker, 1 - defenderIndex, AugmentTrigger.OnMeleeHit, config, tick, events);
             if (outcome == SimEventType.Hit && attack.PogoSpeed > 0f)
             {
                 // 내려찍기 포고 튕김: 히트스탑이 끝나면 위로 튀어 오르고 공중 점프·대시를 되찾는다.

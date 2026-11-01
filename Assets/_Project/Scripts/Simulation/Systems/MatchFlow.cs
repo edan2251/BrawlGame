@@ -182,16 +182,4 @@ namespace Knockbox.Simulation
             }
         }
     }
-
-    /// <summary>증강(CP23에서 채운다). CP22에서는 후보가 없다.</summary>
-    public static class Augments
-    {
-        public static void AddCandidates(in FighterState f, SimConfig config, ref CandidateList list, ref int count)
-        {
-        }
-
-        public static void Grant(ref FighterState f, int id, SimConfig config)
-        {
-        }
-    }
 }

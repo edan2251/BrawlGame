@@ -159,6 +159,8 @@ namespace Knockbox.Simulation
         public int FullChargeHoldTicks;
         public float LungeMinSpeed;
         public float LungeMaxSpeed;
+        /// <summary>즉발 돌진 증강(5.4)의 발사 속도(속도 배율이 곱해진다).</summary>
+        public float InstantLungeSpeed;
         public float LungeGravityMultiplier;
         /// <summary>속도가 이보다 작아지면 돌진이 끝난다.</summary>
         public float LungeEndSpeed;
@@ -196,6 +198,7 @@ namespace Knockbox.Simulation
             FullChargeHoldTicks = 24,
             LungeMinSpeed = 18f,
             LungeMaxSpeed = 34f,
+            InstantLungeSpeed = 26f,
             LungeGravityMultiplier = 0.3f,
             LungeEndSpeed = 12f,
             LungeMaxTicks = 30,
@@ -234,6 +237,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(FullChargeHoldTicks), FullChargeHoldTicks);
             v.Value(nameof(LungeMinSpeed), LungeMinSpeed);
             v.Value(nameof(LungeMaxSpeed), LungeMaxSpeed);
+            v.Value(nameof(InstantLungeSpeed), InstantLungeSpeed);
             v.Value(nameof(LungeGravityMultiplier), LungeGravityMultiplier);
             v.Value(nameof(LungeEndSpeed), LungeEndSpeed);
             v.Value(nameof(LungeMaxTicks), LungeMaxTicks);

@@ -132,6 +132,7 @@ namespace Knockbox.Game
             hud.Setup(palette, shapes);
             pickPanel = Create<PickPanelView>("PickPanel");
             pickPanel.Setup(palette, shapes);
+            pickPanel.AugmentName = id => runner.World != null && Augments.TryGet(runner.World.Config, id, out var d) ? d.Name : $"AUG {id}";
             sfxPlayer = Create<SfxPlayer>("Sfx");
             sfxPlayer.Setup(sfx);
             // 최종 출력 리미터는 AudioListener와 같은 오브젝트에 있어야 전체 소리에 걸린다(F-2).
@@ -501,6 +502,9 @@ namespace Knockbox.Game
                         fx.Shards(V(e.Position), -new Vector2(e.Direction.X, e.Direction.Y), 80f, 4, palette.FighterBody(e.Fighter), 6f, 0.12f, 0.3f);
                         sfxPlayer.Play(Sfx.Land, 0.35f, 1.3f);
                     }
+                    break;
+                case SimEventType.AugmentActive:
+                    hud.ShowAugment(e.Fighter, Augments.TryGet(runner.World.Config, (int)e.Strength, out var augment) ? augment.Name : "AUG");
                     break;
                 case SimEventType.FormSwitch:
                     // 전환: 새 폼 색은 쓰지 않고 짧은 흰 고리와 가벼운 소리.

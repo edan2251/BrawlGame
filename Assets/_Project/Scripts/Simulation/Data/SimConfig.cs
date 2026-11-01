@@ -201,6 +201,8 @@ namespace Knockbox.Simulation
         public readonly CombatParams Combat;
         /// <summary>시작 폼과 기능 스위치(CR-003, 10 문서 5.1).</summary>
         public readonly RuleSet Rules;
+        /// <summary>증강 목록(CP23). 기본은 대표 증강 4개(AugmentCatalog), 테스트는 전용 증강을 더한 목록을 쓴다.</summary>
+        public readonly AugmentDef[] Augments;
         public readonly float HalfBody;
 
         public SimConfig(in MovementParams movement, in MatchParams match)
@@ -224,7 +226,13 @@ namespace Knockbox.Simulation
         }
 
         public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, in RuleSet rules)
+            : this(movement, match, combat, rules, null)
         {
+        }
+
+        public SimConfig(in MovementParams movement, in MatchParams match, in CombatParams combat, in RuleSet rules, AugmentDef[] augments)
+        {
+            Augments = augments ?? AugmentCatalog.CreateDefault();
             Movement = movement;
             Match = match;
             Combat = combat;
@@ -293,6 +301,13 @@ namespace Knockbox.Simulation
             v.Value("StartFormP2", (int)StartFormOf(1));
             v.Value("OwnedForms", (int)Rules.OwnedForms);
             v.Value("LegacyMatch", Rules.LegacyMatch);
+            v.Value("AugmentCount", Augments.Length);
+            for (int i = 0; i < Augments.Length; i++)
+            {
+                v.Begin("Augment");
+                Augments[i].Visit(ref v);
+                v.End();
+            }
             v.Value(nameof(GuardEnabled), GuardEnabled);
             v.Value(nameof(GrabEnabled), GrabEnabled);
             v.Value(nameof(EnergyEnabled), EnergyEnabled);
