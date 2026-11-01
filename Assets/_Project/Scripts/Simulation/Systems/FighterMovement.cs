@@ -308,7 +308,13 @@ namespace Knockbox.Simulation
                 events.Add(new SimEvent(tick, SimEventType.OutOfBounds, index, f.Position, Vec2.Zero, 0f));
 
             bool bounced = false;
-            if (contacts.Landed && contacts.LandedKind == TerrainKind.Bounce)
+            if (contacts.BoundaryX != 0 || contacts.BoundaryY != 0)
+            {
+                BoundaryHit(ref f, contacts, config, index, tick, events);
+                dashing = false;
+                bounced = true;
+            }
+            else if (contacts.Landed && contacts.LandedKind == TerrainKind.Bounce)
             {
                 // 튕김 패드: 윗면에 닿으면 vy = 30, 공중 점프·대시 회복.
                 f.Velocity.Y = m.BouncePadSpeed;
@@ -573,6 +579,58 @@ namespace Knockbox.Simulation
             events.Add(new SimEvent(tick, SimEventType.Spike, index, new Vec2(f.Position.X, f.Position.Y - config.HalfBody), new Vec2(0f, 1f), c.SpikeDamage));
         }
 
+        /// <summary>
+        /// 경계 튕김(03-combat.md 3절, CR-002): 피해 clamp(round(4 + 법선 속도 × 0.35), 4, 15), 법선 속도를 반사해 × 1.1(안쪽으로 최소 14),
+        /// 경직 14, 히트스탑 5, 면역 45틱. 면역 중에는 피해 없이 반사 × 0.5. 가드·패링은 적용하지 않는다.
+        /// 잡고 있거나 잡힌 동안은 피해 없이 멈추기만 한다. 공중 점프·대시는 회복한다(아래 경계에서 빠져나올 수 있게, S-114).
+        /// </summary>
+        static void BoundaryHit(ref FighterState f, in MoveContacts contacts, SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            ref readonly var m = ref config.Movement;
+            float half = config.HalfBody;
+            var normal = SimMath.Normalize(new Vec2(-contacts.BoundaryX, -contacts.BoundaryY));
+            var point = new Vec2(f.Position.X + contacts.BoundaryX * half, f.Position.Y + contacts.BoundaryY * half);
+            float speed = SimMath.Max(contacts.BoundarySpeedX, contacts.BoundarySpeedY);
+            if (f.Action == ActionState.Held || f.Action == ActionState.Holding)
+            {
+                if (contacts.BoundaryX != 0)
+                    f.Velocity.X = 0f;
+                if (contacts.BoundaryY != 0)
+                    f.Velocity.Y = 0f;
+                return;
+            }
+            bool immune = f.BoundaryImmunityTicks > 0;
+            if (contacts.BoundaryX != 0)
+                f.Velocity.X = -contacts.BoundaryX * BoundaryReboundSpeed(contacts.BoundarySpeedX, immune, c);
+            if (contacts.BoundaryY != 0)
+                f.Velocity.Y = -contacts.BoundaryY * BoundaryReboundSpeed(contacts.BoundarySpeedY, immune, c);
+            int damage = 0;
+            if (!immune)
+            {
+                damage = BoundaryDamage(speed, c);
+                int combo = f.IsLaunched ? f.ComboHits : 0;
+                f.Health = SimMath.Max(0, f.Health - damage);
+                f.StunTicks = c.BoundaryHitstun;
+                FighterCombat.EnterStun(ref f, ActionState.Hitstun);
+                f.ComboHits = combo;
+                f.HitstopTicks = SimMath.Max(f.HitstopTicks, c.BoundaryHitstop);
+                f.BoundaryImmunityTicks = c.BoundaryImmunityTicks;
+            }
+            f.DashTicksLeft = 0;
+            f.AirJumpsLeft = m.AirJumps;
+            f.DashCharges = m.DashCharges;
+            f.Grounded = false;
+            f.GroundBox = FighterState.NoBox;
+            events.Add(new SimEvent(tick, SimEventType.BoundaryHit, index, point, normal, damage));
+        }
+
+        public static int BoundaryDamage(float normalSpeed, in CombatParams c) =>
+            SimMath.Clamp(SimMath.RoundToInt(c.BoundaryBaseDamage + normalSpeed * c.BoundaryDamagePerSpeed), c.BoundaryMinDamage, c.BoundaryMaxDamage);
+
+        public static float BoundaryReboundSpeed(float normalSpeed, bool immune, in CombatParams c) =>
+            immune ? normalSpeed * c.BoundaryImmuneRestitution : SimMath.Max(normalSpeed * c.BoundaryRestitution, c.BoundaryMinReboundSpeed);
+
         /// <summary>상대 머리 위(단방향 발판처럼)에 서 있는지.</summary>
         public static bool StandsOn(Vec2 self, Vec2 other, SimConfig config)
         {
@@ -625,12 +683,14 @@ namespace Knockbox.Simulation
                 float fromX = a.Position.X;
                 a.Position.X -= direction * (overlap * (frozenB ? 1f : 0.5f));
                 TerrainCollision.ResolveX(ref a.Position, -direction, half, arena, fromX);
+                TerrainCollision.ClampToBoundary(ref a.Position, half, arena);
             }
             if (!frozenB)
             {
                 float fromX = b.Position.X;
                 b.Position.X += direction * (overlap * (frozenA ? 1f : 0.5f));
                 TerrainCollision.ResolveX(ref b.Position, direction, half, arena, fromX);
+                TerrainCollision.ClampToBoundary(ref b.Position, half, arena);
             }
         }
 

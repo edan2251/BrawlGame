@@ -70,6 +70,8 @@ namespace Knockbox.Simulation
                 f.ContactCooldown--;
             if (f.SpikeImmunityTicks > 0)
                 f.SpikeImmunityTicks--;
+            if (f.BoundaryImmunityTicks > 0)
+                f.BoundaryImmunityTicks--;
             // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
             bool guardPressed = (pressed & InputButtons.Guard) != 0;
             int sinceGuardPress = SimMath.Min(f.TicksSinceGuardPress + 1, FighterState.TimerCap);
@@ -426,7 +428,10 @@ namespace Knockbox.Simulation
             victim.Velocity = Vec2.Zero;
             victim.Position = new Vec2(grabber.Position.X + g.HoldOffset * grabber.Facing, grabber.Position.Y);
             if (arena != null)
+            {
                 TerrainCollision.ResolveX(ref victim.Position, grabber.Facing, config.HalfBody, arena, grabber.Position.X);
+                TerrainCollision.ClampToBoundary(ref victim.Position, config.HalfBody, arena);
+            }
             events.Add(new SimEvent(tick, SimEventType.Grab, victimIndex, victim.Position, new Vec2(grabber.Facing, 0f), 0f));
         }
 
@@ -443,7 +448,10 @@ namespace Knockbox.Simulation
             {
                 victim.Position = new Vec2(thrower.Position.X - g.BackThrowOffset * thrower.Facing, thrower.Position.Y);
                 if (arena != null)
+                {
                     TerrainCollision.ResolveX(ref victim.Position, -thrower.Facing, config.HalfBody, arena, thrower.Position.X);
+                    TerrainCollision.ClampToBoundary(ref victim.Position, config.HalfBody, arena);
+                }
             }
             victim.Velocity = direction * g.ThrowSpeed;
             victim.Health = SimMath.Max(0, victim.Health - g.ThrowDamage);

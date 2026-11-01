@@ -119,6 +119,8 @@ namespace Knockbox.Simulation
         public Vec2 ThrowDirection;
         /// <summary>남은 가시 면역 틱. 면역 동안 가시는 바닥처럼 선다.</summary>
         public int SpikeImmunityTicks;
+        /// <summary>남은 경계 튕김 면역 틱(CR-002). 면역 동안 경계는 피해 없이 반사 × 0.5.</summary>
+        public int BoundaryImmunityTicks;
 
         public const int NoAttack = -1;
 
@@ -194,6 +196,7 @@ namespace Knockbox.Simulation
             v.Value("ThrowDirection.X", ThrowDirection.X);
             v.Value("ThrowDirection.Y", ThrowDirection.Y);
             v.Value(nameof(SpikeImmunityTicks), SpikeImmunityTicks);
+            v.Value(nameof(BoundaryImmunityTicks), BoundaryImmunityTicks);
         }
     }
 }

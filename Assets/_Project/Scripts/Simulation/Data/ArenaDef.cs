@@ -50,10 +50,19 @@ namespace Knockbox.Simulation
         }
 
         public ArenaDef(string name, int columns, int rows, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1)
+            : this(name, columns, rows, false, boxes, spawnFoot0, spawnFoot1)
+        {
+        }
+
+        /// <param name="hasBoundary">
+        /// 맵 v2(CR-002): 바깥 테두리 칸은 지형이 아니고, 테두리 안쪽 면이 경계 튕김(03-combat.md 3절)의 경계가 된다.
+        /// </param>
+        public ArenaDef(string name, int columns, int rows, bool hasBoundary, ArenaBox[] boxes, Vec2 spawnFoot0, Vec2 spawnFoot1)
         {
             Name = name;
             Columns = columns;
             Rows = rows;
+            HasBoundary = hasBoundary;
             this.boxes = boxes;
             SpawnFoot0 = spawnFoot0;
             SpawnFoot1 = spawnFoot1;
@@ -64,6 +73,11 @@ namespace Knockbox.Simulation
         public int Rows { get; }
         public float HalfWidth => Columns * 0.5f;
         public float HalfHeight => Rows * 0.5f;
+        /// <summary>경계 튕김을 쓰는 맵(테두리 벽 없음).</summary>
+        public bool HasBoundary { get; }
+        /// <summary>경계 사각형의 반폭·반높이: 테두리 칸의 안쪽 면. 36 × 20이면 ±17 × ±9(16:9 화면 ±17.8 × ±10 안쪽).</summary>
+        public float BoundaryHalfWidth => HalfWidth - 1f;
+        public float BoundaryHalfHeight => HalfHeight - 1f;
         public Vec2 SpawnFoot0 { get; }
         public Vec2 SpawnFoot1 { get; }
         public int BoxCount => boxes.Length;
@@ -89,6 +103,7 @@ namespace Knockbox.Simulation
             var h = Hasher.Create();
             h.AddInt(Columns);
             h.AddInt(Rows);
+            h.AddBool(HasBoundary);
             h.AddInt(boxes.Length);
             for (int i = 0; i < boxes.Length; i++)
             {

@@ -482,6 +482,18 @@ namespace Knockbox.Simulation
         public int SpikeHitstun;
         public int SpikeImmunityTicks;
 
+        // 경계 튕김(03-combat.md 3절, CR-002): 화면 경계에 닿으면 피해, 반사, 경직, 히트스탑, 면역.
+        public int BoundaryBaseDamage;
+        public float BoundaryDamagePerSpeed;
+        public int BoundaryMinDamage;
+        public int BoundaryMaxDamage;
+        public float BoundaryRestitution;
+        public float BoundaryMinReboundSpeed;
+        public int BoundaryHitstun;
+        public int BoundaryHitstop;
+        public int BoundaryImmunityTicks;
+        public float BoundaryImmuneRestitution;
+
         public AttackDef TestAttack;
         public ChargeModeParams Charge;
         public SwingModeParams Swing;
@@ -534,6 +546,17 @@ namespace Knockbox.Simulation
             SpikeHitstun = 20,
             SpikeImmunityTicks = 45,
 
+            BoundaryBaseDamage = 4,
+            BoundaryDamagePerSpeed = 0.35f,
+            BoundaryMinDamage = 4,
+            BoundaryMaxDamage = 15,
+            BoundaryRestitution = 1.1f,
+            BoundaryMinReboundSpeed = 14f,
+            BoundaryHitstun = 14,
+            BoundaryHitstop = 5,
+            BoundaryImmunityTicks = 45,
+            BoundaryImmuneRestitution = 0.5f,
+
             TestAttack = AttackDef.TestJab,
             Charge = ChargeModeParams.Default,
             Swing = SwingModeParams.Default,
@@ -579,6 +602,16 @@ namespace Knockbox.Simulation
             v.Value(nameof(SpikeBounceSpeed), SpikeBounceSpeed);
             v.Value(nameof(SpikeHitstun), SpikeHitstun);
             v.Value(nameof(SpikeImmunityTicks), SpikeImmunityTicks);
+            v.Value(nameof(BoundaryBaseDamage), BoundaryBaseDamage);
+            v.Value(nameof(BoundaryDamagePerSpeed), BoundaryDamagePerSpeed);
+            v.Value(nameof(BoundaryMinDamage), BoundaryMinDamage);
+            v.Value(nameof(BoundaryMaxDamage), BoundaryMaxDamage);
+            v.Value(nameof(BoundaryRestitution), BoundaryRestitution);
+            v.Value(nameof(BoundaryMinReboundSpeed), BoundaryMinReboundSpeed);
+            v.Value(nameof(BoundaryHitstun), BoundaryHitstun);
+            v.Value(nameof(BoundaryHitstop), BoundaryHitstop);
+            v.Value(nameof(BoundaryImmunityTicks), BoundaryImmunityTicks);
+            v.Value(nameof(BoundaryImmuneRestitution), BoundaryImmuneRestitution);
             v.Begin(nameof(TestAttack));
             TestAttack.Visit(ref v);
             v.End();

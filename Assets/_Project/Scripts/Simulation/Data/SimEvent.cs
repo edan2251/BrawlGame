@@ -38,6 +38,8 @@ namespace Knockbox.Simulation
         GrabBreak,
         /// <summary>가시에 닿음. Strength는 데미지.</summary>
         Spike,
+        /// <summary>경계 튕김(CR-002). Position은 닿은 점, Direction은 경계 안쪽 법선, Strength는 데미지(면역 중 0).</summary>
+        BoundaryHit,
     }
 
     /// <summary>

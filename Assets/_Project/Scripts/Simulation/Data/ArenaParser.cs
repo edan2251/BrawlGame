@@ -24,6 +24,7 @@ namespace Knockbox.Simulation
 
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             string name = "";
+            bool boundary = false;
             int gridStart = -1;
             for (int i = 0; i < lines.Length; i++)
             {
@@ -35,6 +36,8 @@ namespace Knockbox.Simulation
                 }
                 if (line.StartsWith("name:", StringComparison.Ordinal))
                     name = line.Substring(5).Trim();
+                else if (line.StartsWith("boundary:", StringComparison.Ordinal))
+                    boundary = line.Substring(9).Trim() == "true";
             }
             if (gridStart < 0)
                 throw new FormatException($"'{Separator}' 구분선이 없음");
@@ -49,10 +52,10 @@ namespace Knockbox.Simulation
                     continue;
                 grid.Add(line);
             }
-            return ParseGrid(name, grid, requireSymmetry);
+            return ParseGrid(name, grid, requireSymmetry, boundary);
         }
 
-        static ArenaDef ParseGrid(string name, List<string> grid, bool requireSymmetry)
+        static ArenaDef ParseGrid(string name, List<string> grid, bool requireSymmetry, bool boundary)
         {
             int rows = grid.Count;
             if (rows < MinRows || rows > MaxRows)
@@ -115,12 +118,28 @@ namespace Knockbox.Simulation
                 }
             }
 
+            // 경계 튕김 맵(머리글 "boundary: true"): 테두리 칸은 검증만 하고 지형으로 만들지 않는다.
+            if (boundary)
+            {
+                var inner = new List<string>(grid.Count);
+                for (int r = 0; r < rows; r++)
+                {
+                    var chars = grid[r].ToCharArray();
+                    for (int c = 0; c < columns; c++)
+                    {
+                        if (r == 0 || r == rows - 1 || c == 0 || c == columns - 1)
+                            chars[c] = '.';
+                    }
+                    inner.Add(new string(chars));
+                }
+                grid = inner;
+            }
             var boxes = new List<ArenaBox>();
             MergeFullCells(grid, size, '#', TerrainKind.Solid, boxes);
             MergeHalfCells(grid, size, '=', TerrainKind.OneWay, top: true, boxes);
             MergeHalfCells(grid, size, 'B', TerrainKind.Bounce, top: false, boxes);
             MergeHalfCells(grid, size, '^', TerrainKind.Spike, top: false, boxes);
-            return new ArenaDef(name, columns, rows, boxes.ToArray(), spawn0, spawn1);
+            return new ArenaDef(name, columns, rows, boundary, boxes.ToArray(), spawn0, spawn1);
         }
 
         /// <summary>좌우로 뒤집었을 때 같은 자리에 와야 할 문자. 시작 위치 '1'과 '2'는 서로 짝이다.</summary>

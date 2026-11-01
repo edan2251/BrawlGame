@@ -16,6 +16,12 @@ namespace Knockbox.Simulation
         /// <summary>벽에 닿기 직전의 가로 속력.</summary>
         public float WallImpactSpeed;
         public bool OutOfBounds;
+        /// <summary>경계 튕김(CR-002): 이번 틱에 닿은 경계. -1 왼쪽·아래, 1 오른쪽·위, 0 없음.</summary>
+        public int BoundaryX;
+        public int BoundaryY;
+        /// <summary>경계에 닿기 직전의 경계 법선 방향(바깥쪽) 속력.</summary>
+        public float BoundarySpeedX;
+        public float BoundarySpeedY;
     }
 
     /// <summary>
@@ -80,7 +86,24 @@ namespace Knockbox.Simulation
                 }
             }
 
-            // 경기장은 벽으로 닫혀 있으므로 여기 걸리면 버그 신호다.
+            if (arena.HasBoundary)
+            {
+                float bx = arena.BoundaryHalfWidth - half, by = arena.BoundaryHalfHeight - half;
+                if (position.X > bx || position.X < -bx)
+                {
+                    contacts.BoundaryX = position.X > 0f ? 1 : -1;
+                    contacts.BoundarySpeedX = SimMath.Max(0f, velocity.X * contacts.BoundaryX);
+                    position.X = bx * contacts.BoundaryX;
+                }
+                if (position.Y > by || position.Y < -by)
+                {
+                    contacts.BoundaryY = position.Y > 0f ? 1 : -1;
+                    contacts.BoundarySpeedY = SimMath.Max(0f, velocity.Y * contacts.BoundaryY);
+                    position.Y = by * contacts.BoundaryY;
+                }
+            }
+
+            // 경기장은 벽(또는 경계)으로 닫혀 있으므로 여기 걸리면 버그 신호다.
             float limitX = arena.HalfWidth - half;
             float limitY = arena.HalfHeight - half;
             if (position.X < -limitX || position.X > limitX || position.Y < -limitY || position.Y > limitY)
@@ -178,9 +201,28 @@ namespace Knockbox.Simulation
                     bottom = b.MinY;
                 hit = true;
             }
+            // 경계 튕김 맵에서는 위쪽 경계도 천장이다.
+            if (arena.HasBoundary && position.Y + half > arena.BoundaryHalfHeight && (!hit || arena.BoundaryHalfHeight < bottom))
+            {
+                bottom = arena.BoundaryHalfHeight;
+                hit = true;
+            }
             if (hit)
                 position.Y = bottom - half;
             return hit;
+        }
+
+        /// <summary>
+        /// 경계 튕김 맵에서 몸을 경계 안으로 들인다(접촉으로 세지 않음). 밀어내기, 잡기·던지기 배치처럼 이동 밖에서
+        /// 위치를 정하는 곳에서 쓴다. 이동(Move) 중의 경계 접촉은 Move가 기록한다.
+        /// </summary>
+        public static void ClampToBoundary(ref Vec2 position, float half, ArenaDef arena)
+        {
+            if (arena == null || !arena.HasBoundary)
+                return;
+            float bx = arena.BoundaryHalfWidth - half, by = arena.BoundaryHalfHeight - half;
+            position.X = SimMath.Clamp(position.X, -bx, bx);
+            position.Y = SimMath.Clamp(position.Y, -by, by);
         }
 
         static bool ResolveUp(ref Vec2 position, float half, ArenaDef arena)

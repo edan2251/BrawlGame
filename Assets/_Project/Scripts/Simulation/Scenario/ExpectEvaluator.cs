@@ -97,6 +97,7 @@ namespace Knockbox.Simulation
                 case "parry": number = f.ParryTicks; return true;
                 case "bounces": number = f.LungeBounces; return true;
                 case "spikeImmunity": number = f.SpikeImmunityTicks; return true;
+                case "boundaryImmunity": number = f.BoundaryImmunityTicks; return true;
                 default: return false;
             }
         }
