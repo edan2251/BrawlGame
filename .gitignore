@@ -142,7 +142,7 @@ crashlytics-build.properties
 .vscode/
 *.DotSettings.user
 
-# MCP for Unity 기본 스크린샷 폴더 (우리는 docs/progress/captures 를 사용)
+# MCP for Unity 기본 스크린샷 폴더 (우리는 /Captures/ 를 사용)
 /[Aa]ssets/[Ss]creenshots/
 /[Aa]ssets/[Ss]creenshots.meta
 
@@ -160,3 +160,6 @@ Desktop.ini
 
 # 로컬 전용 참고 자료(다른 게임의 영상 캡처 포함). 저장소가 공개라 절대 커밋하지 않는다(CR-001 0절)
 /References/
+
+# 임시 캡처(CLAUDE.md 12절). CP를 마치면 비운다.
+/Captures/

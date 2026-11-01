@@ -11,7 +11,7 @@ namespace Knockbox.EditorTools
 {
     /// <summary>
     /// Knockbox/Run Scenario Captures: Sandbox 씬을 플레이 모드로 열고 모든 showcase_ 시나리오를 재생해
-    /// docs/progress/captures/&lt;라벨&gt;/에 캡처를 저장한 뒤 플레이 모드를 끝낸다. 라벨은 PROGRESS.md의 현재 CP.
+    /// Captures/&lt;라벨&gt;/(프로젝트 루트, Git 제외)에 캡처를 저장한 뒤 플레이 모드를 끝낸다. 라벨은 PROGRESS.md의 현재 CP.
     /// 에디터가 백그라운드면 플레이 모드가 멈추므로 Unity 창을 앞으로 가져와 실행한다(D-015).
     /// </summary>
     [InitializeOnLoad]

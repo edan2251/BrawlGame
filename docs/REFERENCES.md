@@ -49,7 +49,7 @@
 ## 사용자 팔레트
 
 - 출처: 사용자의 다른 게임 CursorDash의 핵심 팔레트. `08-visual-direction.md` 2절의 토큰으로 정리했다(D-021).
-- 견본 장면: `docs/references/palette-preview.png`(저장소에 포함).
+- 견본 장면: `docs/archive/references/palette-preview.png`(저장소에 포함, 보관).
 
 ## Box2D v3 (erincatto/box2d)
 

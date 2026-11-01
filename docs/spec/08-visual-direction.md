@@ -10,7 +10,7 @@
 - **고정은 밝게, 움직이는 것은 탁하게.** 고정 지형은 테마의 밝은 주색, 움직이는 구조물은 같은 계열의 어둡고 탁한 색이다. 밟아도 안전한 곳과 움직이는 곳이 색으로 구분된다.
 - **에셋은 따라 하지 않는다.** Rounds의 구성, 분위기, 표현 방식은 따라가되 캐릭터 디자인, 카드 그림, UI, 로고는 만들지 않는다. 캐릭터는 사각형 몸과 잉크 외곽선을 유지한다.
 
-참고 자료: 로컬의 `References/rounds/`(Rounds 캡처, 커밋 금지), 저장소의 `docs/references/palette-preview.png`(이 문서의 색으로 만든 견본 장면).
+참고 자료: 로컬의 `References/rounds/`(Rounds 캡처, 커밋 금지), 저장소의 `docs/archive/references/palette-preview.png`(이 문서의 색으로 만든 견본 장면).
 
 ## 2. 색 토큰
 

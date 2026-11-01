@@ -82,7 +82,7 @@ AI 대신 정해진 행동을 반복하는 입력원(`IInputSource`)을 둔다. 
 - 입력 항목: `from`~`to` 동안 `hold`를 누르고 있음, 또는 `at` 틱에 `press`를 `holdFor` 틱(기본 1) 동안 누름. 방향은 `Left`, `Right`, `Up`, `Down`, 버튼은 `Jump`, `Attack`, `Dash`, `Guard`, `Grab`.
 - `spawn`은 선택. 없으면 맵의 시작 위치. 시나리오는 Countdown을 건너뛰고 Fighting 상태에서 시작한다.
 - `expect`는 선택. 지원하는 필드(`pos.x`, `pos.y`, `vel.x`, `vel.y`, `hp`, `action`, `grounded` 등)는 코드에 목록으로 둔다. 공용 EditMode 테스트 하나가 `expect`가 있는 모든 시나리오를 실행한다.
-- `captures`는 플레이 모드의 `ScenarioRunner`가 그 틱이 화면에 그려진 직후 PNG로 저장한다. 저장 위치는 `docs/progress/captures/<라벨>/<시나리오>_<이름>.png`이며, 라벨은 실행 시 지정한다(기본: 현재 CP).
+- `captures`는 플레이 모드의 `ScenarioRunner`가 그 틱이 화면에 그려진 직후 PNG로 저장한다. 저장 위치는 `Captures/<라벨>/`(프로젝트 루트, Git 제외)이며, 라벨은 실행 시 지정한다(기본: 현재 CP).
 - 에디터 메뉴 `Knockbox/Run Scenario Captures`는 지정한 시나리오 목록을 플레이 모드에서 차례로 실행하고 캡처한다. Claude Code는 MCP로 이 메뉴를 실행해 시각 검증을 한다.
 
 ### 보여주기용 시나리오 (showcase)

@@ -32,9 +32,9 @@ namespace Knockbox.Game
 
         public bool Finished => Current != null && runner != null && runner.World != null && runner.World.State.Tick >= Current.Ticks;
 
-        /// <summary>프로젝트 루트의 docs/progress/captures/&lt;label&gt;.</summary>
+        /// <summary>프로젝트 루트의 Captures/&lt;label&gt;(Git 제외, CP를 마치면 비운다).</summary>
         public static string CaptureFolder(string label) =>
-            Path.Combine(Directory.GetParent(Application.dataPath).FullName, "docs", "progress", "captures", label);
+            Path.Combine(Directory.GetParent(Application.dataPath).FullName, "Captures", label);
 
         void Start()
         {
