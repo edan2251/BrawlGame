@@ -487,6 +487,16 @@ namespace Knockbox.Game
                         sfxPlayer.Play(Sfx.Land, 0.35f, 1.3f);
                     }
                     break;
+                case SimEventType.ProjectileReflect:
+                    // 보가 투사체를 되받아침(CP20): 반사한 쪽 색 고리와 패링 소리.
+                    fx.RingBurst(V(e.Position), palette.FighterBody(e.Fighter), 0.2f, 0.9f, 0.16f);
+                    sfxPlayer.Play(Sfx.Parry, 0.7f, 1.2f);
+                    break;
+                case SimEventType.LungeStun:
+                case SimEventType.AttackInterrupted:
+                    // 돌진이 끊김 / 근접공격이 돌진에 짐: 위험색 작은 고리.
+                    fx.RingBurst(V(e.Position), palette.hit, 0.3f, 1.1f, 0.18f);
+                    break;
                 case SimEventType.PowerCheck:
                     overlay.ShowPower(e.Fighter, e.Strength);
                     break;

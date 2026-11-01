@@ -112,9 +112,12 @@ namespace Knockbox.Simulation
         public int DashAttackCancelMinTicks;
         /// <summary>공중에서 시작한 공격 도중 착지하면 이만큼 조작할 수 없다.</summary>
         public int LandingLagTicks;
+        /// <summary>참이면 보 폼은 앞 휘두르기 하나만 쓴다(CR-003 CP20). CP16까지의 모드 B 시험은 거짓으로 둔다.</summary>
+        public bool ForwardOnly;
 
         public static SwingModeParams Default => new SwingModeParams
         {
+            ForwardOnly = true,
             Forward = AttackDef.SwingForward,
             Up = AttackDef.SwingUp,
             Down = AttackDef.SwingDown,
@@ -137,6 +140,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(DashAttackCancelEnabled), DashAttackCancelEnabled);
             v.Value(nameof(DashAttackCancelMinTicks), DashAttackCancelMinTicks);
             v.Value(nameof(LandingLagTicks), LandingLagTicks);
+            v.Value(nameof(ForwardOnly), ForwardOnly);
         }
     }
 

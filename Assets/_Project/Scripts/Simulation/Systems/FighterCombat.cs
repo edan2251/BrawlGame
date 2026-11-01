@@ -148,7 +148,7 @@ namespace Knockbox.Simulation
                 if (f.Form == FighterForm.Paper && swing.DashAttackCancelEnabled && (pressed & InputButtons.Attack) != 0
                     && elapsed >= swing.DashAttackCancelMinTicks && CanAfford(f, c.Energy.CostOf(FighterForm.Paper), config))
                 {
-                    StartAttack(ref f, input.MoveX, SwingAttack(f, input), index, tick, events);
+                    StartAttack(ref f, input.MoveX, SwingAttack(f, input, c.Swing), index, tick, events);
                     Spend(ref f, c.Energy.CostOf(FighterForm.Paper), config);
                 }
                 return pressed;
@@ -189,7 +189,7 @@ namespace Knockbox.Simulation
                         StartCharge(ref f, input.MoveX);
                         break;
                     case FighterForm.Paper:
-                        StartAttack(ref f, input.MoveX, SwingAttack(f, input), index, tick, events);
+                        StartAttack(ref f, input.MoveX, SwingAttack(f, input, c.Swing), index, tick, events);
                         Spend(ref f, cost, config);
                         break;
                     case FighterForm.Rock:
@@ -237,8 +237,10 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>모드 B 기술 고르기: 위 → 위 휘두르기, 공중에서 아래 → 내려찍기, 그 외(중립·좌우·지상 아래) → 앞 휘두르기.</summary>
-        static int SwingAttack(in FighterState f, in InputFrame input)
+        static int SwingAttack(in FighterState f, in InputFrame input, in SwingModeParams swing)
         {
+            if (swing.ForwardOnly)
+                return AttackIds.SwingForward;
             if (input.MoveY > 0)
                 return AttackIds.SwingUp;
             if (input.MoveY < 0 && !f.Grounded)
@@ -586,6 +588,18 @@ namespace Knockbox.Simulation
             Vec2 pointAB = default, pointBA = default;
             bool aHitsB = activeA && CanBeHit(snapB, config) && TouchesBody(snapA, config, snapB.Position, out pointAB);
             bool bHitsA = activeB && CanBeHit(snapA, config) && TouchesBody(snapB, config, snapA.Position, out pointBA);
+            // 돌진 → 근접 활성 판정(4.1): 돌진 위력이 임계 이상이면 돌진이 이긴다. 근접공격은 중단되고 피해를 받으며 돌진은 계속된다.
+            // 임계 미만이면 돌진은 공격성이 없는 것으로 보고 아래 규칙대로 판정이 그대로 맞는다. 한 파이터는 돌진과 근접공격을 동시에 할 수 없다.
+            if (bHitsA && !frozenA && OverpowersMelee(snapA, snapB, config, out float powerA))
+            {
+                LungeBreaksMelee(ref a, ref b, snapA, snapB, powerA, pointBA, 1, config, tick, events);
+                return true;
+            }
+            if (aHitsB && !frozenB && OverpowersMelee(snapB, snapA, config, out float powerB))
+            {
+                LungeBreaksMelee(ref b, ref a, snapB, snapA, powerB, pointAB, 0, config, tick, events);
+                return true;
+            }
             if (activeA && activeB && CirclesTouch(snapA, snapB, config, out var clashPoint))
             {
                 Clash(ref a, ref b, snapA, snapB, clashPoint, config.Combat.ClashSpeed, config, tick, events);
@@ -607,6 +621,34 @@ namespace Knockbox.Simulation
                 return true;
             }
             return false;
+        }
+
+        /// <summary>돌진 중이고 근접공격 쪽으로의 위력이 임계 이상인지.</summary>
+        static bool OverpowersMelee(in FighterState lunger, in FighterState melee, SimConfig config, out float power)
+        {
+            power = 0f;
+            if (lunger.Action != ActionState.Lunge)
+                return false;
+            var toward = melee.Position - lunger.Position;
+            toward = toward.LengthSquared > 0f ? SimMath.Normalize(toward) : new Vec2(0f, 1f);
+            power = Power(lunger, toward, config);
+            return power >= config.Combat.Charge.PowerThreshold;
+        }
+
+        /// <summary>돌진이 근접공격을 이김: 몸 충돌 승리와 같은 피해·넉백을 주되, 돌진은 튕겨 나오지 않고 계속된다.</summary>
+        static void LungeBreaksMelee(ref FighterState lunger, ref FighterState melee, in FighterState snapLunger, in FighterState snapMelee,
+            float power, Vec2 point, int meleeIndex, SimConfig config, int tick, SimEventBuffer events)
+        {
+            ref readonly var p = ref config.Combat.Charge;
+            var toward = SimMath.Normalize(snapMelee.Position - snapLunger.Position);
+            BodyStrikeValues(snapLunger.Velocity, toward, power, p, out int damage, out var direction, out float knockback);
+            var strike = new Strike { Damage = damage, Direction = direction, Knockback = knockback, Point = point };
+            events.Add(new SimEvent(tick, SimEventType.AttackInterrupted, meleeIndex, snapMelee.Position, direction, power));
+            ApplyStrike(ref lunger, ref melee, snapLunger, snapMelee, strike, meleeIndex, config, tick, events);
+            melee.AttackId = FighterState.NoAttack;
+            melee.AttackHasHit = false;
+            lunger.ContactCooldown = p.ContactCooldownTicks;
+            melee.ContactCooldown = p.ContactCooldownTicks;
         }
 
         static void HitboxStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, Vec2 point, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)
@@ -815,6 +857,7 @@ namespace Knockbox.Simulation
                 events.Add(new SimEvent(tick, SimEventType.GuardHit, defenderIndex, point, direction, guarded));
                 return;
             }
+            bool lunging = defender.Action == ActionState.Lunge;
             int n = defender.IsLaunched ? defender.ComboHits : 0;
             float k = knockback * SimMath.Pow(c.ComboKnockbackDecay, n);
             defender.Velocity = direction * k;
@@ -824,6 +867,15 @@ namespace Knockbox.Simulation
             EnterStun(ref defender, ActionState.Hitstun);
             defender.HitstopTicks = hitstop;
             events.Add(new SimEvent(tick, SimEventType.Hit, defenderIndex, point, direction, damage));
+            if (lunging)
+            {
+                // 돌진 중에 맞으면(4.1): 돌진이 끊기고 관성을 잃은 채 짧게 기절한다.
+                defender.Velocity = defender.Velocity * c.Rock.LungeStunVelocityScale;
+                defender.ComboHits = 0;
+                defender.StunTicks = c.Rock.LungeStunTicks;
+                EnterStun(ref defender, ActionState.Stagger);
+                events.Add(new SimEvent(tick, SimEventType.LungeStun, defenderIndex, defender.Position, direction, c.Rock.LungeStunTicks));
+            }
         }
 
         /// <summary>몸 충돌에서 이긴 쪽: 속도 × -0.25로 살짝 튕겨 나오고 돌진(대시)이 끝난다.</summary>

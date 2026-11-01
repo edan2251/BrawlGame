@@ -27,6 +27,10 @@ namespace Knockbox.Simulation
         public bool PierceProp;
         /// <summary>한 투사체의 연속 반사 상한(4.2, 핑퐁 방지).</summary>
         public int MaxReflections;
+        /// <summary>돌진 중인 파이터를 맞히면 돌진이 끊기고 이만큼 기절(비틀거림)한다(4.1).</summary>
+        public int LungeStunTicks;
+        /// <summary>기절할 때 남기는 속도 비율(돌진의 관성을 끊는다).</summary>
+        public float LungeStunVelocityScale;
 
         public static RockParams Default => new RockParams
         {
@@ -43,6 +47,8 @@ namespace Knockbox.Simulation
             PierceFighter = false,
             PierceProp = false,
             MaxReflections = 3,
+            LungeStunTicks = 24,
+            LungeStunVelocityScale = 0.25f,
         };
 
         public readonly int TotalTicks => StartupTicks + RecoveryTicks;
@@ -62,6 +68,8 @@ namespace Knockbox.Simulation
             v.Value(nameof(PierceFighter), PierceFighter);
             v.Value(nameof(PierceProp), PierceProp);
             v.Value(nameof(MaxReflections), MaxReflections);
+            v.Value(nameof(LungeStunTicks), LungeStunTicks);
+            v.Value(nameof(LungeStunVelocityScale), LungeStunVelocityScale);
         }
     }
 }

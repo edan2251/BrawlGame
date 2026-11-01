@@ -58,7 +58,11 @@ namespace Knockbox.Simulation
     [Serializable]
     public struct RuleSet
     {
+        /// <summary>P1의 시작 폼. SeparateP2Form이 거짓이면 P2도 같다.</summary>
         public FighterForm StartForm;
+        /// <summary>참이면 P2는 StartFormP2로 시작한다(폼 쌍 시험·봇 매트릭스, CP20).</summary>
+        public bool SeparateP2Form;
+        public FighterForm StartFormP2;
         public FeatureSwitches Switches;
 
         public static RuleSet Default => new RuleSet { StartForm = FighterForm.Scissors, Switches = FeatureSwitches.Default };
@@ -66,9 +70,23 @@ namespace Knockbox.Simulation
         public static RuleSet Legacy(CombatMode mode, bool grabEnabled) =>
             new RuleSet { StartForm = Forms.FromMode(mode), Switches = FeatureSwitches.Legacy(grabEnabled) };
 
-        /// <summary>예: "Scissors g0 r0 e1"(가드, 잡기, 에너지).</summary>
+        public readonly FighterForm StartFormOf(int fighter) => fighter == 1 && SeparateP2Form ? StartFormP2 : StartForm;
+
+        /// <summary>P1·P2의 시작 폼을 따로 정한 규칙.</summary>
+        public readonly RuleSet WithForms(FighterForm p1, FighterForm p2)
+        {
+            var r = this;
+            r.StartForm = p1;
+            r.StartFormP2 = p2;
+            r.SeparateP2Form = p1 != p2;
+            if (!r.SeparateP2Form)
+                r.StartFormP2 = default;
+            return r;
+        }
+
+        /// <summary>예: "Scissors g0 r0 e1"(가드, 잡기, 에너지), 폼이 다르면 "Rock/Paper g0 r0 e1".</summary>
         public readonly string Format() =>
-            $"{StartForm} g{(Switches.GuardEnabled ? 1 : 0)} r{(Switches.GrabEnabled ? 1 : 0)} e{(Switches.EnergyEnabled ? 1 : 0)}";
+            $"{StartForm}{(SeparateP2Form ? "/" + StartFormP2 : "")} g{(Switches.GuardEnabled ? 1 : 0)} r{(Switches.GrabEnabled ? 1 : 0)} e{(Switches.EnergyEnabled ? 1 : 0)}";
 
         public static bool TryParse(string text, out RuleSet rules)
         {
@@ -76,17 +94,25 @@ namespace Knockbox.Simulation
             if (string.IsNullOrEmpty(text))
                 return false;
             string[] parts = text.Split(' ');
-            if (parts.Length != 4 || !Enum.TryParse(parts[0], false, out FighterForm form) || !Enum.IsDefined(typeof(FighterForm), form))
+            if (parts.Length != 4)
+                return false;
+            string[] forms = parts[0].Split('/');
+            if (forms.Length > 2 || !ParseForm(forms[0], out var p1))
+                return false;
+            var p2 = p1;
+            if (forms.Length == 2 && !ParseForm(forms[1], out p2))
                 return false;
             if (!Flag(parts[1], 'g', out bool guard) || !Flag(parts[2], 'r', out bool grab) || !Flag(parts[3], 'e', out bool energy))
                 return false;
             rules = new RuleSet
             {
-                StartForm = form,
                 Switches = new FeatureSwitches { GuardEnabled = guard, GrabEnabled = grab, EnergyEnabled = energy },
-            };
+            }.WithForms(p1, p2);
             return true;
         }
+
+        static bool ParseForm(string text, out FighterForm form) =>
+            Enum.TryParse(text, false, out form) && Enum.IsDefined(typeof(FighterForm), form);
 
         static bool Flag(string part, char key, out bool value)
         {

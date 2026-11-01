@@ -82,8 +82,8 @@ namespace Knockbox.Simulation
             {
                 Tick = 0,
                 Rng = new SimRng(seed),
-                Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1),
-                Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1),
+                Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1, 0),
+                Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1, 1),
             };
             state.Match.Round = 1;
             state.Match.RoundWinner = -1;
@@ -100,8 +100,8 @@ namespace Knockbox.Simulation
         {
             var center0 = SpawnCenter(config, arena, 0);
             var center1 = SpawnCenter(config, arena, 1);
-            state.Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1);
-            state.Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1);
+            state.Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1, 0);
+            state.Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1, 1);
             state.Match.Round++;
             state.Match.RoundWinner = -1;
             state.Match.SetPhase(MatchPhase.Countdown);
@@ -118,7 +118,7 @@ namespace Knockbox.Simulation
             StartNextRound(ref state, config, arena);
         }
 
-        static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing)
+        static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing, int index)
         {
             ref readonly var m = ref config.Movement;
             var f = new FighterState
@@ -132,8 +132,8 @@ namespace Knockbox.Simulation
                 Health = config.Combat.MaxHealth,
                 AttackId = FighterState.NoAttack,
                 TicksSinceGuardPress = FighterState.TimerCap,
-                Form = config.StartForm,
-                OwnedForms = Forms.Bit(config.StartForm),
+                Form = config.StartFormOf(index),
+                OwnedForms = Forms.Bit(config.StartFormOf(index)),
                 Energy = config.Combat.Energy.Max,
             };
             f.GroundBox = TerrainCollision.ProbeGround(center, config.HalfBody, arena, m.GroundProbeDistance, FighterState.NoBox);

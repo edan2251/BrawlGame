@@ -18,6 +18,8 @@ namespace Knockbox.Game
         readonly bool grabs;
         readonly bool smart;
         readonly CombatMode combatMode;
+        /// <summary>바위 폼(CP20): 거리를 벌리고 수평·대각으로 맞을 때 쏜다.</summary>
+        readonly bool rock;
         int chargeTarget;
 
         /// <param name="grabs">true면 다가가서 잡고 던지는 행동을 섞는다(CP7). 기본값은 이전 CP 테스트의 입력을 바꾸지 않는다.</param>
@@ -29,17 +31,24 @@ namespace Knockbox.Game
             this.grabs = grabs;
             smart = false;
             combatMode = CombatMode.Test;
+            rock = false;
             chargeTarget = 0;
         }
 
-        CombatBot(uint seed, bool grabs, CombatMode combatMode) : this(seed, grabs)
+        CombatBot(uint seed, bool grabs, CombatMode combatMode, bool rock) : this(seed, grabs)
         {
             smart = true;
             this.combatMode = combatMode;
+            this.rock = rock;
         }
 
         /// <summary>모드에 맞게 공격 버튼을 쓰는 봇(F6 상대, 봇 영상).</summary>
-        public static CombatBot Smart(uint seed, bool grabs, CombatMode combatMode) => new CombatBot(seed, grabs, combatMode);
+        public static CombatBot Smart(uint seed, bool grabs, CombatMode combatMode) => new CombatBot(seed, grabs, combatMode, false);
+
+        /// <summary>파이터의 폼에 맞게 공격 버튼을 쓰는 봇(CR-003). 가위 = 모드 A 봇, 보 = 모드 B 봇, 바위 = 거리를 두고 쏘는 봇.</summary>
+        public static CombatBot ForForm(uint seed, bool grabs, FighterForm form) =>
+            new CombatBot(seed, grabs, form == FighterForm.Scissors ? CombatMode.Charge : form == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test,
+                form == FighterForm.Rock);
 
         public InputFrame Next(in FighterState self, in FighterState other, int tick)
         {
@@ -109,7 +118,9 @@ namespace Knockbox.Game
             if (smart)
             {
                 float dy = other.Position.Y - self.Position.Y;
-                if (combatMode == CombatMode.Charge)
+                if (rock)
+                    AimRock(self, toward, distance, dy, tick, ref moveX, ref moveY, ref buttons);
+                else if (combatMode == CombatMode.Charge)
                     AimCharge(self, toward, distance, dy, tick, ref moveX, ref moveY, ref buttons);
                 else if (combatMode == CombatMode.Swing)
                     AimSwing(self, distance, dy, ref moveY, buttons);
@@ -149,6 +160,37 @@ namespace Knockbox.Game
             chargeTarget = rng.Range(lo, Math.Min(40, lo + (int)(distance * 4f) + 8));
         }
 
+        /// <summary>
+        /// 바위: 너무 가까우면 물러나며 쏘고, 상대가 수평(높이 차 1.2 안)이나 대각선에 있으면 쏜다. 발사 틱의 입력이 방향이므로
+        /// 선딜 동안 조준 방향을 누르고 있는다.
+        /// </summary>
+        void AimRock(in FighterState self, int toward, float distance, float dy, int tick, ref int moveX, ref int moveY, ref InputButtons buttons)
+        {
+            float ady = dy < 0f ? -dy : dy;
+            bool level = ady < 1.2f;
+            bool diagonal = !level && (distance - ady < 1.5f && ady - distance < 1.5f) && distance < 10f;
+            int aimY = diagonal ? (dy > 0f ? 1 : -1) : 0;
+            if (self.Action == ActionState.Shoot)
+            {
+                buttons &= ~(InputButtons.Attack | InputButtons.Guard | InputButtons.Grab | InputButtons.Dash);
+                moveX = toward;
+                moveY = aimY;
+                return;
+            }
+            buttons &= ~InputButtons.Attack;
+            if (self.InMovementState && (level || diagonal) && distance < 16f && tick % 7 == 0)
+            {
+                buttons |= InputButtons.Attack;
+                buttons &= ~InputButtons.Guard;
+                moveX = toward;
+                moveY = aimY;
+            }
+            else if (distance < 3f && mode != 3)
+            {
+                moveX = -toward;
+            }
+        }
+
         /// <summary>모드 B: 휘두르는 순간 상대가 머리 위면 위 휘두르기, 공중에서 상대가 아래면 내려찍기.</summary>
         void AimSwing(in FighterState self, float distance, float dy, ref int moveY, InputButtons buttons)
         {
@@ -175,7 +217,7 @@ namespace Knockbox.Game
         CombatBot bot;
         bool created;
         bool botGrabs;
-        CombatMode botMode;
+        FighterForm botForm;
         bool jumpHeld;
         int ledgeJumpTicks;
 
@@ -205,13 +247,12 @@ namespace Knockbox.Game
                 return default;
             var config = w.Config;
             ref readonly var self = ref fighter == 0 ? ref w.State.Fighter0 : ref w.State.Fighter1;
-            // 봇은 자기 파이터의 폼으로 싸운다(CR-003). 바위 봇은 CP20.
-            var mode = self.Form == FighterForm.Scissors ? CombatMode.Charge : self.Form == FighterForm.Paper ? CombatMode.Swing : CombatMode.Test;
-            if (!created || botGrabs != config.GrabEnabled || botMode != mode)
+            // 봇은 자기 파이터의 폼으로 싸운다(CR-003).
+            if (!created || botGrabs != config.GrabEnabled || botForm != self.Form)
             {
-                bot = CombatBot.Smart(seed, config.GrabEnabled, mode);
+                bot = CombatBot.ForForm(seed, config.GrabEnabled, self.Form);
                 botGrabs = config.GrabEnabled;
-                botMode = mode;
+                botForm = self.Form;
                 created = true;
             }
             ref readonly var other = ref fighter == 0 ? ref w.State.Fighter1 : ref w.State.Fighter0;

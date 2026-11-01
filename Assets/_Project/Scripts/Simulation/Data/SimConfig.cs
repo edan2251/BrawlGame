@@ -209,6 +209,7 @@ namespace Knockbox.Simulation
         }
 
         public FighterForm StartForm => Rules.StartForm;
+        public FighterForm StartFormOf(int fighter) => Rules.StartFormOf(fighter);
         public bool GuardEnabled => Rules.Switches.GuardEnabled;
         /// <summary>잡기 켜기/끄기. 꺼져 있으면 잡기 입력을 무시한다.</summary>
         public bool GrabEnabled => Rules.Switches.GrabEnabled;
@@ -260,6 +261,7 @@ namespace Knockbox.Simulation
             Combat.Visit(ref v);
             v.End();
             v.Value(nameof(StartForm), (int)StartForm);
+            v.Value("StartFormP2", (int)StartFormOf(1));
             v.Value(nameof(GuardEnabled), GuardEnabled);
             v.Value(nameof(GrabEnabled), GrabEnabled);
             v.Value(nameof(EnergyEnabled), EnergyEnabled);

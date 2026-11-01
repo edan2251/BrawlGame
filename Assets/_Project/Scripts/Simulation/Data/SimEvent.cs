@@ -58,6 +58,12 @@ namespace Knockbox.Simulation
         ProjectileFire,
         /// <summary>투사체가 사라짐(CP19). Fighter는 소유자, Position은 사라진 곳. Strength는 이유(ProjectileEndReason).</summary>
         ProjectileEnd,
+        /// <summary>근접 활성 판정이 투사체를 반사함(CP20). Fighter는 반사한 쪽(새 소유자), Position은 반사한 곳, Direction은 새 진행 방향, Strength는 반사 횟수.</summary>
+        ProjectileReflect,
+        /// <summary>돌진 중 투사체에 맞아 돌진이 끊기고 짧게 기절함(CP20). Fighter는 기절한 쪽, Strength는 기절 틱.</summary>
+        LungeStun,
+        /// <summary>근접공격이 위력 있는 돌진에 져서 중단됨(CP20). Fighter는 중단된 쪽, Strength는 돌진 위력.</summary>
+        AttackInterrupted,
     }
 
     /// <summary>
