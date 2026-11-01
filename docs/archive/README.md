@@ -33,3 +33,4 @@
 | `logs/CP17.md` | CP17 로그(CR-003 준비) | `docs/progress/logs/` |
 | `logs/CP18.md` | CP18 로그(폼 기반, 에너지, 스위치) | `docs/progress/logs/` |
 | `logs/CP19.md` | CP19 로그(투사체, 바위 폼) | `docs/progress/logs/` |
+| `logs/CP20.md` | CP20 로그(보 폼, 속성 해석기, 봇 매트릭스) | `docs/progress/logs/` |

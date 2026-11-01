@@ -178,16 +178,23 @@ namespace Knockbox.Game
                 return;
             }
             buttons &= ~InputButtons.Attack;
-            if (self.InMovementState && (level || diagonal) && distance < 16f && tick % 7 == 0)
+            // 발사 간격은 무작위(틱마다 1/6), 셋 중 하나는 점프하며 쏴서 마주 쏜 투사체끼리만 계속 상쇄되지 않게 한다(CP20 튜닝 1).
+            if (self.InMovementState && (level || diagonal) && distance < 16f && rng.Range(0, 6) == 0)
             {
                 buttons |= InputButtons.Attack;
                 buttons &= ~InputButtons.Guard;
+                if (self.Grounded && rng.Range(0, 3) == 0)
+                    buttons |= InputButtons.Jump;
                 moveX = toward;
                 moveY = aimY;
             }
-            else if (distance < 3f && mode != 3)
+            else if (distance < 2.5f && mode != 3)
             {
                 moveX = -toward;
+            }
+            else if (distance > 7f)
+            {
+                moveX = toward;
             }
         }
 

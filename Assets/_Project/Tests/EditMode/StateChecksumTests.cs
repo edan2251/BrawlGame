@@ -118,10 +118,13 @@ namespace Knockbox.Tests.EditMode
                 if (new SimConfig(MovementParams.Default, m).ComputeChecksum() == baseChecksum)
                     missing.AppendLine(path);
             }
+            // 레거시 생성자는 일부 값(Swing.ForwardOnly)을 고정하므로 규칙 생성자로 확인한다(CP20).
+            var rules = RuleSet.Legacy(CombatMode.Test, true);
+            uint combatBase = new SimConfig(MovementParams.Default, MatchParams.Default, CombatParams.Default, rules).ComputeChecksum();
             foreach (var (path, mutate) in Leaves(typeof(CombatParams), "Combat."))
             {
                 var c = (CombatParams)mutate(CombatParams.Default);
-                if (new SimConfig(MovementParams.Default, MatchParams.Default, c, CombatMode.Test).ComputeChecksum() == baseChecksum)
+                if (new SimConfig(MovementParams.Default, MatchParams.Default, c, rules).ComputeChecksum() == combatBase)
                     missing.AppendLine(path);
             }
             Assert.AreEqual(string.Empty, missing.ToString(), "설정 체크섬에 빠진 필드");
