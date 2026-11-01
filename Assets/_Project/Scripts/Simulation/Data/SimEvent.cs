@@ -66,6 +66,12 @@ namespace Knockbox.Simulation
         AttackInterrupted,
         /// <summary>폼 전환(CP21). Fighter는 전환한 쪽, Direction.X는 이전 폼 번호, Strength는 새 폼 번호.</summary>
         FormSwitch,
+        /// <summary>세트 종료(세트 흐름). Fighter는 세트 승자, Strength는 끝난 세트 번호.</summary>
+        SetEnd,
+        /// <summary>선택 단계 시작. Fighter는 고르는 쪽(초기 폼 선택은 NoFighter), Strength는 선택지 수.</summary>
+        PickStart,
+        /// <summary>한 선수가 선택을 마침(비공개: 무엇을 골랐는지는 담지 않는다). Strength는 시간 초과로 정해졌으면 1.</summary>
+        Picked,
     }
 
     /// <summary>

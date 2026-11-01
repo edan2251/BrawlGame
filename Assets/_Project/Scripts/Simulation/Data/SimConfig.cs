@@ -150,6 +150,16 @@ namespace Knockbox.Simulation
         public int RoundsToWin;
         /// <summary>MatchEnd에 들어온 뒤 이만큼 지나야 버튼으로 새 경기를 시작한다(연타로 결과 화면을 넘기지 않게).</summary>
         public int MatchEndMinTicks;
+        /// <summary>세트 승리에 필요한 라운드 승수(3라운드 중 2선승, D-049).</summary>
+        public int RoundsToWinSet;
+        /// <summary>경기 승리에 필요한 세트 수(D-052).</summary>
+        public int SetsToWinMatch;
+        /// <summary>한 선수의 경기당 선택 상한(D-054).</summary>
+        public int MaxPicks;
+        /// <summary>선택 단계(초기 폼·세트 패자 선택)에서 이만큼 고르지 않으면 시드 난수로 정한다(진행이 멈추지 않게).</summary>
+        public int PickTimeoutTicks;
+        /// <summary>선택이 끝난 뒤 다음 단계로 가기 전 잠깐 멈추는 틱(연출용, 결과는 표시하지 않음).</summary>
+        public int PickHoldTicks;
 
         public static MatchParams Default => new MatchParams
         {
@@ -157,6 +167,11 @@ namespace Knockbox.Simulation
             KoTicks = 60,
             RoundsToWin = 5,
             MatchEndMinTicks = 60,
+            RoundsToWinSet = 2,
+            SetsToWinMatch = 5,
+            MaxPicks = 4,
+            PickTimeoutTicks = 900,
+            PickHoldTicks = 20,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -165,6 +180,11 @@ namespace Knockbox.Simulation
             v.Value(nameof(KoTicks), KoTicks);
             v.Value(nameof(RoundsToWin), RoundsToWin);
             v.Value(nameof(MatchEndMinTicks), MatchEndMinTicks);
+            v.Value(nameof(RoundsToWinSet), RoundsToWinSet);
+            v.Value(nameof(SetsToWinMatch), SetsToWinMatch);
+            v.Value(nameof(MaxPicks), MaxPicks);
+            v.Value(nameof(PickTimeoutTicks), PickTimeoutTicks);
+            v.Value(nameof(PickHoldTicks), PickHoldTicks);
         }
     }
 
@@ -272,6 +292,7 @@ namespace Knockbox.Simulation
             v.Value(nameof(StartForm), (int)StartForm);
             v.Value("StartFormP2", (int)StartFormOf(1));
             v.Value("OwnedForms", (int)Rules.OwnedForms);
+            v.Value("LegacyMatch", Rules.LegacyMatch);
             v.Value(nameof(GuardEnabled), GuardEnabled);
             v.Value(nameof(GrabEnabled), GrabEnabled);
             v.Value(nameof(EnergyEnabled), EnergyEnabled);

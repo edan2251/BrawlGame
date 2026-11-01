@@ -87,6 +87,11 @@ namespace Knockbox.Simulation
             };
             state.Match.Round = 1;
             state.Match.RoundWinner = -1;
+            state.Match.Set = 1;
+            state.Match.Picker = -1;
+            state.Match.FormChoice0 = -1;
+            state.Match.FormChoice1 = -1;
+            state.Match.PickedAt = -1;
             state.Match.SetPhase(startPhase);
             PropPhysics.Init(ref state.Props, arena, config);
             return state;
@@ -100,8 +105,13 @@ namespace Knockbox.Simulation
         {
             var center0 = SpawnCenter(config, arena, 0);
             var center1 = SpawnCenter(config, arena, 1);
+            // 폼과 보유 폼(CP23부터 증강도)은 라운드·세트를 넘어 유지한다(4.7 개정). 전투 상태는 새로 만든다.
+            var keep0 = state.Fighter0;
+            var keep1 = state.Fighter1;
             state.Fighter0 = CreateFighter(config, arena, center0, center0.X <= center1.X ? 1 : -1, 0);
             state.Fighter1 = CreateFighter(config, arena, center1, center1.X < center0.X ? 1 : -1, 1);
+            KeepMatchPart(ref state.Fighter0, keep0);
+            KeepMatchPart(ref state.Fighter1, keep1);
             state.Match.Round++;
             state.Match.RoundWinner = -1;
             state.Match.SetPhase(MatchPhase.Countdown);
@@ -109,13 +119,46 @@ namespace Knockbox.Simulation
             PropPhysics.Init(ref state.Props, arena, config);
         }
 
-        /// <summary>MatchEnd 뒤 새 경기: 점수를 지우고 1라운드 Countdown부터.</summary>
+        /// <summary>파이터 상태 중 경기 끝까지 유지하는 부분(폼, 보유 폼, 증강). 라운드 시작 초기화에서 되살린다.</summary>
+        public static void KeepMatchPart(ref FighterState fresh, in FighterState previous)
+        {
+            fresh.Form = previous.Form;
+            fresh.OwnedForms = previous.OwnedForms;
+            fresh.Augments = previous.Augments;
+        }
+
+        /// <summary>
+        /// MatchEnd 뒤 새 경기: 점수를 지우고 1라운드 Countdown부터(레거시 흐름).
+        /// 세트 흐름(D-052)은 폼·증강·선택 횟수·세트스코어도 지우고 맵 순환을 새로 섞어 초기 폼 선택부터.
+        /// </summary>
         public static void StartNewMatch(ref SimState state, SimConfig config, ArenaDef arena)
         {
             state.Match.Score0 = 0;
             state.Match.Score1 = 0;
             state.Match.Round = 0;
+            if (config.Rules.LegacyMatch)
+            {
+                StartNextRound(ref state, config, arena);
+                return;
+            }
+            state.Match.SetScore0 = 0;
+            state.Match.SetScore1 = 0;
+            state.Match.Set = 1;
+            state.Match.Picks0 = 0;
+            state.Match.Picks1 = 0;
+            state.Match.Picker = -1;
+            state.Match.PickedAt = -1;
+            state.Match.FormChoice0 = -1;
+            state.Match.FormChoice1 = -1;
             StartNextRound(ref state, config, arena);
+            // 경기 부분을 시작 값으로(StartNextRound가 되살린 폼·증강을 지운다).
+            state.Fighter0.Form = config.StartFormOf(0);
+            state.Fighter0.OwnedForms = config.Rules.OwnedFormsOf(0);
+            state.Fighter0.Augments = default;
+            state.Fighter1.Form = config.StartFormOf(1);
+            state.Fighter1.OwnedForms = config.Rules.OwnedFormsOf(1);
+            state.Fighter1.Augments = default;
+            state.Match.SetPhase(MatchPhase.FormSelect);
         }
 
         static FighterState CreateFighter(SimConfig config, ArenaDef arena, Vec2 center, int facing, int index)

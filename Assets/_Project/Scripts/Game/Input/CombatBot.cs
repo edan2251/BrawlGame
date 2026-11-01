@@ -262,6 +262,18 @@ namespace Knockbox.Game
                 return default;
             var config = w.Config;
             ref readonly var self = ref fighter == 0 ? ref w.State.Fighter0 : ref w.State.Fighter1;
+            // 선택 단계(CR-003 개정): 고를 차례면 시드 무작위로 하나를 누른다(누른 틱과 뗀 틱을 번갈아).
+            ref readonly var match = ref w.State.Match;
+            bool choosing = match.Phase == MatchPhase.FormSelect && (fighter == 0 ? match.FormChoice0 : match.FormChoice1) < 0
+                            || match.Phase == MatchPhase.SetPick && match.Picker == fighter && match.PickedAt < 0;
+            if (choosing)
+            {
+                if (match.PhaseTick < 20 || (match.PhaseTick & 1) == 1)
+                    return default;
+                int count = match.Phase == MatchPhase.FormSelect ? Forms.PlayableCount : match.OptionCount;
+                var pickRng = new SimRng(seed ^ (uint)(tick * 2654435761u));
+                return new InputFrame(0, 0, MatchFlow.OptionButton(pickRng.Range(0, count)));
+            }
             // 봇은 자기 파이터의 폼으로 싸운다(CR-003).
             if (!created || botGrabs != config.GrabEnabled || botForm != self.Form)
             {

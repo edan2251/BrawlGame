@@ -82,11 +82,13 @@ namespace Knockbox.Simulation
         /// <summary>시작할 때 보유하는 폼 비트(시작 폼은 항상 포함). 0이면 시작 폼 하나. CP22의 선택 전까지 전환을 시험하는 데 쓴다.</summary>
         public byte OwnedForms;
         public FeatureSwitches Switches;
+        /// <summary>참이면 CP16까지의 경기 흐름(라운드 RoundsToWin 선승, 선택 없음). 거짓이면 라운드·세트·경기와 세트 패자 선택(D-049~D-052).</summary>
+        public bool LegacyMatch;
 
         public static RuleSet Default => new RuleSet { StartForm = FighterForm.Scissors, Switches = FeatureSwitches.Default };
 
         public static RuleSet Legacy(CombatMode mode, bool grabEnabled) =>
-            new RuleSet { StartForm = Forms.FromMode(mode), Switches = FeatureSwitches.Legacy(grabEnabled) };
+            new RuleSet { StartForm = Forms.FromMode(mode), Switches = FeatureSwitches.Legacy(grabEnabled), LegacyMatch = true };
 
         public readonly FighterForm StartFormOf(int fighter) => fighter == 1 && SeparateP2Form ? StartFormP2 : StartForm;
 
@@ -114,7 +116,7 @@ namespace Knockbox.Simulation
         /// <summary>예: "Scissors g0 r0 e1"(가드, 잡기, 에너지), 폼이 다르면 "Rock/Paper g0 r0 e1", 보유 폼이 있으면 끝에 " o7".</summary>
         public readonly string Format() =>
             $"{StartForm}{(SeparateP2Form ? "/" + StartFormP2 : "")} g{(Switches.GuardEnabled ? 1 : 0)} r{(Switches.GrabEnabled ? 1 : 0)} e{(Switches.EnergyEnabled ? 1 : 0)}"
-            + (OwnedForms != 0 ? $" o{OwnedForms}" : "");
+            + (OwnedForms != 0 ? $" o{OwnedForms}" : "") + (LegacyMatch ? " legacy" : "");
 
         public static bool TryParse(string text, out RuleSet rules)
         {
@@ -122,10 +124,12 @@ namespace Knockbox.Simulation
             if (string.IsNullOrEmpty(text))
                 return false;
             string[] parts = text.Split(' ');
-            if (parts.Length != 4 && parts.Length != 5)
+            bool legacy = parts.Length > 4 && parts[parts.Length - 1] == "legacy";
+            int count = legacy ? parts.Length - 1 : parts.Length;
+            if (count != 4 && count != 5)
                 return false;
             byte owned = 0;
-            if (parts.Length == 5 && (parts[4].Length < 2 || parts[4][0] != 'o' || !byte.TryParse(parts[4].Substring(1), out owned) || owned == 0))
+            if (count == 5 && (parts[4].Length < 2 || parts[4][0] != 'o' || !byte.TryParse(parts[4].Substring(1), out owned) || owned == 0))
                 return false;
             string[] forms = parts[0].Split('/');
             if (forms.Length > 2 || !ParseForm(forms[0], out var p1))
@@ -139,6 +143,7 @@ namespace Knockbox.Simulation
             {
                 Switches = new FeatureSwitches { GuardEnabled = guard, GrabEnabled = grab, EnergyEnabled = energy },
                 OwnedForms = owned,
+                LegacyMatch = legacy,
             }.WithForms(p1, p2);
             return true;
         }

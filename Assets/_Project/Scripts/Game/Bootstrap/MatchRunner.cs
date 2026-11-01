@@ -16,7 +16,7 @@ namespace Knockbox.Game
         [Tooltip("F11로 순환하는 전투 튜닝 프리셋(기본, 더 빠르게)")]
         [SerializeField] CombatTuning[] combatPresets;
         [Tooltip("시작 폼과 기능 스위치(CR-003): F1 폼, F4 가드·잡기, Insert 에너지. 다음 StartNewMatch부터 적용")]
-        [SerializeField] RuleSet rules = RuleSet.Default.WithOwned(Forms.AllPlayable);
+        [SerializeField] RuleSet rules = RuleSet.Default;
         [SerializeField] TextAsset[] arenaFiles;
         [Tooltip("맵 짝 파일(<이름>.json): 테마, 광원, 순환 포함 여부")]
         [SerializeField] TextAsset[] arenaMetaFiles;
@@ -223,7 +223,8 @@ namespace Knockbox.Game
         {
             var config = CreateConfig();
             var arenas = ResolveArenas(arenaName);
-            var phase = skipCountdown ? MatchPhase.Fighting : MatchPhase.Countdown;
+            // 세트 흐름(CR-003 개정)은 경기 시작의 초기 폼 선택부터, 레거시 흐름은 카운트다운부터.
+            var phase = skipCountdown ? MatchPhase.Fighting : config.Rules.LegacyMatch ? MatchPhase.Countdown : MatchPhase.FormSelect;
             if (randomizeSeed)
                 seed = (uint)Environment.TickCount | 1u;
             if (useLocalDevices)

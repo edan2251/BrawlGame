@@ -143,6 +143,8 @@ namespace Knockbox.Simulation
         public bool ActionPaid;
         /// <summary>이번 틱에 바위 투사체를 발사하기로 했다(CP19). 이동이 끝난 뒤 투사체 풀에 넣고 지운다.</summary>
         public bool ShotPending;
+        /// <summary>증강 획득 목록(CP23). 경기 끝까지 유지.</summary>
+        public AugmentState Augments;
         public Vec2 ShotDirection;
 
         public const int NoAttack = -1;
@@ -229,6 +231,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(EnergyRegenDelay), EnergyRegenDelay);
             v.Value(nameof(ActionPaid), ActionPaid);
             v.Value(nameof(ShotPending), ShotPending);
+            v.Begin(nameof(Augments));
+            Augments.Visit(ref v);
+            v.End();
             v.Value("ShotDirection.X", ShotDirection.X);
             v.Value("ShotDirection.Y", ShotDirection.Y);
         }

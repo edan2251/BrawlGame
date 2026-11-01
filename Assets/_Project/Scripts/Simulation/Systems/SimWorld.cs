@@ -107,9 +107,24 @@ namespace Knockbox.Simulation
                     var pressed = InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons) | InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons);
                     if (s.Match.PhaseTick >= Config.Match.MatchEndMinTicks && pressed != InputButtons.None)
                     {
-                        s.Match.Rotation.Advance();
+                        if (Config.Rules.LegacyMatch || s.Match.Rotation.Count <= 1)
+                            s.Match.Rotation.Advance();
+                        else
+                            s.Match.Rotation = ArenaRotation.Create(s.Rng.NextUInt(), s.Match.Rotation.Count);
                         SimState.StartNewMatch(ref s, Config, Arena);
+                        if (!Config.Rules.LegacyMatch)
+                            Events.Add(new SimEvent(s.Tick, SimEventType.PickStart, SimEvent.NoFighter, Vec2.Zero, Vec2.Zero, Forms.PlayableCount));
                     }
+                    break;
+                case MatchPhase.FormSelect:
+                    MatchFlow.StepFormSelect(ref s, Config, InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons),
+                        InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons), Events);
+                    break;
+                case MatchPhase.SetPick:
+                    MatchFlow.StepSetPick(ref s, Config, InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons),
+                        InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons), s.Tick, Events, out bool picked);
+                    if (picked)
+                        GoToNextRound(ref s);
                     break;
             }
 
@@ -204,6 +219,11 @@ namespace Knockbox.Simulation
 
         void AfterRoundEnd(ref SimState s)
         {
+            if (!Config.Rules.LegacyMatch)
+            {
+                AfterRoundEndSets(ref s);
+                return;
+            }
             int target = Config.Match.RoundsToWin;
             if (s.Match.Score0 >= target || s.Match.Score1 >= target)
             {
@@ -212,6 +232,54 @@ namespace Knockbox.Simulation
                 Events.Add(new SimEvent(s.Tick, SimEventType.MatchEnd, winner, Vec2.Zero, Vec2.Zero, s.Match.Round));
                 return;
             }
+            s.Match.SetPhase(MatchPhase.RoundTransition);
+            Events.Add(new SimEvent(s.Tick, SimEventType.RoundTransition, SimEvent.NoFighter, Vec2.Zero, Vec2.Zero, s.Match.Round));
+        }
+
+        /// <summary>
+        /// 세트 흐름(D-049~D-054): 무승부면 같은 라운드를 다시, 세트가 끝나지 않았으면 다음 라운드(선택 없음).
+        /// 세트가 끝나면 세트스코어 +1, 라운드 점수 0. 경기가 끝나지 않았으면 세트 패자가 선택(선택 상한·후보가 있으면).
+        /// </summary>
+        void AfterRoundEndSets(ref SimState s)
+        {
+            ref var m = ref s.Match;
+            int winner = m.RoundWinner;
+            if (winner < 0 || m.GetScore(winner) < Config.Match.RoundsToWinSet)
+            {
+                GoToNextRound(ref s);
+                return;
+            }
+            if (winner == 0)
+                m.SetScore0++;
+            else
+                m.SetScore1++;
+            Events.Add(new SimEvent(s.Tick, SimEventType.SetEnd, winner, Vec2.Zero, Vec2.Zero, m.Set));
+            m.Score0 = 0;
+            m.Score1 = 0;
+            if (m.GetSetScore(winner) >= Config.Match.SetsToWinMatch)
+            {
+                m.SetPhase(MatchPhase.MatchEnd);
+                Events.Add(new SimEvent(s.Tick, SimEventType.MatchEnd, winner, Vec2.Zero, Vec2.Zero, m.Round));
+                return;
+            }
+            m.Set++;
+            int loser = 1 - winner;
+            int options = m.GetPicks(loser) < Config.Match.MaxPicks
+                ? MatchFlow.BuildOptions(ref m, s.GetFighter(loser), Config, ref s.Rng)
+                : 0;
+            if (options == 0)
+            {
+                GoToNextRound(ref s);
+                return;
+            }
+            m.Picker = loser;
+            m.PickedAt = -1;
+            m.SetPhase(MatchPhase.SetPick);
+            Events.Add(new SimEvent(s.Tick, SimEventType.PickStart, loser, Vec2.Zero, Vec2.Zero, options));
+        }
+
+        void GoToNextRound(ref SimState s)
+        {
             s.Match.SetPhase(MatchPhase.RoundTransition);
             Events.Add(new SimEvent(s.Tick, SimEventType.RoundTransition, SimEvent.NoFighter, Vec2.Zero, Vec2.Zero, s.Match.Round));
         }
