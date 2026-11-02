@@ -97,6 +97,46 @@ namespace Knockbox.Tests.EditMode
             Assert.AreEqual(s.Fighter0.Position.X + config.Combat.Grab.HoldOffset * s.Fighter0.Facing, s.Fighter1.Position.X, 1e-3f, "잡힌 쪽이 따라옴");
         }
 
+        [Test]
+        public void Holding_CanJumpCarryingVictim()
+        {
+            var config = Config();
+            var w = World(config);
+            GrabAndHold(w);
+            float y0 = w.State.Fighter0.Position.Y;
+            w.Step(new InputFrame(0, 0, InputButtons.Jump, AimDirections.Encode(0)), default);
+            float top = y0;
+            for (int i = 0; i < 12; i++)
+            {
+                w.Step(new InputFrame(0, 0, InputButtons.Jump, AimDirections.Encode(0)), default);
+                top = System.Math.Max(top, w.State.Fighter0.Position.Y);
+                Assert.AreEqual(ActionState.Holding, w.State.Fighter0.Action);
+                Assert.AreEqual(w.State.Fighter0.Position.Y, w.State.Fighter1.Position.Y, 1e-3f, "잡힌 쪽이 따라 올라감");
+            }
+            Assert.Greater(top, y0 + 0.8f, "잡은 채 점프");
+        }
+
+        [Test]
+        public void Throw_FliesFarInNearlyStraightLine()
+        {
+            var config = Config();
+            var w = World(config, -12f, -10.9f);
+            GrabAndHold(w);
+            w.Step(In(InputButtons.None, 0), default);
+            w.Step(In(InputButtons.Attack, 0), default);
+            Assert.AreEqual(ActionState.Thrown, w.State.Fighter1.Action);
+            float y0 = w.State.Fighter1.Position.Y, x0 = w.State.Fighter1.Position.X, minY = y0;
+            for (int i = 0; i < config.Combat.Grab.ThrownTicks; i++)
+            {
+                w.Step(default, default);
+                minY = System.Math.Min(minY, w.State.Fighter1.Position.Y);
+            }
+            float distance = w.State.Fighter1.Position.X - x0;
+            TestContext.WriteLine($"[CR-004 C] 수평 던지기 {config.Combat.Grab.ThrownTicks}틱: 거리 {distance:0.0}, 최대 하강 {y0 - minY:0.00}");
+            Assert.Greater(distance, 18f, "거의 반대편까지");
+            Assert.Less(y0 - minY, 1.5f, "거의 일직선");
+        }
+
         // 5.2 우선순위 ----------------------------------------------------------------
 
         [Test]
@@ -155,8 +195,10 @@ namespace Knockbox.Tests.EditMode
 
         // 받아내기 -------------------------------------------------------------------
 
-        /// <summary>P1은 다음 틱에 잡기 판정이 켜지는 잡기 상태, P2는 왼쪽으로 박치기 중(거리 gap). 한 틱 진행한 월드.</summary>
-        static SimWorld CatchSetup(float gap, int p1Facing = 1, float lungeSpeed = 30f)
+        /// <summary>
+        /// P1은 다음 틱에 잡기 판정이 켜지는 잡기 상태(잡기 방향 grabDir, 0이면 바라보는 쪽), P2는 왼쪽으로 박치기 중(거리 gap). 한 틱 진행한 월드.
+        /// </summary>
+        static SimWorld CatchSetup(float gap, int p1Facing = 1, float lungeSpeed = 30f, float grabDirX = 0f)
         {
             var config = Config();
             var w = World(config, -2f, -2f + gap);
@@ -164,6 +206,7 @@ namespace Knockbox.Tests.EditMode
             s.Fighter0.Facing = (sbyte)p1Facing;
             s.Fighter0.RestartAction(ActionState.Grab);
             s.Fighter0.ActionTick = config.Combat.Grab.StartupTicks - 1;
+            s.Fighter0.AttackDir = new Vec2(grabDirX, 0f);
             s.Fighter1.Facing = -1;
             s.Fighter1.RestartAction(ActionState.Lunge);
             s.Fighter1.Velocity = new Vec2(-lungeSpeed, 0f);
@@ -173,33 +216,45 @@ namespace Knockbox.Tests.EditMode
         }
 
         [Test]
-        public void Catch_GrabOverlappingLunge_Succeeds_AndBeatsSameTickStrike()
+        public void Catch_GrabOverlappingLunge_SucceedsAndAutoThrowsBack_BeatsSameTickStrike()
         {
             var config = Config();
             var w = CatchSetup(1.3f);
             var s = w.State;
-            Assert.AreEqual(ActionState.Holding, s.Fighter0.Action, "박치기를 받아냄");
-            Assert.AreEqual(ActionState.Held, s.Fighter1.Action);
-            Assert.AreEqual(Vec2.Zero, s.Fighter1.Velocity, "잡힌 쪽 속도 0");
-            Assert.AreEqual(config.Combat.MaxHealth, s.Fighter0.Health, "같은 틱 박치기 타격 무효");
-            Assert.AreEqual(Vec2.Zero, s.Fighter0.Velocity, "잡은 쪽 제자리");
             bool caught = false;
             for (int e = 0; e < w.Events.Count; e++)
                 caught |= w.Events[e].Type == SimEventType.LungeCaught;
-            Assert.IsTrue(caught);
+            Assert.IsTrue(caught, "박치기를 받아냄");
+            Assert.AreEqual(config.Combat.MaxHealth, s.Fighter0.Health, "같은 틱 박치기 타격 무효");
+            // 받아내면 바로 날아온 쪽(오른쪽)으로 되던진다. 두 파이터는 잠깐 멈춘다.
+            Assert.AreEqual(ActionState.Thrown, s.Fighter1.Action);
+            Assert.AreEqual(1f, SimMath.Normalize(s.Fighter1.Velocity).X, 1e-3f, "박치기가 날아온 반대 방향");
+            Assert.AreEqual(config.Combat.Grab.ThrowSpeed, SimMath.Length(s.Fighter1.Velocity), 1e-3f);
+            Assert.AreEqual(config.Combat.Body.CatchHitstop, s.Fighter0.HitstopTicks);
+            Assert.AreEqual(config.Combat.Body.CatchHitstop, s.Fighter1.HitstopTicks);
+            Assert.AreEqual(Vec2.Zero, s.Fighter0.Velocity, "잡은 쪽 제자리");
+        }
+
+        [Test]
+        public void Catch_BehindWithCursor_Succeeds()
+        {
+            // 왼쪽을 보고 있어도 커서(오른쪽) 방향 잡기면 등 뒤에서 오는 박치기를 받아낸다.
+            var w = CatchSetup(1.3f, -1, 30f, 1f);
+            Assert.AreEqual(ActionState.Thrown, w.State.Fighter1.Action);
+            Assert.Greater(w.State.Fighter1.Velocity.X, 0f);
         }
 
         [Test]
         public void Catch_NoOverlap_Fails()
         {
-            var w = CatchSetup(3.5f);
+            var w = CatchSetup(4f);
             Assert.AreNotEqual(ActionState.Holding, w.State.Fighter0.Action, "잡기 상자에 닿지 않음");
             Assert.AreEqual(ActionState.Lunge, w.State.Fighter1.Action);
 
-            // 등 뒤에서 오는 박치기는 잡기 상자(앞)에 닿지 않아 받아내지 못하고 맞는다.
+            // 잡기 방향(커서)이 반대쪽이면 받아내지 못하고 맞는다.
             var config = Config();
-            var back = CatchSetup(1.3f, -1);
-            Assert.AreNotEqual(ActionState.Holding, back.State.Fighter0.Action);
+            var back = CatchSetup(1.3f, 1, 30f, -1f);
+            Assert.AreNotEqual(ActionState.Thrown, back.State.Fighter1.Action);
             Assert.Less(back.State.Fighter0.Health, config.Combat.MaxHealth);
         }
 

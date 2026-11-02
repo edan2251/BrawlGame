@@ -128,6 +128,7 @@ namespace Knockbox.Simulation
                     if ((pressed & InputButtons.Grab) != 0 && config.GrabEnabled)
                     {
                         StartGrab(ref f, AimFacing(input), index, tick, events);
+                        f.AttackDir = AimOrMove(f, input);
                         return pressed;
                     }
                     BodyCharge(ref f, input, config, index, tick, events);
@@ -151,6 +152,7 @@ namespace Knockbox.Simulation
                     // 시작 → 활성 → 헛잡기 후딜. 잡으면 상호작용 판정이 Holding으로 바꾼다.
                     if (f.ActionTick < c.Grab.TotalWhiffTicks)
                         return pressed;
+                    f.AttackDir = Vec2.Zero;
                     f.RestartAction(ActionState.Airborne);
                     break;
                 case ActionState.Holding when f.Form == FighterForm.Body:
@@ -224,6 +226,9 @@ namespace Knockbox.Simulation
             if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled && CanAfford(f, grabCost, config))
             {
                 StartGrab(ref f, f.Form == FighterForm.Body ? AimFacing(input) : input.MoveX, index, tick, events);
+                // 몸 폼: 잡기 판정은 커서 방향(등 뒤도 잡을 수 있다).
+                if (f.Form == FighterForm.Body)
+                    f.AttackDir = AimOrMove(f, input);
                 Spend(ref f, grabCost, config);
                 return pressed;
             }
@@ -347,6 +352,7 @@ namespace Knockbox.Simulation
             f.ThrowPending = false;
             f.ActionPaid = false;
             f.AttackBuffer = 0;
+            f.AttackDir = Vec2.Zero;
             f.RestartAction(ActionState.Grab);
             events.Add(new SimEvent(tick, SimEventType.GrabStart, index, f.Position, new Vec2(f.Facing, 0f), 0f));
         }
@@ -548,8 +554,14 @@ namespace Knockbox.Simulation
             f.Action == ActionState.Grab && f.ActionTick < config.Combat.Grab.StartupTicks + config.Combat.Grab.ActiveTicks;
 
         /// <summary>잡기 상자(몸 앞 0.65, 폭 0.7, 높이 0.9)의 월드 중심.</summary>
-        public static Vec2 GrabBoxCenter(in FighterState f, SimConfig config) =>
-            new Vec2(f.Position.X + config.Combat.Grab.BoxOffset * f.Facing, f.Position.Y);
+        public static Vec2 GrabBoxCenter(in FighterState f, SimConfig config)
+        {
+            // 몸 폼(CR-004): 잡기를 시작한 틱의 커서 방향(AttackDir) 쪽. 그 외는 바라보는 쪽.
+            var d = f.AttackDir;
+            if (d.X != 0f || d.Y != 0f)
+                return f.Position + d * config.Combat.Grab.BoxOffset;
+            return new Vec2(f.Position.X + config.Combat.Grab.BoxOffset * f.Facing, f.Position.Y);
+        }
 
         static bool GrabTouches(in FighterState grabber, in FighterState target, SimConfig config)
         {
@@ -679,13 +691,36 @@ namespace Knockbox.Simulation
             bool aCatches = !frozenA && IsGrabActive(a, config) && b.Action == ActionState.Lunge && CanBeGrabbed(b) && GrabTouches(a, b, config);
             bool bCatches = !frozenB && IsGrabActive(b, config) && a.Action == ActionState.Lunge && CanBeGrabbed(a) && GrabTouches(b, a, config);
             if (aCatches)
-                Hold(ref a, ref b, 1, config, arena, tick, events);
+                CatchAndThrow(ref a, ref b, 1, config, arena, tick, events);
             else if (bCatches)
-                Hold(ref b, ref a, 0, config, arena, tick, events);
+                CatchAndThrow(ref b, ref a, 0, config, arena, tick, events);
             else
                 return false;
-            events.Add(new SimEvent(tick, SimEventType.LungeCaught, aCatches ? 1 : 0, aCatches ? b.Position : a.Position, Vec2.Zero, 0f));
             return true;
+        }
+
+        /// <summary>
+        /// 받아내기 성공(단계 C 피드백): 붙잡고 바로 박치기가 날아온 쪽으로 되던진다(패링 느낌). 두 파이터 모두 짧은 히트스탑으로 멈췄다가 날아간다.
+        /// </summary>
+        static void CatchAndThrow(ref FighterState catcher, ref FighterState lunger, int lungerIndex, SimConfig config, ArenaDef arena, int tick, SimEventBuffer events)
+        {
+            var back = SimMath.Normalize(-lunger.Velocity);
+            if (back.LengthSquared == 0f)
+                back = SimMath.Normalize(lunger.Position - catcher.Position);
+            if (back.LengthSquared == 0f)
+                back = new Vec2(catcher.Facing, 0f);
+            // 날아온 쪽을 바라보고 잡아야 던지기가 "뒤로 던지기" 위치 옮김을 하지 않는다.
+            if (back.X > SimMath.Epsilon)
+                catcher.Facing = 1;
+            else if (back.X < -SimMath.Epsilon)
+                catcher.Facing = -1;
+            Hold(ref catcher, ref lunger, lungerIndex, config, arena, tick, events);
+            events.Add(new SimEvent(tick, SimEventType.LungeCaught, lungerIndex, lunger.Position, back, 0f));
+            catcher.ThrowDirection = back;
+            Throw(ref catcher, ref lunger, lungerIndex, config, arena, tick, events);
+            int stop = config.Combat.Body.CatchHitstop;
+            catcher.HitstopTicks = SimMath.Max(catcher.HitstopTicks, stop);
+            lunger.HitstopTicks = SimMath.Max(lunger.HitstopTicks, stop);
         }
 
         /// <summary>잡힌 쪽을 잡은 쪽 몸 앞에 다시 놓는다(잡은 쪽이 이동했을 때).</summary>

@@ -475,7 +475,8 @@ namespace Knockbox.Presentation
                 float reach = gt < g.StartupTicks ? Smooth(gt / g.StartupTicks)
                     : gt < g.StartupTicks + g.ActiveTicks ? 1f
                     : 1f - Smooth((gt - g.StartupTicks - g.ActiveTicks) / g.WhiffRecoveryTicks);
-                var box = position + new Vector2(g.BoxOffset * facing, 0.1f);
+                var center = FighterCombat.GrabBoxCenter(f, config) - f.Position;
+                var box = position + new Vector2(center.X, center.Y + 0.1f);
                 var restFront = front + new Vector2(facing * 0.16f, -0.38f);
                 var restBack = back + new Vector2(-facing * 0.16f, -0.38f);
                 rig.SetHands(Vector2.Lerp(restFront, box + new Vector2(0.05f * facing, 0.18f), reach),

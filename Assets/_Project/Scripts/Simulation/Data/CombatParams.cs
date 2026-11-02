@@ -47,6 +47,12 @@ namespace Knockbox.Simulation
         public int SplatHitstun;
         /// <summary>던져지거나 벽꽝을 맞고 회복한 뒤 잡히지 않는 틱(재그랩 보호).</summary>
         public int RegrabProtectTicks;
+        /// <summary>잡은 상태의 점프 속도(0이면 점프 불가).</summary>
+        public float HoldJumpSpeed;
+        /// <summary>던져진 상태의 중력 배율(일직선으로 멀리 날아가게).</summary>
+        public float ThrownGravityScale;
+        /// <summary>받아내기 성공 뒤 자동 던짐 전 두 파이터 히트스탑(패링 느낌의 정지).</summary>
+        public int CatchHitstop;
 
         public readonly bool Enabled => TapHoldTicks > 0;
 
@@ -72,6 +78,9 @@ namespace Knockbox.Simulation
             SplatDamageMax = 12,
             SplatHitstun = 18,
             RegrabProtectTicks = 45,
+            HoldJumpSpeed = 12f,
+            ThrownGravityScale = 0.2f,
+            CatchHitstop = 8,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -86,6 +95,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(SplatDamageMax), SplatDamageMax);
             v.Value(nameof(SplatHitstun), SplatHitstun);
             v.Value(nameof(RegrabProtectTicks), RegrabProtectTicks);
+            v.Value(nameof(HoldJumpSpeed), HoldJumpSpeed);
+            v.Value(nameof(ThrownGravityScale), ThrownGravityScale);
+            v.Value(nameof(CatchHitstop), CatchHitstop);
         }
     }
 

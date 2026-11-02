@@ -32,6 +32,15 @@ namespace Knockbox.Simulation
             combat.Body = BodyParams.Default;
             // 단계 C(5.2): 마우스로 겨누고 클릭하기에 20틱은 짧다 → 60틱 뒤 자동 던짐.
             combat.Grab.MaxHoldTicks = 60;
+            // 단계 C 피드백: 잡기 판정이 패링처럼 빡빡하다 → 선딜 5 → 3, 활성 3 → 9, 상자 0.7×0.9 → 1.1×1.3(중심 0.65 → 0.75, 커서 방향).
+            combat.Grab.StartupTicks = 3;
+            combat.Grab.ActiveTicks = 9;
+            combat.Grab.BoxOffset = 0.75f;
+            combat.Grab.BoxWidth = 1.1f;
+            combat.Grab.BoxHeight = 1.3f;
+            // 던지기는 일직선으로 거의 반대편까지: 속도 28 → 48, 던져진 상태 24 → 30틱(그동안 중력 0.2배).
+            combat.Grab.ThrowSpeed = 48f;
+            combat.Grab.ThrownTicks = 30;
             return combat;
         }
     }

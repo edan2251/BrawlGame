@@ -53,7 +53,7 @@ namespace Knockbox.Simulation
 
             if (!f.InMovementState)
             {
-                IntegrateCombatState(ref f, config, moveX, moveY, jumpHeld);
+                IntegrateCombatState(ref f, config, moveX, moveY, jumpHeld, (pressed & InputButtons.Jump) != 0);
                 TerrainCollision.Move(ref f.Position, ref f.Velocity, config.HalfBody, arena, m.SubstepMaxDistance, f.DropThroughBox, ref scratch.Contacts);
                 return;
             }
@@ -149,7 +149,7 @@ namespace Knockbox.Simulation
         /// 충전(모드 A): 최대 속도 3, 공중 낙하 최대 4. 돌진: 조작 없음, 공중에서 중력 × 0.3.
         /// 피격 경직: 조작 불가, 중력 정상, 공중 감속 0(날아가는 관성 유지). 그 밖의 경직: 조작 없이 감속.
         /// </summary>
-        static void IntegrateCombatState(ref FighterState f, SimConfig config, int moveX, int moveY, bool jumpHeld)
+        static void IntegrateCombatState(ref FighterState f, SimConfig config, int moveX, int moveY, bool jumpHeld, bool jumpPressed)
         {
             const float dt = SimConfig.Dt;
             ref readonly var m = ref config.Movement;
@@ -169,6 +169,11 @@ namespace Knockbox.Simulation
                         ApplyHorizontal(ref f, m, moveX, m.MaxRunSpeed, c.AttackAirControlMultiplier, c.AttackAirControlMultiplier);
                     ApplyGravity(ref f, m, jumpHeld, 0, moveY);
                     break;
+                case ActionState.Thrown when c.Body.Enabled:
+                    // CR-004: 던져진 몸은 낮은 중력으로 일직선에 가깝게 멀리 날아간다. 바닥을 따라 던져져도 던져진 동안은 마찰 없이 미끄러진다.
+                    if (!f.Grounded)
+                        f.Velocity.Y = SimMath.Max(f.Velocity.Y - m.RiseGravity * m.FallGravityMultiplier * c.Body.ThrownGravityScale * dt, -m.MaxFallSpeed);
+                    break;
                 case ActionState.Hitstun:
                 case ActionState.Thrown:
                     if (f.Grounded)
@@ -176,9 +181,15 @@ namespace Knockbox.Simulation
                     ApplyGravity(ref f, m, false, 0, 0);
                     break;
                 case ActionState.Holding when f.Form == FighterForm.Body:
-                    // 몸 폼(5.2): 잡은 쪽은 느리게 걷고 중력을 받는다. 잡힌 쪽은 상호작용 판정에서 따라온다.
+                    // 몸 폼(5.2): 잡은 쪽은 느리게 걷고, 땅에서 점프할 수 있고(단계 C 피드백), 중력을 받는다. 잡힌 쪽은 상호작용 판정에서 따라온다.
                     ApplyHorizontal(ref f, m, moveX, c.Body.HoldMoveSpeed, 1f, 1f);
-                    ApplyGravity(ref f, m, false, 0, 0);
+                    if (jumpPressed && f.Grounded && c.Body.HoldJumpSpeed > 0f)
+                    {
+                        f.Velocity.Y = c.Body.HoldJumpSpeed;
+                        f.Grounded = false;
+                        f.GroundBox = FighterState.NoBox;
+                    }
+                    ApplyGravity(ref f, m, jumpHeld, 0, 0);
                     break;
                 case ActionState.Holding:
                 case ActionState.Held:
