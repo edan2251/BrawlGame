@@ -8,6 +8,8 @@ namespace Knockbox.Simulation
         public int MoveX;
         public int MoveY;
         public bool WasGrounded;
+        /// <summary>이번 틱에 벽을 기어올랐다(CR-004).</summary>
+        public bool Climbing;
     }
 
     /// <summary>
@@ -68,6 +70,18 @@ namespace Knockbox.Simulation
                     return;
             }
 
+            // 모서리 오르기 중: 정해진 경로를 따라 움직인다(입력·중력·충돌 없음, 경로는 시작할 때 비어 있음을 확인했다).
+            if (f.MantleTicks > 0)
+            {
+                if (f.Action != ActionState.Mantle)
+                    f.MantleTicks = 0;
+                else
+                {
+                    AdvanceMantle(ref f, config);
+                    return;
+                }
+            }
+
             if (!f.InMovementState)
             {
                 IntegrateCombatState(ref f, config, moveX, moveY, jumpHeld, (pressed & InputButtons.Jump) != 0);
@@ -116,10 +130,24 @@ namespace Knockbox.Simulation
             }
             else
             {
+                ref readonly var body = ref config.Combat.Body;
+                // 벽 기어오르기(CR-004): 벽에 닿은 채 벽 쪽 + W, 이번 틱에 점프하지 않으면 위로 일정 속도. 바닥에서 시작해도 된다.
+                bool climb = body.ClimbSpeed > 0f && f.WallSide != 0 && moveX == f.WallSide && moveY > 0 && f.JumpBuffer <= 0;
                 bool apex = !f.Grounded && SimMath.Abs(f.Velocity.Y) < m.ApexSpeedThreshold && jumpHeld;
                 ApplyHorizontal(ref f, m, moveX, m.MaxRunSpeed, apex ? m.ApexAirAccelMultiplier : 1f, 1f);
                 ResolveJumpRequest(ref f, m, arena, moveY, index, tick, events);
                 ApplyGravity(ref f, m, jumpHeld, moveX, moveY);
+                if (climb)
+                {
+                    f.Velocity = new Vec2(f.WallSide * 1f, body.ClimbSpeed);
+                    f.Grounded = false;
+                    f.GroundBox = FighterState.NoBox;
+                    f.JumpCutEligible = false;
+                    scratch.Climbing = true;
+                }
+                // 모서리 잡기: 공중에서 벽 쪽을 누르고 있고 그 지형 윗면이 머리 높이쯤이면 끌어올라 선다.
+                if (body.ClimbSpeed > 0f && !f.Grounded && moveX != 0 && TryStartMantle(ref f, moveX, config, arena, index, tick, events))
+                    return;
             }
 
             TerrainCollision.Move(ref f.Position, ref f.Velocity, config.HalfBody, arena, m.SubstepMaxDistance, f.DropThroughBox, ref scratch.Contacts);
@@ -502,6 +530,72 @@ namespace Knockbox.Simulation
                 f.SetAction(ActionState.WallSlide);
         }
 
+        // 벽 기어오르기·모서리 오르기(CR-004 D/E 피드백 2) ------------------------------------------
+
+        /// <summary>
+        /// side 쪽에 바로 맞닿은 고체 지형 중 윗면이 발보다 높고 머리 위 LedgeReach 안에 있는 것을 찾아, 그 윗면에 설 자리가 비어 있으면
+        /// 모서리 오르기를 시작한다. 경로: 지금 x에서 윗면 높이까지 올라간 뒤 윗면 안쪽으로.
+        /// </summary>
+        static bool TryStartMantle(ref FighterState f, int side, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events)
+        {
+            float half = config.HalfBody;
+            float probe = config.Movement.GroundProbeDistance;
+            ref readonly var body = ref config.Combat.Body;
+            var p = f.Position;
+            for (int i = 0; i < arena.BoxCount; i++)
+            {
+                ref readonly var b = ref arena.GetBox(i);
+                if (!b.IsSolidBlock)
+                    continue;
+                float gap = side > 0 ? b.MinX - (p.X + half) : (p.X - half) - b.MaxX;
+                if (gap < -TerrainCollision.Epsilon || gap > probe)
+                    continue;
+                float top = b.MaxY;
+                if (top <= p.Y - half + 0.1f || top > p.Y + half + body.LedgeReach)
+                    continue;
+                if (p.Y + half <= b.MinY)
+                    continue;
+                var up = new Vec2(p.X, top + half + 0.02f);
+                var to = new Vec2(side > 0 ? b.MinX + half + 0.05f : b.MaxX - half - 0.05f, up.Y);
+                if (TerrainCollision.OverlapsSolid(up, half - 0.01f, arena) || TerrainCollision.OverlapsSolid(to, half - 0.01f, arena))
+                    continue;
+                f.MantleFrom = p;
+                f.MantleTo = to;
+                f.MantleTicks = SimMath.Max(2, body.MantleTicks);
+                f.Velocity = Vec2.Zero;
+                f.DashTicksLeft = 0;
+                f.Facing = (sbyte)side;
+                f.RestartAction(ActionState.Mantle);
+                events.Add(new SimEvent(tick, SimEventType.WallSlideStart, index, p, new Vec2(side, 1f), 0f));
+                return true;
+            }
+            return false;
+        }
+
+        static void AdvanceMantle(ref FighterState f, SimConfig config)
+        {
+            int total = SimMath.Max(2, config.Combat.Body.MantleTicks);
+            f.MantleTicks--;
+            float t = 1f - f.MantleTicks / (float)total;
+            const float rise = 0.6f;
+            if (t <= rise)
+            {
+                float k = t / rise;
+                f.Position = new Vec2(f.MantleFrom.X, f.MantleFrom.Y + (f.MantleTo.Y - f.MantleFrom.Y) * k);
+            }
+            else
+            {
+                float k = (t - rise) / (1f - rise);
+                f.Position = new Vec2(f.MantleFrom.X + (f.MantleTo.X - f.MantleFrom.X) * k, f.MantleTo.Y);
+            }
+            f.Velocity = Vec2.Zero;
+            if (f.MantleTicks == 0)
+            {
+                f.Position = f.MantleTo;
+                f.RestartAction(ActionState.Idle);
+            }
+        }
+
         /// <summary>점프 버퍼가 있으면 우선순위대로 처리한다: 발판 하강 → 땅·코요테 점프 → 벽 점프 → 공중 점프.</summary>
         static void ResolveJumpRequest(ref FighterState f, in MovementParams m, ArenaDef arena, int moveY, int index, int tick, SimEventBuffer events)
         {
@@ -620,6 +714,8 @@ namespace Knockbox.Simulation
 
             if (contacts.OutOfBounds)
                 events.Add(new SimEvent(tick, SimEventType.OutOfBounds, index, f.Position, Vec2.Zero, 0f));
+            if (f.Action == ActionState.Mantle)
+                return;
 
             bool bounced = false;
             if (contacts.BoundaryX != 0 || contacts.BoundaryY != 0)
@@ -740,6 +836,10 @@ namespace Knockbox.Simulation
             else if (f.Grounded)
             {
                 f.SetAction(SimMath.Abs(f.Velocity.X) > SimMath.Epsilon || scratch.MoveX != 0 ? ActionState.Run : ActionState.Idle);
+            }
+            else if (scratch.Climbing && f.WallSide != 0)
+            {
+                f.SetAction(ActionState.Climb);
             }
             else if (f.WallSide != 0 && scratch.MoveX == f.WallSide && f.Velocity.Y < 0f)
             {

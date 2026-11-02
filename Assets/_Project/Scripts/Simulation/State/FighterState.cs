@@ -12,6 +12,10 @@ namespace Knockbox.Simulation
         Run,
         Airborne,
         WallSlide,
+        /// <summary>벽 기어오르기(CR-004: 벽 쪽 + W). 이동 상태다.</summary>
+        Climb,
+        /// <summary>모서리를 잡고 끌어올라 윗면에 서는 중(CR-004 "영차"). 위치는 정해진 경로를 따른다.</summary>
+        Mantle,
         Dash,
         Attack,
         /// <summary>가드 버튼을 누르고 있음. 누른 순간부터 ParryTicks 동안은 패링 구간.</summary>
@@ -170,6 +174,10 @@ namespace Knockbox.Simulation
         public int GravityPiece;
         /// <summary>남은 중력장 무시 틱(S로 놓고 떨어진 직후).</summary>
         public int GravityLock;
+        /// <summary>모서리 오르기 남은 틱(0이면 아님)과 출발·도착 위치(먼저 위로, 그다음 윗면 쪽으로).</summary>
+        public int MantleTicks;
+        public Vec2 MantleFrom;
+        public Vec2 MantleTo;
 
         public const int NoAttack = -1;
         public const sbyte SurfaceNone = 0;
@@ -278,6 +286,11 @@ namespace Knockbox.Simulation
             v.Value(nameof(GravityDir), (int)GravityDir);
             v.Value(nameof(GravityPiece), GravityPiece);
             v.Value(nameof(GravityLock), GravityLock);
+            v.Value(nameof(MantleTicks), MantleTicks);
+            v.Value("MantleFrom.X", MantleFrom.X);
+            v.Value("MantleFrom.Y", MantleFrom.Y);
+            v.Value("MantleTo.X", MantleTo.X);
+            v.Value("MantleTo.Y", MantleTo.Y);
         }
     }
 }

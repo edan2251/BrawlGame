@@ -61,6 +61,8 @@ namespace Knockbox.Simulation
             combat.Grab.ThrowSpeed = 48f;
             combat.Grab.ThrownTicks = 30;
             combat.Body.SurfaceMode = surfaceMode;
+            // D/E 피드백 2: 벽 기어오르기(벽 쪽 + W, 달리기의 약 40%, 제한 없음)와 모서리 잡고 오르기.
+            combat.Body.ClimbSpeed = 4.4f;
             return combat;
         }
     }

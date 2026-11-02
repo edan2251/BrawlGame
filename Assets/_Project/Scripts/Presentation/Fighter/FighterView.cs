@@ -467,6 +467,16 @@ namespace Knockbox.Presentation
                 rig.SetHands(chest + new Vector2(facing * 0.55f, -0.02f), chest + new Vector2(facing * 0.5f, -0.24f), LimbRig.ArmLayers.BothFront);
                 return;
             }
+            if (f.Action == ActionState.Climb || f.Action == ActionState.Mantle)
+            {
+                // 기어오르기: 두 손으로 벽 위쪽을 번갈아 짚는다. 모서리 오르기: 두 손으로 윗면을 짚고 몸을 끌어올린다(CR-004).
+                bool mantle = f.Action == ActionState.Mantle;
+                bool swap = !mantle && (f.ActionTick / 8) % 2 == 1;
+                var high = new Vector2(facing * 0.42f, mantle ? 0.55f : 0.5f);
+                var low = new Vector2(facing * 0.42f, mantle ? 0.5f : 0.15f);
+                rig.SetHands(front + (swap ? low : high), back + (swap ? high : low), LimbRig.ArmLayers.BothFront);
+                return;
+            }
             if (f.Action == ActionState.Charge)
             {
                 // 충전: 팔을 뒤로 젖힌다(충전이 쌓일수록 더).

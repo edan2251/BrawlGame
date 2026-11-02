@@ -32,8 +32,8 @@ namespace Knockbox.Game
         [SerializeField] bool useLocalDevices;
         [Tooltip("CR-004 실험: Brawl 맵 고정, RuleSet.Brawl(몸 폼), 짧은 카운트다운과 3선승, 로컬 플레이면 P1 마우스 조준, P2 샌드백(F6으로 바꿈)")]
         [SerializeField] bool brawlExperiment;
-        [Tooltip("CR-004 7절 표면 이동: 0 끔, 1 D(붙기만), 2 E(거미식 자유 표면 이동 + 지형 중력장). 실험 경기에서 F4로 순환")]
-        [SerializeField, Range(0, 2)] int surfaceMode = 2;
+        [Tooltip("CR-004 7절 표면 이동(보관, 기본 끔): 0 끔, 1 D(붙기만), 2 E(거미식 자유 표면 이동 + 지형 중력장). 실험 경기에서 F4로 순환")]
+        [SerializeField, Range(0, 2)] int surfaceMode = 0;
 
         readonly FixedTickClock clock = new FixedTickClock();
         readonly InputDelayQueue delay1 = new InputDelayQueue();

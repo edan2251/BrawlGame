@@ -61,6 +61,12 @@ namespace Knockbox.Simulation
         public float FieldRadius;
         /// <summary>E: S로 놓고 떨어진 뒤 중력장·붙기를 무시하는 틱.</summary>
         public int SurfaceReleaseTicks;
+        /// <summary>벽 기어오르기 속도(0이면 끔). 벽 쪽 + W.</summary>
+        public float ClimbSpeed;
+        /// <summary>모서리 잡기: 지형 윗면이 머리 위 이만큼 안에 있으면 잡고 올라간다.</summary>
+        public float LedgeReach;
+        /// <summary>모서리 오르기에 걸리는 틱(앞 60%는 위로, 나머지는 윗면 쪽으로).</summary>
+        public int MantleTicks;
 
         public readonly bool Enabled => TapHoldTicks > 0;
 
@@ -93,6 +99,9 @@ namespace Knockbox.Simulation
             SurfaceHoldPush = 1f,
             FieldRadius = 2f,
             SurfaceReleaseTicks = 20,
+            ClimbSpeed = 0f,
+            LedgeReach = 0.45f,
+            MantleTicks = 15,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -114,6 +123,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(SurfaceHoldPush), SurfaceHoldPush);
             v.Value(nameof(FieldRadius), FieldRadius);
             v.Value(nameof(SurfaceReleaseTicks), SurfaceReleaseTicks);
+            v.Value(nameof(ClimbSpeed), ClimbSpeed);
+            v.Value(nameof(LedgeReach), LedgeReach);
+            v.Value(nameof(MantleTicks), MantleTicks);
         }
     }
 
