@@ -37,6 +37,16 @@ namespace Knockbox.Simulation
         /// <summary>주먹 후딜 중 누른 좌클릭을 저장해 두는 틱.</summary>
         public int PunchBufferTicks;
         public AttackDef Punch;
+        /// <summary>잡은 상태(Holding)의 최대 이동 속도(5.2 "이동은 느리게").</summary>
+        public float HoldMoveSpeed;
+        /// <summary>벽꽝 추가 피해 = 충돌 속도 × 이 값(반올림). 던지기 기본 피해(Grab.ThrowDamage)와 따로.</summary>
+        public float SplatDamagePerSpeed;
+        /// <summary>한 번 날아가는 동안(회복 전까지) 받는 벽꽝 추가 피해 합의 상한.</summary>
+        public int SplatDamageMax;
+        /// <summary>벽꽝 경직(고정, 누적하지 않고 남은 경직과 큰 쪽).</summary>
+        public int SplatHitstun;
+        /// <summary>던져지거나 벽꽝을 맞고 회복한 뒤 잡히지 않는 틱(재그랩 보호).</summary>
+        public int RegrabProtectTicks;
 
         public readonly bool Enabled => TapHoldTicks > 0;
 
@@ -57,6 +67,11 @@ namespace Knockbox.Simulation
                 Circle0 = new HitCircle(new Vec2(0.5f, 0f), new Vec2(1.0f, 0f), 0.3f),
                 Circle1 = new HitCircle(new Vec2(0.35f, 0f), new Vec2(0.65f, 0f), 0.22f),
             },
+            HoldMoveSpeed = 2.5f,
+            SplatDamagePerSpeed = 0.5f,
+            SplatDamageMax = 12,
+            SplatHitstun = 18,
+            RegrabProtectTicks = 45,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -66,6 +81,11 @@ namespace Knockbox.Simulation
             v.Begin(nameof(Punch));
             Punch.Visit(ref v);
             v.End();
+            v.Value(nameof(HoldMoveSpeed), HoldMoveSpeed);
+            v.Value(nameof(SplatDamagePerSpeed), SplatDamagePerSpeed);
+            v.Value(nameof(SplatDamageMax), SplatDamageMax);
+            v.Value(nameof(SplatHitstun), SplatHitstun);
+            v.Value(nameof(RegrabProtectTicks), RegrabProtectTicks);
         }
     }
 

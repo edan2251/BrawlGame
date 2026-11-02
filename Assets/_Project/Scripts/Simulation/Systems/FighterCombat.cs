@@ -76,6 +76,8 @@ namespace Knockbox.Simulation
                 f.BoxDamageSum = 0;
             if (f.AttackBuffer > 0)
                 f.AttackBuffer--;
+            if (f.GrabProtectTicks > 0)
+                f.GrabProtectTicks--;
             TickEnergy(ref f, config);
             // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
             bool guardPressed = (pressed & InputButtons.Guard) != 0;
@@ -97,6 +99,10 @@ namespace Knockbox.Simulation
                     }
                     if (f.IsLaunched)
                         f.ComboHits = 0;
+                    // 재그랩 보호(5.2): 던져졌거나 벽꽝을 맞은 뒤 회복하면 잠시 잡히지 않는다.
+                    if (c.Body.Enabled && (f.Action == ActionState.Thrown || f.SplatDamageTaken > 0))
+                        f.GrabProtectTicks = c.Body.RegrabProtectTicks;
+                    f.SplatDamageTaken = 0;
                     f.RestartAction(ActionState.Airborne);
                     break;
                 case ActionState.Attack:
@@ -118,6 +124,12 @@ namespace Knockbox.Simulation
                     }
                     break;
                 case ActionState.Charge when f.Form == FighterForm.Body:
+                    // 준비·충전 중 우클릭: 취소하고 잡기로 전환(비용 없음, 5.2 받아내기 최우선).
+                    if ((pressed & InputButtons.Grab) != 0 && config.GrabEnabled)
+                    {
+                        StartGrab(ref f, AimFacing(input), index, tick, events);
+                        return pressed;
+                    }
                     BodyCharge(ref f, input, config, index, tick, events);
                     return pressed;
                 case ActionState.Charge:
@@ -141,6 +153,15 @@ namespace Knockbox.Simulation
                         return pressed;
                     f.RestartAction(ActionState.Airborne);
                     break;
+                case ActionState.Holding when f.Form == FighterForm.Body:
+                    // 몸 폼(5.2): 좌클릭을 누르는 순간(탭/홀드 구분 없음) 또는 최대 유지 뒤 커서 방향으로 던진다.
+                    // 잡는 순간 이미 눌려 있던 좌클릭은 눌림이 아니므로 무시된다(뗐다가 다시 눌러야 한다).
+                    if (!f.ThrowPending && ((pressed & InputButtons.Attack) != 0 || f.ActionTick >= c.Grab.MaxHoldTicks))
+                    {
+                        f.ThrowPending = true;
+                        f.ThrowDirection = AimOrMove(f, input);
+                    }
+                    return pressed;
                 case ActionState.Holding:
                     // 잡기 버튼을 떼거나 최대 시간이 지나면 이번 틱에 던진다. 방향은 이번 틱의 8방향 입력.
                     if (!f.ThrowPending && (!input.Held(InputButtons.Grab) || f.ActionTick >= c.Grab.MaxHoldTicks))
@@ -202,7 +223,7 @@ namespace Knockbox.Simulation
             int grabCost = SimMath.Max(c.Energy.GrabCost, 0);
             if ((pressed & InputButtons.Grab) != 0 && (pressed & InputButtons.Attack) == 0 && config.GrabEnabled && CanAfford(f, grabCost, config))
             {
-                StartGrab(ref f, input.MoveX, index, tick, events);
+                StartGrab(ref f, f.Form == FighterForm.Body ? AimFacing(input) : input.MoveX, index, tick, events);
                 Spend(ref f, grabCost, config);
                 return pressed;
             }
@@ -325,6 +346,7 @@ namespace Knockbox.Simulation
             f.DashTicksLeft = 0;
             f.ThrowPending = false;
             f.ActionPaid = false;
+            f.AttackBuffer = 0;
             f.RestartAction(ActionState.Grab);
             events.Add(new SimEvent(tick, SimEventType.GrabStart, index, f.Position, new Vec2(f.Facing, 0f), 0f));
         }
@@ -510,7 +532,7 @@ namespace Knockbox.Simulation
         /// <summary>잡을 수 있는지. 피격 경직, 던져지는 중, KO, 이미 붙잡힌 상대는 잡히지 않는다. 비틀거림은 잡힌다.</summary>
         public static bool CanBeGrabbed(in FighterState f) =>
             f.Action != ActionState.Hitstun && f.Action != ActionState.Thrown && f.Action != ActionState.KO
-            && f.Action != ActionState.Held && f.Action != ActionState.Holding;
+            && f.Action != ActionState.Held && f.Action != ActionState.Holding && f.GrabProtectTicks == 0;
 
         /// <summary>잡기 상자가 활성인 틱인지.</summary>
         public static bool IsGrabActive(in FighterState f, SimConfig config)
@@ -605,6 +627,17 @@ namespace Knockbox.Simulation
                 Throw(ref b, ref a, 0, config, arena, tick, events);
                 return;
             }
+            if (config.Combat.Body.Enabled)
+            {
+                // 잡은 채로 움직이면 잡힌 쪽이 따라온다(5.2).
+                if (a.Action == ActionState.Holding && b.Action == ActionState.Held)
+                    KeepHeld(a, ref b, config, arena);
+                else if (b.Action == ActionState.Holding && a.Action == ActionState.Held)
+                    KeepHeld(b, ref a, config, arena);
+                // 받아내기(5.2): 잡기 판정이 박치기 중인 상대와 겹치면 잡기 성공. 같은 틱의 박치기 타격보다 먼저 처리한다.
+                if (Catch(ref a, ref b, frozenA, frozenB, config, arena, tick, events))
+                    return;
+            }
             var snapA = a;
             var snapB = b;
             if (ResolveHitboxes(ref a, ref b, snapA, snapB, frozenA, frozenB, config, tick, events))
@@ -635,6 +668,36 @@ namespace Knockbox.Simulation
                 Hold(ref a, ref b, 1, config, arena, tick, events);
             else
                 Hold(ref b, ref a, 0, config, arena, tick, events);
+        }
+
+        /// <summary>
+        /// 받아내기(CR-004 5.2): 활성 잡기 상자가 박치기(Lunge) 중인 상대에 닿으면 붙잡는다. 위력 조건은 없다.
+        /// 잡은 쪽은 제자리, 잡힌 쪽은 속도 0(9절 임시안). 한 파이터는 잡기와 박치기를 동시에 할 수 없으므로 양쪽 성공은 없다.
+        /// </summary>
+        static bool Catch(ref FighterState a, ref FighterState b, bool frozenA, bool frozenB, SimConfig config, ArenaDef arena, int tick, SimEventBuffer events)
+        {
+            bool aCatches = !frozenA && IsGrabActive(a, config) && b.Action == ActionState.Lunge && CanBeGrabbed(b) && GrabTouches(a, b, config);
+            bool bCatches = !frozenB && IsGrabActive(b, config) && a.Action == ActionState.Lunge && CanBeGrabbed(a) && GrabTouches(b, a, config);
+            if (aCatches)
+                Hold(ref a, ref b, 1, config, arena, tick, events);
+            else if (bCatches)
+                Hold(ref b, ref a, 0, config, arena, tick, events);
+            else
+                return false;
+            events.Add(new SimEvent(tick, SimEventType.LungeCaught, aCatches ? 1 : 0, aCatches ? b.Position : a.Position, Vec2.Zero, 0f));
+            return true;
+        }
+
+        /// <summary>잡힌 쪽을 잡은 쪽 몸 앞에 다시 놓는다(잡은 쪽이 이동했을 때).</summary>
+        static void KeepHeld(in FighterState grabber, ref FighterState victim, SimConfig config, ArenaDef arena)
+        {
+            victim.Position = new Vec2(grabber.Position.X + config.Combat.Grab.HoldOffset * grabber.Facing, grabber.Position.Y);
+            victim.Velocity = Vec2.Zero;
+            if (arena != null)
+            {
+                TerrainCollision.ResolveX(ref victim.Position, grabber.Facing, config.HalfBody, arena, grabber.Position.X);
+                TerrainCollision.ClampToBoundary(ref victim.Position, config.HalfBody, arena);
+            }
         }
 
         /// <summary>붙잡기: 상대를 몸 앞 0.8에 고정하고 둘 다 멈춘다.</summary>

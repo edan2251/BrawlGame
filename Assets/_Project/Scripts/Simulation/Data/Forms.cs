@@ -92,8 +92,13 @@ namespace Knockbox.Simulation
         public static RuleSet Legacy(CombatMode mode, bool grabEnabled) =>
             new RuleSet { StartForm = Forms.FromMode(mode), Switches = FeatureSwitches.Legacy(grabEnabled), LegacyMatch = true };
 
-        /// <summary>CR-004 실험(D-061·D-062): 몸 폼, CP16 경기 흐름, 가드·잡기·에너지 끔.</summary>
-        public static RuleSet Brawl => new RuleSet { StartForm = FighterForm.Body, Switches = default, LegacyMatch = true };
+        /// <summary>CR-004 실험(D-061·D-062): 몸 폼, CP16 경기 흐름, 잡기 켬(단계 C), 가드·에너지 끔.</summary>
+        public static RuleSet Brawl => new RuleSet
+        {
+            StartForm = FighterForm.Body,
+            Switches = new FeatureSwitches { GrabEnabled = true },
+            LegacyMatch = true,
+        };
 
         public readonly FighterForm StartFormOf(int fighter) => fighter == 1 && SeparateP2Form ? StartFormP2 : StartForm;
 

@@ -175,6 +175,11 @@ namespace Knockbox.Simulation
                         f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, m.GroundDecel * dt);
                     ApplyGravity(ref f, m, false, 0, 0);
                     break;
+                case ActionState.Holding when f.Form == FighterForm.Body:
+                    // 몸 폼(5.2): 잡은 쪽은 느리게 걷고 중력을 받는다. 잡힌 쪽은 상호작용 판정에서 따라온다.
+                    ApplyHorizontal(ref f, m, moveX, c.Body.HoldMoveSpeed, 1f, 1f);
+                    ApplyGravity(ref f, m, false, 0, 0);
+                    break;
                 case ActionState.Holding:
                 case ActionState.Held:
                     // 붙잡기 동안 둘 다 움직이지 않는다(공중이어도 떠 있음).
@@ -494,7 +499,18 @@ namespace Knockbox.Simulation
             f.Velocity = v * (splat ? c.WallSplatRestitution : c.BounceRestitution);
             f.Grounded = false;
             f.GroundBox = FighterState.NoBox;
-            if (splat)
+            if (splat && c.Body.Enabled)
+            {
+                // CR-004(5.2): 벽꽝 추가 피해는 충돌 속도에 비례하고, 한 번 날아가는 동안의 합이 상한을 넘지 않는다. 경직은 고정(누적하지 않음).
+                int damage = SimMath.Min(c.Body.SplatDamageMax - f.SplatDamageTaken, (int)(strongest * c.Body.SplatDamagePerSpeed + 0.5f));
+                damage = SimMath.Max(0, damage);
+                f.SplatDamageTaken += damage;
+                f.Health = SimMath.Max(0, f.Health - damage);
+                f.StunTicks = SimMath.Max(f.StunTicks, c.Body.SplatHitstun);
+                f.HitstopTicks = SimMath.Max(f.HitstopTicks, c.WallSplatHitstop);
+                events.Add(new SimEvent(tick, SimEventType.WallSplat, index, point, normal, strongest));
+            }
+            else if (splat)
             {
                 f.Health = SimMath.Max(0, f.Health - splatDamage);
                 f.StunTicks += c.WallSplatHitstun;

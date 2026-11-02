@@ -152,6 +152,10 @@ namespace Knockbox.Simulation
         public Vec2 AttackDir;
         /// <summary>주먹 후딜 중 누른 좌클릭을 저장해 둔 남은 틱(CR-004 5.1). 0이면 없음.</summary>
         public int AttackBuffer;
+        /// <summary>남은 재그랩 보호 틱(CR-004 5.2). 0보다 크면 잡히지 않는다.</summary>
+        public int GrabProtectTicks;
+        /// <summary>이번에 날아가는 동안 받은 벽꽝 추가 피해 합(상한 검사용). 회복하면 0.</summary>
+        public int SplatDamageTaken;
 
         public const int NoAttack = -1;
 
@@ -245,6 +249,8 @@ namespace Knockbox.Simulation
             v.Value("AttackDir.X", AttackDir.X);
             v.Value("AttackDir.Y", AttackDir.Y);
             v.Value(nameof(AttackBuffer), AttackBuffer);
+            v.Value(nameof(GrabProtectTicks), GrabProtectTicks);
+            v.Value(nameof(SplatDamageTaken), SplatDamageTaken);
         }
     }
 }

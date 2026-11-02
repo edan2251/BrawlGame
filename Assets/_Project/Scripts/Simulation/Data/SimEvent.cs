@@ -74,6 +74,8 @@ namespace Knockbox.Simulation
         Picked,
         /// <summary>증강이 발동함(CP23). Fighter는 가진 쪽, Strength는 증강 번호. 연출이 이름 아이콘을 잠깐 띄운다.</summary>
         AugmentActive,
+        /// <summary>받아내기(CR-004 5.2): 잡기가 박치기 중인 상대를 잡음. Fighter는 잡힌 쪽. Grab 이벤트도 함께 나온다.</summary>
+        LungeCaught,
     }
 
     /// <summary>
