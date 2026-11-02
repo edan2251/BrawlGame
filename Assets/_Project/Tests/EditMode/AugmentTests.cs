@@ -9,6 +9,7 @@ namespace Knockbox.Tests.EditMode
     /// CP23: 증강 틀(10-forms-and-growth.md 5.3·5.4 개정, D-055~D-057). 수치 기대값은 증강 데이터·설정값에서 계산한다.
     /// 슬롯 충돌·무의미 조합·플래그 충돌·트리거 순서는 테스트 전용 증강 데이터(Id 100~)로만 확인한다(제품 증강 수는 늘리지 않는다).
     /// </summary>
+    [Category(TestCategories.LegacyCombat)]
     public class AugmentTests
     {
         const float FloorY = -7.55f;

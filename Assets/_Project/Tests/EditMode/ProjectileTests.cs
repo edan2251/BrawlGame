@@ -7,6 +7,7 @@ namespace Knockbox.Tests.EditMode
     /// <summary>
     /// CP19: 투사체 풀과 바위 폼(10-forms-and-growth.md 4.3·4.4). 수치 기대값은 RockParams·EnergyParams에서 계산한다.
     /// </summary>
+    [Category(TestCategories.LegacyCombat)]
     public class ProjectileTests
     {
         const float FloorY = -7.55f;

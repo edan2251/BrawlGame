@@ -9,6 +9,7 @@ namespace Knockbox.Tests.EditMode
     /// 지는 쪽(P1)은 싸우지 않고 가까운 경계로 계속 대시해 경계 튕김 피해를 받는다(선택 단계에서는 번호를 누름). 이기는 쪽(P2)은 봇이다.
     /// 체력·KO는 실제 시뮬레이션으로 정해진다.
     /// </summary>
+    [Category(TestCategories.LegacyCombat)]
     public class FullFlowTests
     {
         [TestCase(241u)]

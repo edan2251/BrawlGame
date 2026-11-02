@@ -7,6 +7,7 @@ namespace Knockbox.Tests.EditMode
     /// CP18: 파이터별 폼, 기능 스위치, 공격 에너지(10-forms-and-growth.md 4.4·5.1).
     /// 수치 기대값은 EnergyParams·ChargeModeParams에서 계산한다.
     /// </summary>
+    [Category(TestCategories.LegacyCombat)]
     public class FormEnergyTests
     {
         const float FloorY = -7.55f;

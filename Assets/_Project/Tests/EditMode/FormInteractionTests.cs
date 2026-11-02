@@ -7,6 +7,7 @@ namespace Knockbox.Tests.EditMode
     /// CP20: 보 폼과 속성 해석기(10-forms-and-growth.md 4.1·4.2). 상호작용 표의 모든 칸을 결정적 시나리오로 확인한다.
     /// 타이밍과 수치는 설정값(공격 데이터, 바위 수치)에서 정한다.
     /// </summary>
+    [Category(TestCategories.LegacyCombat)]
     public class FormInteractionTests
     {
         const float FloorY = -7.55f;

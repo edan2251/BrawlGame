@@ -14,6 +14,7 @@ namespace Knockbox.Tests.EditMode
     /// </summary>
     [Explicit("측정: 이름으로 실행")]
     [Category("Measure")]
+    [Category(TestCategories.LegacyCombat)]
     public class M1MatrixTests
     {
         const int MatchTicks = 7200;

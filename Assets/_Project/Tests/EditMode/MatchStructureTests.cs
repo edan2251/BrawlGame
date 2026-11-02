@@ -9,6 +9,7 @@ namespace Knockbox.Tests.EditMode
     /// CP22: 라운드·세트·경기와 세트 패자 선택(10-forms-and-growth.md 4.6·4.7 개정, D-049~D-054).
     /// 승패는 KO를 직접 만들어(체력 0) 빠르게 진행한다. 승수·세트 수는 설정값에서 읽는다.
     /// </summary>
+    [Category(TestCategories.LegacyCombat)]
     public class MatchStructureTests
     {
         static SimConfig Config(FighterForm p1 = FighterForm.Scissors, FighterForm p2 = FighterForm.Scissors) =>

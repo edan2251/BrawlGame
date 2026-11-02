@@ -6,6 +6,7 @@ using NUnit.Framework;
 namespace Knockbox.Tests.EditMode
 {
     /// <summary>CP21: 폼 전환(10-forms-and-growth.md 4.5, 5.2). 타이밍은 공격 데이터에서 정한다.</summary>
+    [Category(TestCategories.LegacyCombat)]
     public class FormSwitchTests
     {
         const float FloorY = -7.55f;
