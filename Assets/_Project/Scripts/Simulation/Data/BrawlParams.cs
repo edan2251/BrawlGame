@@ -29,6 +29,7 @@ namespace Knockbox.Simulation
             combat.Charge.LungeMaxBounces = 0;
             combat.Charge.LungeStopRecoil = 4f;
             combat.Charge.LungeStopKeep = 0.25f;
+            combat.Body = BodyParams.Default;
             return combat;
         }
     }

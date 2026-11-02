@@ -432,6 +432,8 @@ namespace Knockbox.Game
                 case GamepadInputSource _: return "gamepad";
                 case DummyInputSource d: return "dummy " + d.Behavior;
                 case BotInputSource _: return "bot";
+                case BrawlBot _: return "brawl bot";
+                case MouseAimInputSource _: return "mouse";
                 case FrameArrayInputSource _: return "scenario";
                 default: return source == null ? "none" : "idle";
             }

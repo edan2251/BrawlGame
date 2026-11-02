@@ -6,8 +6,8 @@ using UnityEngine.InputSystem;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// CR-004 단계 A: P1 몸 중심에서 마우스 커서 쪽으로 점선 조준선을 그린다. 연출 전용이며 시뮬레이션 입력에는 들어가지 않는다
-    /// (조준 입력은 단계 B). 실험 경기에서만, 마우스가 있을 때만 보인다.
+    /// CR-004: P1 몸 중심에서 마우스 커서 쪽으로 점선 조준선을 그린다. 입력과 같은 64방향 양자화 방향이라 주먹·박치기 방향과 일치한다.
+    /// 실험 경기에서만, 마우스가 있을 때만 보인다.
     /// </summary>
     public sealed class AimLineView : MonoBehaviour
     {
@@ -43,12 +43,10 @@ namespace Knockbox.Game
             var a = runner.PreviousState.Fighter0.Position;
             var b = runner.World.State.Fighter0.Position;
             var center = Vector2.Lerp(new Vector2(a.X, a.Y), new Vector2(b.X, b.Y), alpha);
-            Vector2 screen = mouse.position.ReadValue();
-            var world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
-            var dir = (Vector2)world - center;
-            if (dir.sqrMagnitude < 1e-6f)
-                dir = Vector2.right;
-            dir.Normalize();
+            byte aim = AimInput.FromScreen(cam, mouse.position.ReadValue(), center);
+            var dir = Vector2.right;
+            if (AimDirections.TryGet(aim, out var d))
+                dir = new Vector2(d.X, d.Y);
             for (int i = 0; i < Dots; i++)
                 dots[i].transform.localPosition = center + dir * (Start + Spacing * i);
         }

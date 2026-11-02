@@ -21,6 +21,7 @@ namespace Knockbox.Game
         CameraRig cameraRig;
         readonly DummyInputSource dummy = new DummyInputSource();
         BotInputSource bot;
+        BrawlBot brawlBot;
         /// <summary>빌드의 F1 순환: 가위·바위·보(시험 공격 폼은 에디터 전용).</summary>
         static readonly FighterForm[] BuildForms = { FighterForm.Scissors, FighterForm.Rock, FighterForm.Paper };
 
@@ -32,6 +33,7 @@ namespace Knockbox.Game
             if (GetComponent<AutoPlayDebug>() == null)
                 gameObject.AddComponent<AutoPlayDebug>();
             bot = new BotInputSource(() => runner.World, 1, 0xB07u);
+            brawlBot = new BrawlBot(() => runner.World, 1, 0xB07u);
         }
 
         void Start()
@@ -183,6 +185,11 @@ namespace Knockbox.Game
                 b.Reset();
                 runner.Player2Input = b;
             }
+            else if (p2 is BrawlBot bb)
+            {
+                bb.Reset();
+                runner.Player2Input = bb;
+            }
         }
 
         void CycleP2Input()
@@ -195,8 +202,17 @@ namespace Knockbox.Game
                 next = dummy;
             else if (current is DummyInputSource)
             {
-                bot.Reset();
-                next = bot;
+                // CR-004 실험 경기는 몸 폼 봇.
+                if (runner.BrawlExperiment)
+                {
+                    brawlBot.Reset();
+                    next = brawlBot;
+                }
+                else
+                {
+                    bot.Reset();
+                    next = bot;
+                }
             }
             else
                 next = new KeyboardInputSource(KeyboardLayout.Right);

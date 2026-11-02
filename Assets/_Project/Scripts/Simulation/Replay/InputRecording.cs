@@ -13,7 +13,9 @@ namespace Knockbox.Simulation
     {
         public const uint Magic = 0x5052424B; // "KBRP"
         /// <summary>4: CR-003(CP18). Mode 칸에 규칙(RuleSet.Format)을 쓰고 상태에 폼·에너지가 들어갔다. 3 이하 기록은 설정 체크섬이 달라 재생할 수 없다.</summary>
-        public const ushort FormatVersion = 4;
+        /// <summary>5: 프레임에 조준 바이트 추가(CR-004). 4는 조준 없이 읽는다.</summary>
+        public const ushort FormatVersion = 5;
+        const ushort NoAimVersion = 4;
         public const char ArenaSeparator = ',';
 
         readonly List<InputFrame> p1 = new List<InputFrame>();
@@ -150,11 +152,11 @@ namespace Knockbox.Simulation
                 w.Write(Rotation.Slot);
                 w.Write(Rotation.Cycle);
                 w.Write(p1.Count);
-                var buffer = new byte[6];
+                var buffer = new byte[InputFrame.Size * 2];
                 for (int i = 0; i < p1.Count; i++)
                 {
                     p1[i].Write(buffer, 0);
-                    p2[i].Write(buffer, 3);
+                    p2[i].Write(buffer, InputFrame.Size);
                     w.Write(buffer);
                 }
             }
@@ -168,8 +170,8 @@ namespace Knockbox.Simulation
             if (r.ReadUInt32() != Magic)
                 throw new InvalidDataException("입력 기록 파일이 아님");
             ushort version = r.ReadUInt16();
-            if (version != FormatVersion)
-                throw new InvalidDataException(version < FormatVersion
+            if (version != FormatVersion && version != NoAimVersion)
+                throw new InvalidDataException(version < NoAimVersion
                     ? $"CR-003(폼 전투) 전의 입력 기록(버전 {version})은 호환되지 않음"
                     : $"지원하지 않는 입력 기록 버전: {version}");
 
@@ -200,12 +202,16 @@ namespace Knockbox.Simulation
             int count = r.ReadInt32();
             if (count < 0)
                 throw new InvalidDataException($"잘못된 프레임 수: {count}");
+            bool aim = version == FormatVersion;
+            int size = aim ? InputFrame.Size : InputFrame.LegacySize;
             for (int i = 0; i < count; i++)
             {
-                byte[] buffer = r.ReadBytes(6);
-                if (buffer.Length != 6)
+                byte[] buffer = r.ReadBytes(size * 2);
+                if (buffer.Length != size * 2)
                     throw new InvalidDataException("입력 기록이 중간에 끊김");
-                rec.Append(InputFrame.Read(buffer, 0), InputFrame.Read(buffer, 3));
+                rec.Append(
+                    aim ? InputFrame.Read(buffer, 0) : InputFrame.ReadLegacy(buffer, 0),
+                    aim ? InputFrame.Read(buffer, size) : InputFrame.ReadLegacy(buffer, size));
             }
             return rec;
         }

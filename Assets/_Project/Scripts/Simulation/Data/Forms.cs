@@ -13,6 +13,8 @@ namespace Knockbox.Simulation
         Rock,
         Paper,
         Test,
+        /// <summary>몸(CR-004): 주먹(탭), 박치기(홀드). 실험 경기 전용이며 폼 전환·선택에 들어가지 않는다.</summary>
+        Body,
     }
 
     public static class Forms
@@ -90,8 +92,8 @@ namespace Knockbox.Simulation
         public static RuleSet Legacy(CombatMode mode, bool grabEnabled) =>
             new RuleSet { StartForm = Forms.FromMode(mode), Switches = FeatureSwitches.Legacy(grabEnabled), LegacyMatch = true };
 
-        /// <summary>CR-004 실험(D-061·D-062): CP16 경기 흐름, 가드·잡기·에너지 끔. 몸 폼은 단계 B에서 붙는다.</summary>
-        public static RuleSet Brawl => new RuleSet { StartForm = FighterForm.Scissors, Switches = default, LegacyMatch = true };
+        /// <summary>CR-004 실험(D-061·D-062): 몸 폼, CP16 경기 흐름, 가드·잡기·에너지 끔.</summary>
+        public static RuleSet Brawl => new RuleSet { StartForm = FighterForm.Body, Switches = default, LegacyMatch = true };
 
         public readonly FighterForm StartFormOf(int fighter) => fighter == 1 && SeparateP2Form ? StartFormP2 : StartForm;
 

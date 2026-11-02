@@ -13,12 +13,14 @@ namespace Knockbox.Tests.EditMode
         static SimConfig Config() =>
             new SimConfig(MovementParams.Default, BrawlParams.Match(MatchParams.Default), BrawlParams.Combat(CombatParams.Default), RuleSet.Brawl);
 
-        /// <summary>바닥 위 x에서 왼쪽으로 chargeTicks만큼 누른 뒤 떼서 돌진하고, 돌진이 끝날 때까지 진행한다.</summary>
+        /// <summary>바닥 위 x에서 왼쪽으로 T + chargeTicks만큼 누른 뒤 떼서 돌진하고, 돌진이 끝날 때까지 진행한다.</summary>
         static SimWorld LungeLeft(SimConfig config, ArenaDef arena, float x, int chargeTicks, out float launchX, out int lungeTicks)
         {
             float floorY = arena.SpawnFoot0.Y + config.HalfBody;
             var w = TestWorlds.CreateAt(new Vec2(x, floorY), new Vec2(14f, floorY), config, arena);
-            for (int t = 0; t < chargeTicks; t++)
+            // 몸 폼(단계 B): 충전은 탭/홀드 임계 T 뒤부터 센다.
+            int hold = config.Combat.Body.TapHoldTicks + chargeTicks;
+            for (int t = 0; t <= hold; t++)
                 w.Step(new InputFrame(-1, 0, InputButtons.Attack), default);
             launchX = w.State.Fighter0.Position.X;
             lungeTicks = 0;

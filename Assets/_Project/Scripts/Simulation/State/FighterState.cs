@@ -146,6 +146,12 @@ namespace Knockbox.Simulation
         /// <summary>증강 획득 목록(CP23). 경기 끝까지 유지.</summary>
         public AugmentState Augments;
         public Vec2 ShotDirection;
+        /// <summary>
+        /// 조준 공격의 방향(CR-004 몸 폼의 주먹, 단위 벡터). 0이면 바라보는 쪽 기준(이전 공격). 판정 원과 넉백을 이 방향 기준으로 놓는다.
+        /// </summary>
+        public Vec2 AttackDir;
+        /// <summary>주먹 후딜 중 누른 좌클릭을 저장해 둔 남은 틱(CR-004 5.1). 0이면 없음.</summary>
+        public int AttackBuffer;
 
         public const int NoAttack = -1;
 
@@ -236,6 +242,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Value("ShotDirection.X", ShotDirection.X);
             v.Value("ShotDirection.Y", ShotDirection.Y);
+            v.Value("AttackDir.X", AttackDir.X);
+            v.Value("AttackDir.Y", AttackDir.Y);
+            v.Value(nameof(AttackBuffer), AttackBuffer);
         }
     }
 }

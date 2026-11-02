@@ -74,6 +74,8 @@ namespace Knockbox.Simulation
                 f.BoundaryImmunityTicks--;
             if (f.BoxDamageTicks > 0 && --f.BoxDamageTicks == 0)
                 f.BoxDamageSum = 0;
+            if (f.AttackBuffer > 0)
+                f.AttackBuffer--;
             TickEnergy(ref f, config);
             // 가드 입력은 조작할 수 없을 때 눌러도 센다(경직 중 연타로 패링을 준비하지 못하게).
             bool guardPressed = (pressed & InputButtons.Guard) != 0;
@@ -99,11 +101,25 @@ namespace Knockbox.Simulation
                     break;
                 case ActionState.Attack:
                     if (f.ActionTick < config.GetAttack(f.AttackId).TotalTicks)
+                    {
+                        // 몸 폼(5.1): 주먹 후딜 중 누른 좌클릭은 잠시 저장했다가 끝나면 시작한다.
+                        if (f.Form == FighterForm.Body && (pressed & InputButtons.Attack) != 0)
+                            f.AttackBuffer = c.Body.PunchBufferTicks;
                         return pressed;
+                    }
                     f.AttackId = FighterState.NoAttack;
                     f.AttackHasHit = false;
+                    f.AttackDir = Vec2.Zero;
                     f.RestartAction(ActionState.Airborne);
+                    if (f.AttackBuffer > 0)
+                    {
+                        f.AttackBuffer = 0;
+                        pressed |= InputButtons.Attack;
+                    }
                     break;
+                case ActionState.Charge when f.Form == FighterForm.Body:
+                    BodyCharge(ref f, input, config, index, tick, events);
+                    return pressed;
                 case ActionState.Charge:
                     // 누르고 있는 동안 충전. 떼거나 최대 충전 뒤 24틱이 지나면 발사.
                     if (input.Held(InputButtons.Attack) && f.ActionTick < c.Charge.FullChargeTicks + c.Charge.FullChargeHoldTicks)
@@ -211,6 +227,10 @@ namespace Knockbox.Simulation
                         // 선딜 시작은 확인만, 소비는 발사할 때(Fire).
                         StartShoot(ref f, input.MoveX);
                         break;
+                    case FighterForm.Body:
+                        // 누르는 순간 준비 동작(주먹 선딜)이 시작된다. 탭/홀드는 다음 틱부터 BodyCharge가 가른다.
+                        StartCharge(ref f, AimFacing(input));
+                        break;
                     default:
                         StartAttack(ref f, input.MoveX, AttackIds.Test, index, tick, events);
                         break;
@@ -290,6 +310,7 @@ namespace Knockbox.Simulation
                 f.Facing = (sbyte)moveX;
             f.AttackId = attackId;
             f.AttackHasHit = false;
+            f.AttackDir = Vec2.Zero;
             f.ActionPaid = false;
             f.AttackFromAir = !f.Grounded;
             f.DashTicksLeft = 0;
@@ -347,8 +368,59 @@ namespace Knockbox.Simulation
             f.RestartAction(ActionState.Charge);
         }
 
+        /// <summary>조준(없으면 이동 입력)의 좌우. 0이면 바꾸지 않는다.</summary>
+        static int AimFacing(in InputFrame input)
+        {
+            if (AimDirections.TryGet(input.Aim, out var aim))
+                return aim.X > SimMath.Epsilon ? 1 : aim.X < -SimMath.Epsilon ? -1 : 0;
+            return input.MoveX;
+        }
+
+        /// <summary>조준 방향. 조준이 없으면 8방향 입력, 그것도 없으면 바라보는 쪽.</summary>
+        static Vec2 AimOrMove(in FighterState f, in InputFrame input)
+        {
+            if (AimDirections.TryGet(input.Aim, out var aim))
+                return aim;
+            return input.MoveX == 0 && input.MoveY == 0 ? new Vec2(f.Facing, 0f) : SimMath.Normalize(new Vec2(input.MoveX, input.MoveY));
+        }
+
+        /// <summary>
+        /// 몸 폼의 좌클릭(5.1 "선딜 겸용"). 행동 틱 = 누른 뒤 지난 틱.
+        /// T 전에 떼면 주먹: 선딜 진행분을 이어받아 타격은 뗀 틱과 선딜 끝 중 늦은 쪽. T 이후 떼면 뗀 틱의 조준으로 박치기(충전은 T부터 센다).
+        /// 최대 충전 뒤 유지 시간이 지나면 자동 발사.
+        /// </summary>
+        static void BodyCharge(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var c = ref config.Combat;
+            int t = c.Body.TapHoldTicks;
+            int facing = AimFacing(input);
+            if (facing != 0)
+                f.Facing = (sbyte)facing;
+            bool held = input.Held(InputButtons.Attack);
+            if (held && f.ActionTick < t + c.Charge.FullChargeTicks + c.Charge.FullChargeHoldTicks)
+                return;
+            if (f.ActionTick < t)
+            {
+                int elapsed = f.ActionTick;
+                StartAttack(ref f, 0, AttackIds.Punch, index, tick, events);
+                f.AttackDir = AimOrMove(f, input);
+                f.ActionTick = SimMath.Min(elapsed, c.Body.Punch.StartupTicks);
+                return;
+            }
+            Launch(ref f, input, config, index, tick, events);
+        }
+
+        /// <summary>몸 폼이 박치기 준비를 마쳤는지(T 이후 누르고 있음). 연출용.</summary>
+        public static bool IsLungeReady(in FighterState f, SimConfig config) =>
+            f.Form == FighterForm.Body && f.Action == ActionState.Charge && f.ActionTick >= config.Combat.Body.TapHoldTicks;
+
+        /// <summary>충전 진행 틱(몸 폼은 T 이후부터). 연출의 충전 단계에 쓴다.</summary>
+        public static int ChargeTicks(in FighterState f, SimConfig config) =>
+            f.Form == FighterForm.Body ? SimMath.Max(0, f.ActionTick - config.Combat.Body.TapHoldTicks) : f.ActionTick;
+
         /// <summary>
         /// 돌진 발사: 충전 틱(행동 틱)에 따라 18 → 34, 방향은 이번 틱의 8방향 입력(중립이면 바라보는 쪽).
+        /// 몸 폼(CR-004)은 조준 방향, 충전은 탭/홀드 임계 뒤부터 센다.
         /// </summary>
         static void Launch(ref FighterState f, in InputFrame input, SimConfig config, int index, int tick, SimEventBuffer events)
         {
@@ -363,16 +435,15 @@ namespace Knockbox.Simulation
             Spend(ref f, cost, config);
             // 증강(5.4): 즉발 돌진은 고정 속도, 속도 배율은 충전형·즉발 모두에 곱한다.
             var aug = Augments.Compute(f.Augments, config);
-            float speed = (aug.InstantLunge ? config.Combat.Charge.InstantLungeSpeed : config.Combat.Charge.LungeSpeed(f.ActionTick)) * aug.LungeSpeedMul;
+            float speed = (aug.InstantLunge ? config.Combat.Charge.InstantLungeSpeed : config.Combat.Charge.LungeSpeed(ChargeTicks(f, config))) * aug.LungeSpeedMul;
             if (aug.InstantLunge)
                 events.Add(new SimEvent(tick, SimEventType.AugmentActive, index, f.Position, Vec2.Zero, aug.LaunchSlotOwner));
             if (aug.LungeSpeedMul != 1f)
                 events.Add(new SimEvent(tick, SimEventType.AugmentActive, index, f.Position, Vec2.Zero, AugmentCatalog.LungeSpeed));
-            var direction = input.MoveX == 0 && input.MoveY == 0
-                ? new Vec2(f.Facing, 0f)
-                : SimMath.Normalize(new Vec2(input.MoveX, input.MoveY));
-            if (input.MoveX != 0)
-                f.Facing = (sbyte)input.MoveX;
+            var direction = AimOrMove(f, input);
+            int facing = AimFacing(input);
+            if (facing != 0)
+                f.Facing = (sbyte)facing;
             f.Velocity = direction * speed;
             f.LungeBounces = 0;
             f.JumpCutEligible = false;
@@ -400,14 +471,26 @@ namespace Knockbox.Simulation
         {
             int k = f.ActionTick - attack.StartupTicks;
             float t = attack.ActiveTicks > 1 ? (float)k / (attack.ActiveTicks - 1) : 0f;
-            var offset = circle.At(t);
-            return new Vec2(f.Position.X + offset.X * f.Facing, f.Position.Y + offset.Y);
+            return f.Position + AttackOffset(f, circle.At(t));
+        }
+
+        /// <summary>
+        /// 공격 기준 좌표(앞 +x, 위 +y) → 월드 오프셋. 조준 공격(AttackDir)은 x축을 조준 방향으로 돌리고 y축은 화면 위쪽에 가까운 수직으로 잡아
+        /// 좌우 대칭이 그대로 유지된다. 그 외는 바라보는 쪽으로 좌우만 뒤집는다.
+        /// </summary>
+        public static Vec2 AttackOffset(in FighterState f, Vec2 local)
+        {
+            var d = f.AttackDir;
+            if (d.X == 0f && d.Y == 0f)
+                return new Vec2(local.X * f.Facing, local.Y);
+            var up = d.X >= 0f ? new Vec2(-d.Y, d.X) : new Vec2(d.Y, -d.X);
+            return d * local.X + up * local.Y;
         }
 
         /// <summary>몸 충돌의 공격성 가중치: 가위 폼에서 돌진 1.0, 대시는 튜닝 값(CR-003 기본 0), 그 외 0.</summary>
         public static float Aggression(in FighterState f, SimConfig config)
         {
-            if (f.Form != FighterForm.Scissors)
+            if (f.Form != FighterForm.Scissors && f.Form != FighterForm.Body)
                 return 0f;
             if (f.Action == ActionState.Lunge)
                 return config.Combat.Charge.LungeAggression;
@@ -696,7 +779,7 @@ namespace Knockbox.Simulation
         static void HitboxStrike(ref FighterState attacker, ref FighterState defender, in FighterState snapAttacker, in FighterState snapDefender, Vec2 point, int defenderIndex, SimConfig config, int tick, SimEventBuffer events)
         {
             ref readonly var attack = ref config.GetAttack(snapAttacker.AttackId);
-            var direction = new Vec2(attack.KnockbackDirection.X * snapAttacker.Facing, attack.KnockbackDirection.Y);
+            var direction = AttackOffset(snapAttacker, attack.KnockbackDirection);
             attacker.AttackHasHit = true;
             var strike = new Strike
             {

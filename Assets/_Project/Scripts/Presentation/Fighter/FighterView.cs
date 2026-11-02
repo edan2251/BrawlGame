@@ -286,7 +286,7 @@ namespace Knockbox.Presentation
             wallShift = Mathf.Lerp(wallShift, wallTarget, 1f - Mathf.Exp(-30f * dt));
             // 히트스탑 떨림, 또는 충전이 쌓일수록 커지는 떨림.
             float tremble = shake;
-            if (!frozen && current.Action == ActionState.Charge && dt > 0f)
+            if (!frozen && Charging(current, config) && dt > 0f)
                 tremble = 0.008f + 0.022f * ChargeProgress(current, config);
             var jitter = tremble > 0f ? new Vector2(random.Range(-1f, 1f), random.Range(-1f, 1f)) * tremble : Vector2.zero;
             // 이긴 쪽 기쁨: 제자리에서 통통 튄다.
@@ -400,7 +400,11 @@ namespace Knockbox.Presentation
         }
 
         static float ChargeProgress(in FighterState f, SimConfig config) =>
-            Mathf.Clamp01(f.ActionTick / (float)config.Combat.Charge.FullChargeTicks);
+            Mathf.Clamp01(FighterCombat.ChargeTicks(f, config) / (float)config.Combat.Charge.FullChargeTicks);
+
+        /// <summary>충전 연출을 보일지. 몸 폼(CR-004)은 탭/홀드 임계 T 전에는 주먹 준비라 충전으로 보이지 않고, T에 닿으면 눌리고 색이 바뀐다.</summary>
+        static bool Charging(in FighterState f, SimConfig config) =>
+            f.Action == ActionState.Charge && (f.Form != FighterForm.Body || FighterCombat.IsLungeReady(f, config));
 
         /// <summary>충전 단계 1~3: 1/3 전, 최대 충전 전, 최대 충전.</summary>
         public static int ChargeStage(in FighterState f, SimConfig config)
@@ -421,7 +425,7 @@ namespace Knockbox.Presentation
                 line = palette.energy;
             else if (power >= config.Combat.Charge.PowerThreshold)
                 line = palette.hit;
-            else if (f.Action == ActionState.Charge)
+            else if (Charging(f, config))
             {
                 int stage = ChargeStage(f, config);
                 // 08 5절: 1단계 energySoft → 2단계 energy → 3단계(최대 충전)는 흰색과 energy 사이로 깜박인다.
@@ -433,7 +437,7 @@ namespace Knockbox.Presentation
             // 글로: 평소 몸 색, 번쩍일 때 흰색, 충전 2·3단계는 에너지 색으로 조금 더 밝게.
             if (flashLeft > 0f)
                 glow.color = PaletteAsset.WithAlpha(palette.flash, 0.4f);
-            else if (f.Action == ActionState.Charge && ChargeStage(f, config) >= 2)
+            else if (Charging(f, config) && ChargeStage(f, config) >= 2)
                 glow.color = PaletteAsset.WithAlpha(palette.energy, 0.3f);
             else
                 glow.color = PaletteAsset.WithAlpha(palette.FighterBody(index), f.Action == ActionState.KO ? 0f : BodyGlowAlpha);
@@ -515,7 +519,9 @@ namespace Knockbox.Presentation
             int last = attack.StartupTicks + attack.ActiveTicks;
             float k = Mathf.Clamp01((Mathf.Min(t, last - 1) - attack.StartupTicks) / Mathf.Max(attack.ActiveTicks - 1, 1));
             var offset = Vector2.Lerp(new Vector2(c.Start.X, c.Start.Y), new Vector2(c.End.X, c.End.Y), k);
-            var strike = position + new Vector2(offset.x * facing, offset.y);
+            // 조준 공격(CR-004 주먹)은 조준 방향 기준, 그 외는 바라보는 쪽으로 뒤집는다.
+            var world = FighterCombat.AttackOffset(f, new Vec2(offset.x, offset.y));
+            var strike = position + new Vector2(world.X, world.Y);
             Vector2 hand;
             if (t < attack.StartupTicks)
                 hand = Vector2.Lerp(rest, wind, Smooth(t / attack.StartupTicks));
@@ -552,7 +558,7 @@ namespace Knockbox.Presentation
             float vx = Mathf.Abs(f.Velocity.X), vy = Mathf.Abs(f.Velocity.Y);
             float stretch = 1f + 0.25f * Mathf.Clamp01((Mathf.Max(vx, vy) - 6f) / 20f);
             var target = vx >= vy ? new Vector2(stretch, 1f / stretch) : new Vector2(1f / stretch, stretch);
-            if (f.Action == ActionState.Charge)
+            if (Charging(f, config))
             {
                 // 충전: 납작해진다.
                 float k = ChargeProgress(f, config);

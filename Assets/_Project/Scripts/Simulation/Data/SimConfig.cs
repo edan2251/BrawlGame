@@ -240,6 +240,8 @@ namespace Knockbox.Simulation
             Combat.Swing.Forward = Prepare(combat.Swing.Forward);
             Combat.Swing.Up = Prepare(combat.Swing.Up);
             Combat.Swing.Down = Prepare(combat.Swing.Down);
+            if (combat.Body.Enabled)
+                Combat.Body.Punch = Prepare(combat.Body.Punch);
             Combat.Grab.NeutralThrowDirection = SimMath.Normalize(combat.Grab.NeutralThrowDirection);
             Rules = rules;
             HalfBody = movement.BodySize * 0.5f;
@@ -266,6 +268,7 @@ namespace Knockbox.Simulation
                 case AttackIds.SwingForward: return ref Combat.Swing.Forward;
                 case AttackIds.SwingUp: return ref Combat.Swing.Up;
                 case AttackIds.SwingDown: return ref Combat.Swing.Down;
+                case AttackIds.Punch: return ref Combat.Body.Punch;
                 default: return ref Combat.TestAttack;
             }
         }

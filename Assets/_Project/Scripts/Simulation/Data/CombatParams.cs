@@ -20,6 +20,53 @@ namespace Knockbox.Simulation
         public const int SwingForward = 1;
         public const int SwingUp = 2;
         public const int SwingDown = 3;
+        /// <summary>몸 폼의 주먹(CR-004). 판정 원은 조준 방향(AttackDir) 기준으로 놓인다.</summary>
+        public const int Punch = 4;
+    }
+
+    /// <summary>
+    /// 몸 폼(CR-004 5.1, 임시안): 좌클릭 탭 = 주먹, 홀드 = 박치기(돌진 수치는 ChargeModeParams). 누르는 순간 주먹 선딜이 시작되고,
+    /// TapHoldTicks 전에 떼면 주먹(타격 = 뗀 틱과 선딜 끝 중 늦은 쪽), 그때까지 누르고 있으면 박치기 준비 완료(충전은 그 뒤부터).
+    /// 기본값(0)은 몸 폼이 없는 설정이다(BrawlParams.Combat가 채운다).
+    /// </summary>
+    [Serializable]
+    public struct BodyParams
+    {
+        /// <summary>탭/홀드 임계 T(틱). 초기 후보 8.</summary>
+        public int TapHoldTicks;
+        /// <summary>주먹 후딜 중 누른 좌클릭을 저장해 두는 틱.</summary>
+        public int PunchBufferTicks;
+        public AttackDef Punch;
+
+        public readonly bool Enabled => TapHoldTicks > 0;
+
+        /// <summary>주먹: 선딜 3 / 활성 3 / 후딜 10, 데미지 8, 넉백 12(조준 방향에서 위로 20°).</summary>
+        public static BodyParams Default => new BodyParams
+        {
+            TapHoldTicks = 8,
+            PunchBufferTicks = 6,
+            Punch = new AttackDef
+            {
+                StartupTicks = 3,
+                ActiveTicks = 3,
+                RecoveryTicks = 10,
+                Damage = 8,
+                KnockbackStrength = 12f,
+                KnockbackDirection = new Vec2(0.9396926f, 0.34202015f),
+                CircleCount = 2,
+                Circle0 = new HitCircle(new Vec2(0.5f, 0f), new Vec2(1.0f, 0f), 0.3f),
+                Circle1 = new HitCircle(new Vec2(0.35f, 0f), new Vec2(0.65f, 0f), 0.22f),
+            },
+        };
+
+        public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
+        {
+            v.Value(nameof(TapHoldTicks), TapHoldTicks);
+            v.Value(nameof(PunchBufferTicks), PunchBufferTicks);
+            v.Begin(nameof(Punch));
+            Punch.Visit(ref v);
+            v.End();
+        }
     }
 
     /// <summary>보조 스킬: 잡기와 던지기(03-combat.md 6절). 두 모드 공통.</summary>
@@ -252,13 +299,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(LungeMaxTicks), LungeMaxTicks);
             v.Value(nameof(LungeBounceRestitution), LungeBounceRestitution);
             v.Value(nameof(LungeMaxBounces), LungeMaxBounces);
-            // CR-004 값은 켰을 때만 체크섬에 넣는다(0이면 이전 설정 체크섬·입력 기록과 같다).
-            if (LungeDrag != 0f || LungeStopRecoil != 0f || LungeStopKeep != 0f)
-            {
-                v.Value(nameof(LungeDrag), LungeDrag);
-                v.Value(nameof(LungeStopRecoil), LungeStopRecoil);
-                v.Value(nameof(LungeStopKeep), LungeStopKeep);
-            }
+            v.Value(nameof(LungeDrag), LungeDrag);
+            v.Value(nameof(LungeStopRecoil), LungeStopRecoil);
+            v.Value(nameof(LungeStopKeep), LungeStopKeep);
             v.Value(nameof(LungeAggression), LungeAggression);
             v.Value(nameof(DashAggression), DashAggression);
             v.Value(nameof(PowerThreshold), PowerThreshold);
@@ -529,6 +572,8 @@ namespace Knockbox.Simulation
         public EnergyParams Energy;
         /// <summary>바위 폼의 투사체(CP19).</summary>
         public RockParams Rock;
+        /// <summary>몸 폼(CR-004). 기본은 꺼짐(0).</summary>
+        public BodyParams Body;
 
         public static CombatParams Default => new CombatParams
         {
@@ -666,6 +711,9 @@ namespace Knockbox.Simulation
             v.End();
             v.Begin(nameof(Rock));
             Rock.Visit(ref v);
+            v.End();
+            v.Begin(nameof(Body));
+            Body.Visit(ref v);
             v.End();
         }
     }

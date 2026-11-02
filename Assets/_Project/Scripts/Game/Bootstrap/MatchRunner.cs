@@ -30,7 +30,7 @@ namespace Knockbox.Game
         [SerializeField] bool skipCountdown;
         [Tooltip("켜면 경기 시작 때 P1 키보드 왼쪽, P2 첫 게임패드(없으면 키보드 오른쪽)를 붙인다")]
         [SerializeField] bool useLocalDevices;
-        [Tooltip("CR-004 실험: Brawl 맵 고정, RuleSet.Brawl, 짧은 카운트다운과 3선승, 로컬 플레이면 P2는 샌드백(F6으로 바꿈)")]
+        [Tooltip("CR-004 실험: Brawl 맵 고정, RuleSet.Brawl(몸 폼), 짧은 카운트다운과 3선승, 로컬 플레이면 P1 마우스 조준, P2 샌드백(F6으로 바꿈)")]
         [SerializeField] bool brawlExperiment;
 
         readonly FixedTickClock clock = new FixedTickClock();
@@ -246,7 +246,7 @@ namespace Knockbox.Game
                 seed = (uint)Environment.TickCount | 1u;
             if (useLocalDevices)
             {
-                Player1Input = new KeyboardInputSource(KeyboardLayout.Left);
+                Player1Input = brawlExperiment ? new MouseAimInputSource(() => World, 0) : (IInputSource)new KeyboardInputSource(KeyboardLayout.Left);
                 Player2Input = brawlExperiment ? new DummyInputSource()
                     : GamepadInputSource.Available(0) ? new GamepadInputSource(0) : new KeyboardInputSource(KeyboardLayout.Right);
             }
