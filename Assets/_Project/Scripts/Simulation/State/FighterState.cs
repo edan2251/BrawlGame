@@ -164,6 +164,12 @@ namespace Knockbox.Simulation
         public sbyte SurfaceCirc;
         /// <summary>직전 틱의 좌우 키 집합(1 A, 2 D, 3 둘 다). 집합이 바뀔 때만 방향을 다시 정한다.</summary>
         public byte SurfaceKeys;
+        /// <summary>중력 방향(CR-004 E, SpiderMovement): 0 아래, 1 오른쪽, 2 위, 3 왼쪽.</summary>
+        public sbyte GravityDir;
+        /// <summary>지금 중력을 준 떠 있는 지형 조각 + 1(0 없음). 같은 조각 안에서 중력이 바뀌면 모서리를 감아 돈다.</summary>
+        public int GravityPiece;
+        /// <summary>남은 중력장 무시 틱(S로 놓고 떨어진 직후).</summary>
+        public int GravityLock;
 
         public const int NoAttack = -1;
         public const sbyte SurfaceNone = 0;
@@ -269,6 +275,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(SurfaceOuter), SurfaceOuter);
             v.Value(nameof(SurfaceCirc), (int)SurfaceCirc);
             v.Value(nameof(SurfaceKeys), (int)SurfaceKeys);
+            v.Value(nameof(GravityDir), (int)GravityDir);
+            v.Value(nameof(GravityPiece), GravityPiece);
+            v.Value(nameof(GravityLock), GravityLock);
         }
     }
 }

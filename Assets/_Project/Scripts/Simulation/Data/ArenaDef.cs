@@ -92,6 +92,70 @@ namespace Knockbox.Simulation
             SpawnFoot1 = spawnFoot1;
         }
 
+        ArenaDef[] rotated;
+        int[] pieceOfBox;
+
+        /// <summary>
+        /// CR-004 E(SpiderMovement)용 자료를 한 번 만든다: 90° 단위로 돌린 맵 사본 셋(중력 오른쪽·위·왼쪽이 아래가 되도록)과,
+        /// 프레임에 닿지 않는 내부 고체 상자를 맞닿음으로 묶은 지형 조각 번호. Step 밖(SimWorld 생성)에서 부른다.
+        /// </summary>
+        public void PrepareSurfaceData()
+        {
+            if (rotated != null)
+                return;
+            rotated = new ArenaDef[4];
+            rotated[0] = this;
+            for (int g = 1; g < 4; g++)
+            {
+                var list = new ArenaBox[boxes.Length];
+                for (int i = 0; i < boxes.Length; i++)
+                {
+                    var b = boxes[i];
+                    var p = SpiderMovement.ToLocal(new Vec2(b.MinX, b.MinY), g);
+                    var q = SpiderMovement.ToLocal(new Vec2(b.MaxX, b.MaxY), g);
+                    list[i] = new ArenaBox(b.Kind, SimMath.Min(p.X, q.X), SimMath.Min(p.Y, q.Y), SimMath.Max(p.X, q.X), SimMath.Max(p.Y, q.Y));
+                }
+                bool swap = g % 2 == 1;
+                rotated[g] = new ArenaDef(Name, swap ? Rows : Columns, swap ? Columns : Rows, HasBoundary, list, SpawnFoot0, SpawnFoot1);
+            }
+            pieceOfBox = new int[boxes.Length];
+            float fx = HalfWidth - 1f - 1e-3f, fy = HalfHeight - 1f - 1e-3f;
+            for (int i = 0; i < boxes.Length; i++)
+            {
+                var b = boxes[i];
+                bool frame = b.MinX <= -fx || b.MaxX >= fx || b.MinY <= -fy || b.MaxY >= fy;
+                pieceOfBox[i] = b.IsSolidBlock && !frame ? i : -1;
+            }
+            // 맞닿은 내부 상자끼리 같은 조각(가장 작은 번호)으로 묶는다.
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                for (int i = 0; i < boxes.Length; i++)
+                {
+                    for (int j = 0; j < boxes.Length; j++)
+                    {
+                        if (pieceOfBox[i] < 0 || pieceOfBox[j] < 0 || pieceOfBox[j] <= pieceOfBox[i])
+                            continue;
+                        var a = boxes[i];
+                        var b = boxes[j];
+                        bool touch = a.MinX <= b.MaxX + 1e-3f && b.MinX <= a.MaxX + 1e-3f && a.MinY <= b.MaxY + 1e-3f && b.MinY <= a.MaxY + 1e-3f;
+                        if (touch)
+                        {
+                            pieceOfBox[j] = pieceOfBox[i];
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>중력 g가 아래가 되도록 돌린 맵(PrepareSurfaceData 뒤). g = 0이면 자기 자신.</summary>
+        public ArenaDef Rotated(int g) => g == 0 || rotated == null ? this : rotated[g];
+
+        /// <summary>상자가 속한 떠 있는 지형 조각 번호. 프레임·비고체는 −1.</summary>
+        public int PieceOf(int box) => pieceOfBox == null || box < 0 || box >= pieceOfBox.Length ? -1 : pieceOfBox[box];
+
         public string Name { get; }
         public int Columns { get; }
         public int Rows { get; }

@@ -146,5 +146,17 @@ namespace Knockbox.Simulation
             else
                 Dropped++;
         }
+
+        /// <summary>start 이후에 쌓인 사건의 위치·방향을 중력 g 좌표계에서 월드로 돌린다(CR-004 E, SpiderMovement).</summary>
+        public void RotateSince(int start, int g)
+        {
+            if (g == 0)
+                return;
+            for (int i = start; i < Count; i++)
+            {
+                items[i].Position = SpiderMovement.ToWorld(items[i].Position, g);
+                items[i].Direction = SpiderMovement.ToWorld(items[i].Direction, g);
+            }
+        }
     }
 }

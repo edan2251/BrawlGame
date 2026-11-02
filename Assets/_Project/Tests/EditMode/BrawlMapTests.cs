@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace Knockbox.Tests.EditMode
 {
     /// <summary>
-    /// CR-004 단계 A: 대표 맵 Brawl(요청서 6절). 사방 실제 벽(경계 튕김 없음), 프레임에 닿지 않는 내부 사각 지형 3개, 바닥 양쪽 대칭 스폰.
+    /// CR-004 대표 맵 Brawl(요청서 6절, D/E 피드백으로 T·ㄴ·┘ 지형). 사방 실제 벽(경계 튕김 없음), 프레임에 닿지 않는 내부 지형, 바닥 양쪽 대칭 스폰.
     /// 최대 속도(대시, 점프 + 공중 대시)로 벽과 지형을 들이받아도 통과하거나 프레임 밖으로 나가지 않는다.
     /// </summary>
     public class BrawlMapTests
@@ -54,8 +54,8 @@ namespace Knockbox.Tests.EditMode
             }
             float share = innerArea / (4f * frameX * frameY);
             TestContext.WriteLine($"[CR-004 A] 내부 지형 {interior}개, 면적 {share:P1}");
-            Assert.AreEqual(3, interior);
-            Assert.That(share, Is.InRange(0.06f, 0.10f));
+            Assert.AreEqual(6, interior, "T(가로·기둥), ㄴ(세로·가로), 대칭 ┘");
+            Assert.That(share, Is.InRange(0.05f, 0.09f));
         }
 
         [Test]

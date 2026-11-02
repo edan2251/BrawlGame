@@ -34,6 +34,8 @@ namespace Knockbox.Simulation
                 throw new ArgumentException($"맵 순환 상태({count}개)와 맵 목록({arenas.Length}개)이 다름", nameof(arenas));
             Config = config;
             this.arenas = arenas;
+            for (int i = 0; i < arenas.Length; i++)
+                arenas[i].PrepareSurfaceData();
             State = initial;
             Events = new SimEventBuffer(eventCapacity);
             PropScratch = new PropScratch();

@@ -32,6 +32,8 @@ namespace Knockbox.Game
         public bool Rotation;
         /// <summary>참이면 맨 위 테두리 줄(천장)도 그린다(CR-004: 천장에 붙는 실험 맵). 기본은 그리지 않는다(08 4·7절).</summary>
         public bool Ceiling;
+        /// <summary>그림자 세기(그림자 속 밝기 = 빛 × (1 − 세기)). 기본 BackgroundView.ShadowStrength(0.25).</summary>
+        public float Shadow = Knockbox.Presentation.BackgroundView.ShadowStrength;
         /// <summary>구조물 목록(묶음 번호 포함). 비어 있으면 구조물 없음.</summary>
         public PropDef[] Props = new PropDef[0];
 
@@ -56,6 +58,8 @@ namespace Knockbox.Game
             }
             if (root.TryGetValue("rotation", out object rotation) && rotation != null)
                 meta.Rotation = rotation is bool b ? b : throw new FormatException($"{sourceName}: \"rotation\"은 참/거짓");
+            if (root.TryGetValue("shadow", out object shadow) && shadow != null)
+                meta.Shadow = shadow is double d ? Mathf.Clamp01((float)d) : throw new FormatException($"{sourceName}: \"shadow\"는 0~1 숫자");
             if (root.TryGetValue("ceiling", out object ceiling) && ceiling != null)
                 meta.Ceiling = ceiling is bool c ? c : throw new FormatException($"{sourceName}: \"ceiling\"은 참/거짓");
             if (root.TryGetValue("props", out object props) && props != null)

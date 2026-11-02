@@ -59,7 +59,10 @@ namespace Knockbox.Presentation
 
         public Vector2 LightPosition => lightPoint;
 
-        public void Build(ArenaDef arena, ArenaTheme theme, PaletteAsset paletteAsset, ShapeLibrary shapes, Vector2 lightPosition)
+        /// <summary>이 배경의 그림자 세기(맵 짝 파일 "shadow", 기본 ShadowStrength).</summary>
+        float strength = ShadowStrength;
+
+        public void Build(ArenaDef arena, ArenaTheme theme, PaletteAsset paletteAsset, ShapeLibrary shapes, Vector2 lightPosition, float shadowStrength = ShadowStrength)
         {
             palette = paletteAsset;
             if (motes[0] == null)
@@ -67,10 +70,11 @@ namespace Knockbox.Presentation
                 for (int i = 0; i < MoteCount; i++)
                     motes[i] = ShapeLibrary.Create(transform, "Mote", shapes.Circle, SortingLayers.Background, 3, palette.mote);
             }
-            string key = $"{arena.Name}#{arena.ComputeChecksum():X8}|{theme.name}|{lightPosition.x:F2},{lightPosition.y:F2}";
+            string key = $"{arena.Name}#{arena.ComputeChecksum():X8}|{theme.name}|{lightPosition.x:F2},{lightPosition.y:F2}|{shadowStrength:F2}";
             if (key == currentKey)
                 return;
             currentKey = key;
+            strength = shadowStrength;
             lightPoint = lightPosition;
             halfWidth = arena.HalfWidth;
             halfHeight = arena.HalfHeight;
@@ -247,7 +251,7 @@ namespace Knockbox.Presentation
                 for (int x = 0; x < width; x++)
                 {
                     int i = y * width + x;
-                    float k = Falloff(TexelCenter(x, y)) * (1f - shadowMask[i] * ShadowStrength) * (1f - noise[i] * NoiseDepth);
+                    float k = Falloff(TexelCenter(x, y)) * (1f - shadowMask[i] * strength) * (1f - noise[i] * NoiseDepth);
                     var c = theme.light * k;
                     c.a = 1f;
                     pixels[i] = c;

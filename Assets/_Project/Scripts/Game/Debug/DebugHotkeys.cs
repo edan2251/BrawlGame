@@ -185,7 +185,7 @@ namespace Knockbox.Game
                 Debug.Log($"[Knockbox] 입력 기록 재생: {path}");
         }
 
-        public static string SurfaceModeName(int mode) => mode == 1 ? "D (stick)" : mode == 2 ? "E (stick + outer run)" : "off";
+        public static string SurfaceModeName(int mode) => mode == 1 ? "D (stick)" : mode == 2 ? "E (spider: free surface + terrain gravity)" : "off";
 
         /// <summary>새 경기는 P2를 기본 장치로 되돌리므로, 허수아비를 쓰고 있었다면 다시 붙인다.</summary>
         void RestartKeepingDummy()

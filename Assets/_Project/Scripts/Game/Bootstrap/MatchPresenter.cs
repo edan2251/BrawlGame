@@ -33,6 +33,7 @@ namespace Knockbox.Game
         /// <summary>선택 화면(CP22). 증강 이름은 CP23이 채운다.</summary>
         public PickPanelView PickPanel => pickPanel;
         PropShadowView propShadows;
+        FighterShadowView fighterShadows;
         BoundaryView boundaryView;
         FighterView fighter0;
         FighterView fighter1;
@@ -117,6 +118,8 @@ namespace Knockbox.Game
             propView = Create<PropView>("Props");
             propShadows = Create<PropShadowView>("PropShadows");
             propShadows.Setup(palette, ShapeLibrary.ActiveMaterial);
+            fighterShadows = Create<FighterShadowView>("FighterShadows");
+            fighterShadows.Setup(palette, ShapeLibrary.ActiveMaterial);
             fighter0 = CreateFighter(0);
             fighter1 = CreateFighter(1);
             dust = Create<DustPool>("Dust");
@@ -218,7 +221,10 @@ namespace Knockbox.Game
         {
             builtArena = arena;
             CurrentTheme = palette.Theme(ThemeIndex(arena));
-            background.Build(arena, CurrentTheme, palette, shapes, LightPosition(arena));
+            var meta = runner.GetMeta(arena.Name);
+            background.Build(arena, CurrentTheme, palette, shapes, LightPosition(arena), meta.Shadow);
+            // 캐릭터 그림자는 실험 경기에서만(CR-004 D/E 피드백). 이전 장면의 측정 테스트는 그대로 둔다.
+            fighterShadows.SetLight(LightPosition(arena), runner.BrawlExperiment ? meta.Shadow : 0f);
             background.ResetMotes();
             arenaView.Build(arena, CurrentTheme, palette, shapes, runner.GetMeta(arena.Name).Ceiling);
             propView.Build(arena, CurrentTheme, shapes);
@@ -324,6 +330,8 @@ namespace Knockbox.Game
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
             aimLine.Render(runner, alpha);
+            // 몸 그림(BodySize 1 × 크기 배율)에 맞춘 그림자.
+            fighterShadows.Render(fighter0.transform.localPosition, fighter1.transform.localPosition, world.Config.Movement.BodySize / 0.9f * 0.5f);
             UpdateKnockout(current, world.Config);
             UpdateCountdownSound(current, world.Config);
             dust.Tick(dt);

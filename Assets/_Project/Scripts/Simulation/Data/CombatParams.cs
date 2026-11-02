@@ -55,8 +55,12 @@ namespace Knockbox.Simulation
         public int CatchHitstop;
         /// <summary>표면 이동 실험(7절): 0 끔, 1 = D(붙기만), 2 = E(붙기 + 외곽 표면 달리기).</summary>
         public int SurfaceMode;
-        /// <summary>붙은 채 표면 쪽으로 미는 속도(접촉 유지용).</summary>
+        /// <summary>붙은 채 표면 쪽으로 미는 속도(접촉 유지용, D 모드).</summary>
         public float SurfaceHoldPush;
+        /// <summary>E: 떠 있는 지형 중력장 반경(몸 상자와 지형 사이 틈).</summary>
+        public float FieldRadius;
+        /// <summary>E: S로 놓고 떨어진 뒤 중력장·붙기를 무시하는 틱.</summary>
+        public int SurfaceReleaseTicks;
 
         public readonly bool Enabled => TapHoldTicks > 0;
 
@@ -87,6 +91,8 @@ namespace Knockbox.Simulation
             CatchHitstop = 8,
             SurfaceMode = 0,
             SurfaceHoldPush = 1f,
+            FieldRadius = 2f,
+            SurfaceReleaseTicks = 20,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -106,6 +112,8 @@ namespace Knockbox.Simulation
             v.Value(nameof(CatchHitstop), CatchHitstop);
             v.Value(nameof(SurfaceMode), SurfaceMode);
             v.Value(nameof(SurfaceHoldPush), SurfaceHoldPush);
+            v.Value(nameof(FieldRadius), FieldRadius);
+            v.Value(nameof(SurfaceReleaseTicks), SurfaceReleaseTicks);
         }
     }
 

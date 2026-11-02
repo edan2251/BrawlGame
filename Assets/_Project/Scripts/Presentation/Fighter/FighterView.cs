@@ -20,6 +20,8 @@ namespace Knockbox.Presentation
         /// <summary>몸 그림 중심이 충돌 상자 중심보다 이만큼 위에 있다. 그 아래로 다리가 보인다.</summary>
         public const float VisualLift = 0.2f;
         const float BodySize = 1f;
+        /// <summary>그림을 돌리는 중력 각도(도). 시뮬레이션 GravityDir × 90을 부드럽게 따라간다.</summary>
+        float gravityAngle;
         const float OutlineSize = 1.12f;
         const float MaxTiltDegrees = 8f;
         /// <summary>벽에 닿아 있을 때 몸 그림을 벽에서 떼는 거리(그림 1.12와 충돌 0.9의 차이만큼).</summary>
@@ -296,9 +298,14 @@ namespace Knockbox.Presentation
                 celebrateTime += dt;
                 hop = Mathf.Abs(Mathf.Sin(celebrateTime * 9f)) * 0.45f;
             }
-            pose.localPosition = new Vector3(wallShift + jitter.x, VisualLift - BodySize * 0.5f + jitter.y + hop, 0f);
-            pose.localScale = new Vector3(scale.x, scale.y, 1f);
-            pose.localRotation = Quaternion.Euler(0f, 0f, tilt + spin);
+            // 몸 크기(CR-004: 0.72면 0.8배)와 중력 방향(거미식 표면 이동: 발이 붙은 면 쪽)으로 그림 전체를 맞춘다.
+            float size = config.Movement.BodySize / 0.9f;
+            float up = current.GravityDir * 90f;
+            gravityAngle = Mathf.LerpAngle(gravityAngle, up, frozen ? 0f : 1f - Mathf.Exp(-25f * dt));
+            var foot = Quaternion.Euler(0f, 0f, gravityAngle) * new Vector3(wallShift + jitter.x, (VisualLift - BodySize * 0.5f + jitter.y + hop) * size, 0f);
+            pose.localPosition = foot;
+            pose.localScale = new Vector3(scale.x * size, scale.y * size, 1f);
+            pose.localRotation = Quaternion.Euler(0f, 0f, gravityAngle + tilt + spin);
 
             UpdateColors(current, dt, config);
             UpdateEyes(current, dt);

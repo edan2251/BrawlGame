@@ -23,6 +23,15 @@ namespace Knockbox.Simulation
         /// <param name="pressed">이번 틱에 새로 눌린 버튼(히트스탑 동안 눌러 둔 버튼 포함). FighterCombat.BeginTick이 계산한다.</param>
         public static void Integrate(ref FighterState f, in InputFrame input, InputButtons pressed, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events, out MovementScratch scratch)
         {
+            // CR-004 E: 거미식 자유 표면 이동(중력 방향을 돌린 좌표계에서 아래 핵심을 돌린다).
+            if (config.Combat.Body.SurfaceMode == 2)
+                SpiderMovement.Integrate(ref f, input, pressed, config, arena, index, tick, events, out scratch);
+            else
+                IntegrateCore(ref f, input, pressed, config, arena, index, tick, events, out scratch);
+        }
+
+        public static void IntegrateCore(ref FighterState f, in InputFrame input, InputButtons pressed, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events, out MovementScratch scratch)
+        {
             ref readonly var m = ref config.Movement;
             bool jumpHeld = input.Held(InputButtons.Jump);
             int moveX = input.MoveX;
@@ -51,7 +60,7 @@ namespace Knockbox.Simulation
             scratch.MoveX = moveX;
             scratch.MoveY = moveY;
 
-            if (config.Combat.Body.SurfaceMode > 0)
+            if (config.Combat.Body.SurfaceMode == 1)
             {
                 SurfacePrepare(ref f, input, config, arena);
                 if (f.Surface != FighterState.SurfaceNone && f.InMovementState
@@ -299,6 +308,7 @@ namespace Knockbox.Simulation
             byte keys = HorizontalKeys(input);
             if (config.Combat.Body.SurfaceMode < 2)
             {
+                // D: 키 집합만 기록한다(달리기 없음).
                 f.SurfaceKeys = keys;
                 return;
             }
@@ -595,6 +605,14 @@ namespace Knockbox.Simulation
 
         public static void ResolveContacts(ref FighterState f, in FighterState other, in MovementScratch scratch, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events)
         {
+            if (config.Combat.Body.SurfaceMode == 2)
+                SpiderMovement.ResolveContacts(ref f, other, scratch, config, arena, index, tick, events);
+            else
+                ResolveContactsCore(ref f, other, scratch, config, arena, index, tick, events);
+        }
+
+        public static void ResolveContactsCore(ref FighterState f, in FighterState other, in MovementScratch scratch, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events)
+        {
             ref readonly var m = ref config.Movement;
             float half = config.HalfBody;
             bool dashing = f.Action == ActionState.Dash && f.DashTicksLeft > 0;
@@ -637,7 +655,7 @@ namespace Knockbox.Simulation
             }
 
             // 표면 이동(CR-004 7절): 붙어 있거나 이번 틱에 붙으면 접지·벽 미끄러짐 처리 대신 여기서 끝낸다.
-            if (config.Combat.Body.SurfaceMode > 0 && SurfaceContacts(ref f, scratch, config, arena, index, tick, events))
+            if (config.Combat.Body.SurfaceMode == 1 && SurfaceContacts(ref f, scratch, config, arena, index, tick, events))
                 return;
 
             int ground = FighterState.NoBox;
