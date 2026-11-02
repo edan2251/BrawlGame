@@ -57,6 +57,15 @@ namespace Knockbox.Game
         /// <summary>0보다 크면 그 틱 수에 도달했을 때 자동으로 멈춘다. 시나리오 재생용.</summary>
         public int StopAtTick { get; set; }
 
+        /// <summary>온라인 경기 규칙(두 선수가 함께 눌러야 재대결). 다음 StartNewMatch부터 적용된다.</summary>
+        public bool OnlineRematch { get; set; }
+
+        /// <summary>
+        /// 온라인 락스텝(CR-004 온라인 2단계): 설정되면 입력원·지연 큐 대신 이것이 틱마다 확정된 두 입력을 준다.
+        /// 아직 없으면 그 틱을 계산하지 않고 기다린다(예측하지 않음).
+        /// </summary>
+        public ILockstepInputs Lockstep { get; set; }
+
         public IInputSource Player1Input { get; set; } = new IdleInputSource();
         public IInputSource Player2Input { get; set; } = new IdleInputSource();
 
@@ -90,6 +99,13 @@ namespace Knockbox.Game
         {
             get => seed;
             set => seed = value;
+        }
+
+        /// <summary>켜면 StartNewMatch마다 시드를 새로 뽑는다. 온라인은 끄고 방장의 시드를 쓴다.</summary>
+        public bool RandomizeSeed
+        {
+            get => randomizeSeed;
+            set => randomizeSeed = value;
         }
 
         public MovementTuning Tuning
@@ -165,9 +181,13 @@ namespace Knockbox.Game
                     continue;
                 foreach (var candidate in candidates)
                 {
-                    var config = CreateConfig(tuning, candidate);
-                    if (config.ComputeChecksum() == recording.ConfigChecksum)
-                        return config;
+                    // 온라인 경기 기록(재대결 규칙 켬)도 찾는다.
+                    for (int online = 0; online < 2; online++)
+                    {
+                        var config = CreateConfig(tuning, candidate, online == 1);
+                        if (config.ComputeChecksum() == recording.ConfigChecksum)
+                            return config;
+                    }
                 }
             }
             return null;
@@ -358,16 +378,18 @@ namespace Knockbox.Game
 #endif
         }
 
-        public SimConfig CreateConfig() => CreateConfig(combatTuning, rules);
+        public SimConfig CreateConfig() => CreateConfig(combatTuning, rules, OnlineRematch);
 
-        SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet)
+        SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet, bool onlineRematch = false)
         {
             var match = movementTuning != null ? movementTuning.Match : MatchParams.Default;
             var movement = movementTuning != null ? movementTuning.Movement : MovementParams.Default;
             var combatParams = combat != null ? combat.Combat : CombatParams.Default;
+            var matchParams = brawlExperiment ? BrawlParams.Match(match) : match;
+            matchParams.RematchBothHold = onlineRematch;
             return new SimConfig(
                 brawlExperiment ? BrawlParams.Movement(movement) : movement,
-                brawlExperiment ? BrawlParams.Match(match) : match,
+                matchParams,
                 brawlExperiment ? BrawlParams.Combat(combatParams, surfaceMode) : combatParams,
                 ruleSet);
         }
@@ -452,17 +474,29 @@ namespace Knockbox.Game
 
             int ticks = clock.Advance(elapsed);
             for (int i = 0; i < ticks && Running; i++)
-                StepOnce();
+            {
+                if (!StepOnce())
+                    break;
+            }
         }
 
-        /// <summary>한 틱 진행한다. 일시정지 중 한 틱 진행(O)에도 쓴다.</summary>
-        public void StepOnce()
+        /// <summary>한 틱 진행한다. 일시정지 중 한 틱 진행(O)에도 쓴다. 락스텝에서 상대 입력이 아직 없으면 진행하지 않고 false.</summary>
+        public bool StepOnce()
         {
             if (World == null)
-                return;
+                return false;
             int tick = World.State.Tick;
-            var p1 = delay1.Push(Player1Input != null ? Player1Input.Poll(tick) : default);
-            var p2 = delay2.Push(Player2Input != null ? Player2Input.Poll(tick) : default);
+            InputFrame p1, p2;
+            if (Lockstep != null)
+            {
+                if (!Lockstep.TryGetInputs(tick, out p1, out p2))
+                    return false;
+            }
+            else
+            {
+                p1 = delay1.Push(Player1Input != null ? Player1Input.Poll(tick) : default);
+                p2 = delay2.Push(Player2Input != null ? Player2Input.Poll(tick) : default);
+            }
             Recording?.Append(p1, p2);
 
             PreviousState = World.State;
@@ -502,6 +536,7 @@ namespace Knockbox.Game
 
             if (StopAtTick > 0 && World.State.Tick >= StopAtTick)
                 Running = false;
+            return true;
         }
 
         /// <summary>

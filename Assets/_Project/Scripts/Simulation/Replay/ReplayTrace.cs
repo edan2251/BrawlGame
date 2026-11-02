@@ -7,28 +7,28 @@ namespace Knockbox.Simulation
 {
     /// <summary>
     /// 다른 PC 결정론 확인(CR-004 온라인 1단계): 입력 기록을 처음부터 재생하며 틱마다 체크섬을 남기고,
-    /// 지정한 틱의 전체 상태를 필드 단위로 남긴다. 재생은 모든 입력이 확정된 계산이므로 모든 틱을 비교해도 된다.
+    /// 지정한 틱의 전체 상태를 필드 단위로 남긴다(시뮬레이션 밖 도구, Step 안에서는 쓰지 않음). 재생은 모든 입력이 확정된 계산이므로 모든 틱을 비교해도 된다.
     /// 체크섬 불일치는 감지일 뿐이고, 원인은 같은 틱의 상태 덤프를 두 PC에서 비교해 찾는다.
     /// </summary>
     public static class ReplayTrace
     {
         /// <summary>
-        /// 재생한다. 반환 배열의 i번째는 i틱 진행 뒤의 체크섬(0번은 시작 상태). dumpTicks에 든 틱(0 = 시작 상태)의 덤프를 dumps에 담는다.
+        /// 재생한다. 반환 배열의 i번째는 i틱 진행 뒤의 체크섬(0번은 시작 상태). dumpTicks에 든 틱(0 = 시작 상태)의 덤프를 onDump(틱, 덤프)로 넘긴다.
         /// 설정·맵·시작 상태가 기록과 다르면 예외(InputRecording.CreateInitialState).
         /// </summary>
-        public static uint[] Run(InputRecording recording, SimConfig config, ArenaDef[] arenas, ICollection<int> dumpTicks, IDictionary<int, string> dumps)
+        public static uint[] Run(InputRecording recording, SimConfig config, ArenaDef[] arenas, ICollection<int> dumpTicks, Action<int, string> onDump)
         {
             var world = new SimWorld(config, arenas, recording.CreateInitialState(config, arenas));
             var checksums = new uint[recording.Count + 1];
             checksums[0] = world.ComputeChecksum();
             if (dumpTicks != null && dumpTicks.Contains(0))
-                dumps[0] = Dump(world.State);
+                onDump(0, Dump(world.State));
             for (int i = 0; i < recording.Count; i++)
             {
                 world.Step(recording.GetP1(i), recording.GetP2(i));
                 checksums[i + 1] = world.ComputeChecksum();
                 if (dumpTicks != null && dumpTicks.Contains(i + 1))
-                    dumps[i + 1] = Dump(world.State);
+                    onDump(i + 1, Dump(world.State));
             }
             return checksums;
         }
@@ -46,7 +46,7 @@ namespace Knockbox.Simulation
         /// <summary>두 체크섬 열에서 처음 다른 틱. 같으면 −1, 길이만 다르면 짧은 쪽 길이.</summary>
         public static int FirstMismatch(IReadOnlyList<uint> a, IReadOnlyList<uint> b)
         {
-            int n = Math.Min(a.Count, b.Count);
+            int n = SimMath.Min(a.Count, b.Count);
             for (int i = 0; i < n; i++)
             {
                 if (a[i] != b[i])

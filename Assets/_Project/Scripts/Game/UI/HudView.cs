@@ -159,7 +159,7 @@ namespace Knockbox.Game
                     text = winner == 0 ? "P1 WINS" : "P2 WINS";
                     color = palette.flash;
                     string sets = SetFlow ? $"SETS {m.SetScore0} - {m.SetScore1}   " : "";
-                    subText = sets + (m.PhaseTick >= match.MatchEndMinTicks ? "PRESS ANY BUTTON" : "");
+                    subText = sets + (m.PhaseTick >= match.MatchEndMinTicks ? (match.RematchBothHold ? "BOTH HOLD ATTACK" : "PRESS ANY BUTTON") : "");
                     return;
                 default:
                     text = "";

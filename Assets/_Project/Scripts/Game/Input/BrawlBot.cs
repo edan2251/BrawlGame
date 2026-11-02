@@ -184,4 +184,119 @@ namespace Knockbox.Game
             return new InputFrame(0, 0, InputButtons.Attack, aim);
         }
     }
+    /// <summary>
+    /// CR-004 온라인 시험용 추격 봇: 상대에게 다가가 붙으면 주먹(두 번)과 잡기(한 번)를 번갈아 쓰고, 중거리에서 가끔 박치기,
+    /// 막히거나 상대가 높이 있으면 점프하며 벽 쪽 + 위(기어오르기). 잡으면 15틱 뒤 가까운 옆벽 쪽으로 던진다.
+    /// 대표 기록(Tools/ReplayCheck/brawl_sample.kbrp)의 P1을 만든 규칙과 같다. 같은 seed면 같은 상황에서 같은 입력.
+    /// </summary>
+    public sealed class BrawlChaserBot : IInputSource
+    {
+        readonly Func<SimWorld> world;
+        readonly int fighter;
+        readonly int seed;
+        int cooldown, hold, jumpTicks, stuck, holdWait, counter;
+
+        public BrawlChaserBot(Func<SimWorld> world, int fighter, int seed)
+        {
+            this.world = world;
+            this.fighter = fighter;
+            this.seed = seed;
+            counter = seed;
+        }
+
+        public InputFrame Poll(int tick)
+        {
+            var w = world();
+            if (w == null)
+                return default;
+            var me = w.State.GetFighter(fighter);
+            var other = w.State.GetFighter(1 - fighter);
+            float dx = other.Position.X - me.Position.X, dy = other.Position.Y - me.Position.Y;
+            byte aim = AimInput.Quantize(new Vector2(dx, dy));
+            float distance = Mathf.Sqrt(dx * dx + dy * dy);
+            if (hold > 0)
+            {
+                hold--;
+                return new InputFrame(0, 0, hold > 0 ? InputButtons.Attack : InputButtons.None, aim);
+            }
+            if (me.Action == ActionState.Holding)
+            {
+                if (holdWait == 0)
+                    holdWait = 15;
+                if (--holdWait > 0)
+                    return new InputFrame(0, 0, InputButtons.None, aim);
+                return new InputFrame(0, 0, InputButtons.Attack, AimInput.Quantize(new Vector2(me.Position.X >= 0f ? 1f : -1f, 0.2f)));
+            }
+            holdWait = 0;
+            if (cooldown > 0)
+                cooldown--;
+            int moveX = Mathf.Abs(dx) > 0.5f ? (dx > 0f ? 1 : -1) : 0;
+            var buttons = InputButtons.None;
+            bool free = me.InMovementState;
+            if (free && cooldown == 0 && distance < 1.25f)
+            {
+                counter++;
+                if (counter % 3 == 0)
+                {
+                    buttons |= InputButtons.Grab;
+                    cooldown = 25;
+                }
+                else
+                {
+                    buttons |= InputButtons.Attack;
+                    hold = 1;
+                    cooldown = 14;
+                }
+            }
+            else if (free && cooldown == 0 && distance > 3f && distance < 8f && (w.State.Tick + counter) % 45 == 0)
+            {
+                buttons |= InputButtons.Attack;
+                hold = w.Config.Combat.Body.TapHoldTicks + 10 + counter % 3 * 6;
+                cooldown = 40;
+                counter++;
+            }
+            if (moveX != 0 && me.Grounded && Mathf.Abs(me.Velocity.X) < 0.5f)
+                stuck++;
+            else if (me.Grounded)
+                stuck = 0;
+            bool up = stuck > 8 || dy > 1.5f;
+            if (jumpTicks > 0)
+            {
+                jumpTicks--;
+                buttons |= InputButtons.Jump;
+            }
+            else if (up && me.Grounded)
+            {
+                jumpTicks = 14;
+                buttons |= InputButtons.Jump;
+            }
+            return new InputFrame(moveX, up ? 1 : 0, buttons, aim);
+        }
+    }
+
+    /// <summary>
+    /// 온라인 시험용: 경기 끝(MatchEnd) 화면에서 waitTicks 뒤 공격을 누르고 있어 재대결 준비를 한다(두 선수가 함께 눌러야 시작).
+    /// 그 밖에는 안쪽 입력원을 그대로 쓴다.
+    /// </summary>
+    public sealed class RematchHoldInput : IInputSource
+    {
+        readonly Func<SimWorld> world;
+        readonly IInputSource inner;
+        readonly int waitTicks;
+
+        public RematchHoldInput(Func<SimWorld> world, IInputSource inner, int waitTicks)
+        {
+            this.world = world;
+            this.inner = inner;
+            this.waitTicks = waitTicks;
+        }
+
+        public InputFrame Poll(int tick)
+        {
+            var w = world();
+            if (w != null && w.State.Match.Phase == MatchPhase.MatchEnd)
+                return new InputFrame(0, 0, w.State.Match.PhaseTick >= waitTicks ? InputButtons.Attack : InputButtons.None, 0);
+            return inner.Poll(tick);
+        }
+    }
 }

@@ -106,8 +106,10 @@ namespace Knockbox.Simulation
                     SimState.StartNextRound(ref s, Config, Arena);
                     break;
                 case MatchPhase.MatchEnd:
-                    var pressed = InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons) | InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons);
-                    if (s.Match.PhaseTick >= Config.Match.MatchEndMinTicks && pressed != InputButtons.None)
+                    bool rematch = Config.Match.RematchBothHold
+                        ? (p1.Buttons & p2.Buttons & InputButtons.Attack) != 0
+                        : (InputFrame.Pressed(p1.Buttons, s.Fighter0.PrevButtons) | InputFrame.Pressed(p2.Buttons, s.Fighter1.PrevButtons)) != InputButtons.None;
+                    if (s.Match.PhaseTick >= Config.Match.MatchEndMinTicks && rematch)
                     {
                         if (Config.Rules.LegacyMatch || s.Match.Rotation.Count <= 1)
                             s.Match.Rotation.Advance();

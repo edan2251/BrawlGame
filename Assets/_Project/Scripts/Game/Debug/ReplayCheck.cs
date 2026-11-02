@@ -75,7 +75,7 @@ namespace Knockbox.Game
 
                 var dumps = new Dictionary<int, string>();
                 var wanted = new HashSet<int>(dumpTicks ?? new List<int>());
-                uint[] checksums = ReplayTrace.Run(recording, config, arenas, wanted, dumps);
+                uint[] checksums = ReplayTrace.Run(recording, config, arenas, wanted, (t, text) => dumps[t] = text);
                 int mismatch = expected != null ? ReplayTrace.FirstMismatch(checksums, expected) : -1;
                 if (mismatch >= 0)
                 {
@@ -83,7 +83,7 @@ namespace Knockbox.Game
                     var extra = new HashSet<int> { Math.Max(mismatch - 1, 0), Math.Min(mismatch, checksums.Length - 1) };
                     extra.ExceptWith(dumps.Keys);
                     if (extra.Count > 0)
-                        ReplayTrace.Run(recording, config, arenas, extra, dumps);
+                        ReplayTrace.Run(recording, config, arenas, extra, (t, text) => dumps[t] = text);
                 }
 
                 var header = new StringBuilder();

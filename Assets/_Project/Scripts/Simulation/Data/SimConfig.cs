@@ -160,6 +160,11 @@ namespace Knockbox.Simulation
         public int PickTimeoutTicks;
         /// <summary>선택이 끝난 뒤 다음 단계로 가기 전 잠깐 멈추는 틱(연출용, 결과는 표시하지 않음).</summary>
         public int PickHoldTicks;
+        /// <summary>
+        /// 온라인 재대결(CR-004 온라인 2단계): 켜면 MatchEnd에서 두 선수가 같은 틱에 공격 버튼을 누르고 있어야 새 경기를 시작한다
+        /// (한 명만 눌러도 시작하던 규칙 대신). 상태를 따로 두지 않는다. 로컬 경기는 끔.
+        /// </summary>
+        public bool RematchBothHold;
 
         public static MatchParams Default => new MatchParams
         {
@@ -185,6 +190,9 @@ namespace Knockbox.Simulation
             v.Value(nameof(MaxPicks), MaxPicks);
             v.Value(nameof(PickTimeoutTicks), PickTimeoutTicks);
             v.Value(nameof(PickHoldTicks), PickHoldTicks);
+            // 켤 때만 넣는다: 끈 설정의 체크섬(기존 입력 기록·재생 기준)은 그대로.
+            if (RematchBothHold)
+                v.Value(nameof(RematchBothHold), true);
         }
     }
 
