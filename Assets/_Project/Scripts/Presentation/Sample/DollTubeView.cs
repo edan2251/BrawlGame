@@ -71,7 +71,8 @@ namespace Knockbox.Presentation
             var mesh = new Mesh { name = name };
             mesh.MarkDynamic();
             filter.sharedMesh = mesh;
-            return new Layer { Mesh = mesh, Color = color };
+            // 정점 색은 색 공간 변환을 거치지 않으므로 선형 색 공간이면 스프라이트와 같은 색이 되게 미리 바꾼다.
+            return new Layer { Mesh = mesh, Color = QualitySettings.activeColorSpace == ColorSpace.Linear ? color.linear : color };
         }
 
         public void Render(in DollSkeleton k, float worldAngle, float dt)

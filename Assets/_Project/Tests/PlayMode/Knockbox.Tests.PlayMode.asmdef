@@ -6,7 +6,8 @@
     "UnityEditor.TestRunner",
     "Knockbox.Simulation",
     "Knockbox.Presentation",
-    "Knockbox.Game"
+    "Knockbox.Game",
+    "Unity.2D.Animation.Runtime"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

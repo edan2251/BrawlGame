@@ -53,7 +53,7 @@ namespace Knockbox.Presentation
             lightPoint = lightPosition;
             active = strength > 0f;
             float a = 1f - Mathf.Pow(1f - Mathf.Clamp01(strength), 1f / Samples);
-            var shade = PaletteAsset.WithAlpha(palette.ink, a);
+            var shade = PaletteAsset.WithAlpha(QualitySettings.activeColorSpace == ColorSpace.Linear ? palette.ink.linear : palette.ink, a);
             for (int i = 0; i < colors.Length; i++)
                 colors[i] = shade;
             mesh.colors = colors;

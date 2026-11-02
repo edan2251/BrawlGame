@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 namespace Knockbox.Game
 {
     /// <summary>
-    /// CR-004 단계 S(8절) 캐릭터 외형 샘플 씬: R1(부위 메시 + 관절 구)과 R2(IK 체인 튜브 + 스프링 몸통)를 나란히 두고 같은 포즈를 보여 준다.
+    /// CR-004 단계 S(8절) 캐릭터 외형 샘플 씬: R1(부위 메시 + 관절 구), R2(IK 체인 튜브 + 스프링 몸통), R3(SDF로 녹여 합친 콩 모양, S2)를
+    /// 나란히 두고 같은 포즈를 보여 준다.
     /// 포즈는 화면 왼쪽 버튼이나 숫자키(1~0), 판정 오버레이(실험 경기 판정 상자 0.72와 주먹 판정 원)는 O 키나 버튼으로 켜고 끈다.
     /// 오버레이를 켜면 몸통 폭 비율(판정 폭의 1~1.25배)과 주먹을 뻗은 순간 주먹 끝이 판정 원 안에 있는지를 함께 표시한다.
     /// 시뮬레이션과 무관한 연출 샘플이다.
@@ -15,7 +16,8 @@ namespace Knockbox.Game
     {
         [SerializeField] PaletteAsset palette;
         [SerializeField] ShapeLibrary shapes;
-        [SerializeField] float spacing = 2.4f;
+        [SerializeField] float spacing = 2.3f;
+        const int Count = 3;
 
         static readonly DollPoseKind[] Kinds = (DollPoseKind[])System.Enum.GetValues(typeof(DollPoseKind));
 
@@ -24,11 +26,12 @@ namespace Knockbox.Game
         bool overlay = true;
         DollPartsView r1;
         DollTubeView r2;
-        readonly Transform[] roots = new Transform[2];
-        readonly SpriteRenderer[] grounds = new SpriteRenderer[2];
-        readonly SpriteRenderer[][] boxLines = new SpriteRenderer[2][];
-        readonly SpriteRenderer[][] rings = new SpriteRenderer[2][];
-        readonly TextMesh[] status = new TextMesh[2];
+        DollSdfView r3;
+        readonly Transform[] roots = new Transform[Count];
+        readonly SpriteRenderer[] grounds = new SpriteRenderer[Count];
+        readonly SpriteRenderer[][] boxLines = new SpriteRenderer[Count][];
+        readonly SpriteRenderer[][] rings = new SpriteRenderer[Count][];
+        readonly TextMesh[] status = new TextMesh[Count];
         float half;
         AttackDef punch;
         string fistResult = "-";
@@ -47,12 +50,12 @@ namespace Knockbox.Game
             if (cam != null)
                 cam.backgroundColor = palette.bgBase;
 
-            string[] titles = { "R1  parts + joint balls", "R2  IK tubes + spring body" };
-            for (int i = 0; i < 2; i++)
+            string[] titles = { "R1  parts + joint balls", "R2  IK tubes + spring body", "R3  SDF smooth blend" };
+            for (int i = 0; i < Count; i++)
             {
-                var root = new GameObject(i == 0 ? "R1" : "R2").transform;
+                var root = new GameObject("R" + (i + 1)).transform;
                 root.SetParent(transform, false);
-                root.localPosition = new Vector3((i == 0 ? -1f : 1f) * spacing * 0.5f, 0f, 0f);
+                root.localPosition = new Vector3((i - (Count - 1) * 0.5f) * spacing, 0f, 0f);
                 roots[i] = root;
                 grounds[i] = ShapeLibrary.Create(root, "Ground", shapes.Square, SortingLayers.Terrain, 0, palette.Theme(2).terrain);
                 Label(root, titles[i], new Vector2(0f, 1.25f), 0.06f, palette.flash);
@@ -70,7 +73,16 @@ namespace Knockbox.Game
             r2 = new GameObject("R2 Doll").AddComponent<DollTubeView>();
             r2.transform.SetParent(roots[1], false);
             r2.Setup(palette.p1Body, palette.p1Shade, palette.ink);
+            r3 = new GameObject("R3 Doll").AddComponent<DollSdfView>();
+            r3.transform.SetParent(roots[2], false);
+            r3.Setup(shapes, palette.p1Body, palette.p1Shade, palette.ink, palette.flash);
         }
+
+        /// <summary>R3 셰이더를 찾았는지(빌드·테스트 확인용).</summary>
+        public bool SdfReady => r3 != null && r3.ShaderFound;
+
+        /// <summary>i번째 인형(0 = R1)의 판정 상자 중심 월드 위치.</summary>
+        public Vector3 DollPosition(int i) => roots[i].position;
 
         TextMesh Label(Transform parent, string text, Vector2 at, float size, Color color)
         {
@@ -110,8 +122,9 @@ namespace Knockbox.Game
             var skeleton = DollSkeleton.Solve(pose);
             r1.Render(skeleton, pose.WorldAngle);
             r2.Render(skeleton, pose.WorldAngle, Time.deltaTime);
+            r3.Render(skeleton, pose.WorldAngle);
             CheckFist(pose, skeleton);
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < Count; i++)
                 RenderOverlay(i, pose);
         }
 

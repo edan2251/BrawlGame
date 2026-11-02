@@ -23,11 +23,11 @@ namespace Knockbox.EditorTools
             camera.tag = "MainCamera";
             var cam = camera.AddComponent<Camera>();
             cam.orthographic = true;
-            cam.orthographicSize = 1.7f;
+            cam.orthographicSize = 2.1f;
             cam.clearFlags = CameraClearFlags.SolidColor;
             if (palette != null)
                 cam.backgroundColor = palette.bgBase;
-            camera.transform.position = new Vector3(0.6f, 0.25f, -10f);
+            camera.transform.position = new Vector3(-0.5f, 0.3f, -10f);
 
             var sample = new GameObject("Character Sample").AddComponent<CharacterSampleScene>();
             var so = new SerializedObject(sample);
