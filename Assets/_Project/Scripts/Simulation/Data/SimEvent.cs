@@ -78,6 +78,8 @@ namespace Knockbox.Simulation
         LungeCaught,
         /// <summary>잡기 해제(CR-004 몸 폼: 최대 유지 시간 동안 던지지 않음). Fighter는 풀려난 쪽.</summary>
         GrabRelease,
+        /// <summary>표면에 붙음(CR-004 7절). Direction은 표면 바깥쪽 법선, Strength는 외곽이면 1.</summary>
+        SurfaceAttach,
     }
 
     /// <summary>

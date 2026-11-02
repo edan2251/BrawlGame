@@ -32,6 +32,8 @@ namespace Knockbox.Game
         [SerializeField] bool useLocalDevices;
         [Tooltip("CR-004 실험: Brawl 맵 고정, RuleSet.Brawl(몸 폼), 짧은 카운트다운과 3선승, 로컬 플레이면 P1 마우스 조준, P2 샌드백(F6으로 바꿈)")]
         [SerializeField] bool brawlExperiment;
+        [Tooltip("CR-004 7절 표면 이동: 0 끔, 1 D(붙기만), 2 E(붙기 + 외곽 달리기). 실험 경기에서 F4로 순환")]
+        [SerializeField, Range(0, 2)] int surfaceMode = 1;
 
         readonly FixedTickClock clock = new FixedTickClock();
         readonly InputDelayQueue delay1 = new InputDelayQueue();
@@ -221,6 +223,13 @@ namespace Knockbox.Game
             set => brawlExperiment = value;
         }
 
+        /// <summary>표면 이동 모드(0 끔, 1 D, 2 E). 다음 StartNewMatch부터 적용된다.</summary>
+        public int SurfaceMode
+        {
+            get => surfaceMode;
+            set => surfaceMode = value;
+        }
+
         /// <summary>CR-004 실험 맵(6절).</summary>
         public const string BrawlArenaName = "Brawl";
 
@@ -358,7 +367,7 @@ namespace Knockbox.Game
             return new SimConfig(
                 movementTuning != null ? movementTuning.Movement : MovementParams.Default,
                 brawlExperiment ? BrawlParams.Match(match) : match,
-                brawlExperiment ? BrawlParams.Combat(combatParams) : combatParams,
+                brawlExperiment ? BrawlParams.Combat(combatParams, surfaceMode) : combatParams,
                 ruleSet);
         }
 

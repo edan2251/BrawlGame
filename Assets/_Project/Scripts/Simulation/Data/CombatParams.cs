@@ -53,6 +53,10 @@ namespace Knockbox.Simulation
         public float ThrownGravityScale;
         /// <summary>받아내기 성공 뒤 자동 던짐 전 두 파이터 히트스탑(패링 느낌의 정지).</summary>
         public int CatchHitstop;
+        /// <summary>표면 이동 실험(7절): 0 끔, 1 = D(붙기만), 2 = E(붙기 + 외곽 표면 달리기).</summary>
+        public int SurfaceMode;
+        /// <summary>붙은 채 표면 쪽으로 미는 속도(접촉 유지용).</summary>
+        public float SurfaceHoldPush;
 
         public readonly bool Enabled => TapHoldTicks > 0;
 
@@ -81,6 +85,8 @@ namespace Knockbox.Simulation
             HoldJumpSpeed = 12f,
             ThrownGravityScale = 0.2f,
             CatchHitstop = 8,
+            SurfaceMode = 0,
+            SurfaceHoldPush = 1f,
         };
 
         public readonly void Visit<T>(ref T v) where T : struct, IStateVisitor
@@ -98,6 +104,8 @@ namespace Knockbox.Simulation
             v.Value(nameof(HoldJumpSpeed), HoldJumpSpeed);
             v.Value(nameof(ThrownGravityScale), ThrownGravityScale);
             v.Value(nameof(CatchHitstop), CatchHitstop);
+            v.Value(nameof(SurfaceMode), SurfaceMode);
+            v.Value(nameof(SurfaceHoldPush), SurfaceHoldPush);
         }
     }
 

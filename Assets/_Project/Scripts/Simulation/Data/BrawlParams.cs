@@ -18,7 +18,8 @@ namespace Knockbox.Simulation
         /// 단계 A 피드백: 돌진이 느리고 길게 일직선으로 간다 → 더 빠르게 나가서 강하게 감속하고 일찍 끝난다(약 2.5~6칸).
         /// 지형에 부딪히면 반사 대신 멈추고 작은 반동만(고무벽 느낌 제거, 5.1 "벽에 닿음: 종료").
         /// </summary>
-        public static CombatParams Combat(CombatParams combat)
+        /// <param name="surfaceMode">표면 이동(7절): 0 끔, 1 D, 2 E.</param>
+        public static CombatParams Combat(CombatParams combat, int surfaceMode = 0)
         {
             combat.Charge.FullChargeTicks = 24;
             combat.Charge.LungeMinSpeed = 24f;
@@ -41,6 +42,7 @@ namespace Knockbox.Simulation
             // 던지기는 일직선으로 거의 반대편까지: 속도 28 → 48, 던져진 상태 24 → 30틱(그동안 중력 0.2배).
             combat.Grab.ThrowSpeed = 48f;
             combat.Grab.ThrownTicks = 30;
+            combat.Body.SurfaceMode = surfaceMode;
             return combat;
         }
     }

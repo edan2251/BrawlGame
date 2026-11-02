@@ -156,8 +156,22 @@ namespace Knockbox.Simulation
         public int GrabProtectTicks;
         /// <summary>이번에 날아가는 동안 받은 벽꽝 추가 피해 합(상한 검사용). 회복하면 0.</summary>
         public int SplatDamageTaken;
+        /// <summary>붙은 표면(CR-004 7절): SurfaceNone, SurfaceWallRight(오른쪽에 벽), SurfaceWallLeft, SurfaceCeiling.</summary>
+        public sbyte Surface;
+        /// <summary>붙은 표면이 외곽 프레임인지(달리기는 외곽에서만).</summary>
+        public bool SurfaceOuter;
+        /// <summary>표면 달리기 방향 기억: +1 반시계(바닥 → 오른벽 위 → 천장 왼쪽 → 왼벽 아래), -1 시계, 0 없음.</summary>
+        public sbyte SurfaceCirc;
+        /// <summary>직전 틱의 좌우 키 집합(1 A, 2 D, 3 둘 다). 집합이 바뀔 때만 방향을 다시 정한다.</summary>
+        public byte SurfaceKeys;
 
         public const int NoAttack = -1;
+        public const sbyte SurfaceNone = 0;
+        public const sbyte SurfaceWallRight = 1;
+        public const sbyte SurfaceWallLeft = 2;
+        public const sbyte SurfaceCeiling = 3;
+        /// <summary>방향을 정할 때만 쓰는 외곽 바닥(붙기 상태가 아니라 서 있음).</summary>
+        public const sbyte SurfaceFloor = 4;
 
         /// <summary>이동 규칙이 행동을 정하는 상태(조작 가능).</summary>
         public readonly bool InMovementState => Action <= ActionState.Dash;
@@ -251,6 +265,10 @@ namespace Knockbox.Simulation
             v.Value(nameof(AttackBuffer), AttackBuffer);
             v.Value(nameof(GrabProtectTicks), GrabProtectTicks);
             v.Value(nameof(SplatDamageTaken), SplatDamageTaken);
+            v.Value(nameof(Surface), (int)Surface);
+            v.Value(nameof(SurfaceOuter), SurfaceOuter);
+            v.Value(nameof(SurfaceCirc), (int)SurfaceCirc);
+            v.Value(nameof(SurfaceKeys), (int)SurfaceKeys);
         }
     }
 }

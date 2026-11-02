@@ -418,7 +418,7 @@ namespace Knockbox.Game
                 footerP2 = p2;
                 footerDummy = dummy;
                 var sw = world.Config.Rules.Switches;
-                footer = $"{footerArena} / {world.Config.StartForm}{(sw.GuardEnabled ? " +guard" : "")}{(sw.GrabEnabled ? " +grab" : "")}{(sw.EnergyEnabled ? "" : " (no energy)")} / {footerPreset} / P2 {InputSourceName(p2)}"
+                footer = $"{footerArena} / {world.Config.StartForm}{(sw.GuardEnabled ? " +guard" : "")}{(sw.GrabEnabled ? " +grab" : "")}{(sw.EnergyEnabled ? "" : " (no energy)")}{(world.Config.Combat.Body.SurfaceMode == 1 ? " / surface D" : world.Config.Combat.Body.SurfaceMode == 2 ? " / surface E" : "")} / {footerPreset} / P2 {InputSourceName(p2)}"
                          + (recording ? " / REC" : "") + (playback ? " / REPLAY" : "");
             }
             return footer;

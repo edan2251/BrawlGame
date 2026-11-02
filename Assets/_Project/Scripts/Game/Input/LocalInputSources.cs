@@ -38,6 +38,7 @@ namespace Knockbox.Game
             if (Held(left ? k.eKey : k.numpad3Key)) buttons |= InputButtons.Guard;
             if (Held(left ? k.qKey : k.numpad4Key)) buttons |= InputButtons.Grab;
             if (Held(left ? k.rKey : k.numpad5Key)) buttons |= InputButtons.SwitchForm;
+            if (Held(left ? k.dKey : k.rightArrowKey) && Held(left ? k.aKey : k.leftArrowKey)) buttons |= InputButtons.BothHorizontal;
             return new InputFrame(x, y, buttons);
         }
 

@@ -34,6 +34,9 @@ namespace Knockbox.Game
             if (GetComponent<AutoPlayDebug>() == null)
                 gameObject.AddComponent<AutoPlayDebug>();
             bot = new BotInputSource(() => runner.World, 1, 0xB07u);
+            // CR-004 D/E 지표: 플레이하는 동안 라운드마다 한 줄만 남긴다.
+            var metrics = new SurfaceMetrics();
+            runner.Ticked += metrics.OnTicked;
             brawlBot = new BrawlBot(() => runner.World, 1, 0xB07u);
             practiceBot = new LungePracticeBot(() => runner.World, 1);
         }
@@ -88,7 +91,14 @@ namespace Knockbox.Game
                 ToggleRecording();
             if (k.f10Key.wasPressedThisFrame)
                 PlayLatestRecording();
-            if (k.f4Key.wasPressedThisFrame)
+            if (k.f4Key.wasPressedThisFrame && runner.BrawlExperiment)
+            {
+                // CR-004 실험 경기: 표면 이동 모드 순환(끔 → D 붙기 → E 붙기 + 외곽 달리기).
+                runner.SurfaceMode = (runner.SurfaceMode + 1) % 3;
+                RestartKeepingDummy();
+                Debug.Log($"[Knockbox] 표면 이동: {SurfaceModeName(runner.SurfaceMode)}");
+            }
+            else if (k.f4Key.wasPressedThisFrame)
             {
                 // 가드·잡기 한 스위치(10 문서 5.1, D-043).
                 var rules = runner.Rules;
@@ -174,6 +184,8 @@ namespace Knockbox.Game
             if (runner.PlayRecording(ReplayFiles.Load(path)))
                 Debug.Log($"[Knockbox] 입력 기록 재생: {path}");
         }
+
+        public static string SurfaceModeName(int mode) => mode == 1 ? "D (stick)" : mode == 2 ? "E (stick + outer run)" : "off";
 
         /// <summary>새 경기는 P2를 기본 장치로 되돌리므로, 허수아비를 쓰고 있었다면 다시 붙인다.</summary>
         void RestartKeepingDummy()

@@ -13,7 +13,12 @@ namespace Knockbox.Simulation
         Grab = 1 << 4,
         /// <summary>폼 전환(CR-003 CP21): 누를 때마다 보유한 다음 폼(가위 → 바위 → 보 순서)으로.</summary>
         SwitchForm = 1 << 5,
-        All = Jump | Attack | Dash | Guard | Grab | SwitchForm,
+        /// <summary>
+        /// 좌우 키가 동시에 눌려 있음(CR-004 7절). 이때 MoveX는 상쇄되어 0이므로 "아무것도 안 누름"과 구분하려고 따로 싣는다.
+        /// 버튼이 아니라 상태 표시라 눌림/뗌 계산에는 쓰지 않는다.
+        /// </summary>
+        BothHorizontal = 1 << 6,
+        All = Jump | Attack | Dash | Guard | Grab | SwitchForm | BothHorizontal,
     }
 
     /// <summary>

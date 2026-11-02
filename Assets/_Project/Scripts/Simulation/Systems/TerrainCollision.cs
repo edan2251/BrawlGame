@@ -268,6 +268,24 @@ namespace Knockbox.Simulation
             return found;
         }
 
+        /// <summary>머리 바로 위(probe 이내)에 단단한 지형의 아랫면이 있는지.</summary>
+        public static bool ProbeCeiling(Vec2 position, float half, ArenaDef arena, float probe)
+        {
+            float top = position.Y + half;
+            for (int i = 0; i < arena.BoxCount; i++)
+            {
+                ref readonly var b = ref arena.GetBox(i);
+                if (!b.IsSolidBlock)
+                    continue;
+                if (position.X + half <= b.MinX + Epsilon || position.X - half >= b.MaxX - Epsilon)
+                    continue;
+                float gap = b.MinY - top;
+                if (gap >= -Epsilon && gap <= probe)
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>옆(probe 이내)에 닿은 단단한 지형 쪽. -1 왼쪽, 1 오른쪽, 양쪽이거나 없으면 0.</summary>
         public static int ProbeWall(Vec2 position, float half, ArenaDef arena, float probe)
         {

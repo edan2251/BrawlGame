@@ -51,6 +51,14 @@ namespace Knockbox.Simulation
             scratch.MoveX = moveX;
             scratch.MoveY = moveY;
 
+            if (config.Combat.Body.SurfaceMode > 0)
+            {
+                SurfacePrepare(ref f, input, config, arena);
+                if (f.Surface != FighterState.SurfaceNone && f.InMovementState
+                    && IntegrateAttached(ref f, input, pressed, config, arena, ref scratch))
+                    return;
+            }
+
             if (!f.InMovementState)
             {
                 IntegrateCombatState(ref f, config, moveX, moveY, jumpHeld, (pressed & InputButtons.Jump) != 0);
@@ -154,6 +162,12 @@ namespace Knockbox.Simulation
             const float dt = SimConfig.Dt;
             ref readonly var m = ref config.Movement;
             ref readonly var c = ref config.Combat;
+            // 표면에 붙은 채 공격·잡기 중이면 그 자리에 멈춘다(CR-004 7절: 행동이 끝나면 다시 이어간다).
+            if (f.Surface != FighterState.SurfaceNone)
+            {
+                f.Velocity = Vec2.Zero;
+                return;
+            }
             switch (f.Action)
             {
                 case ActionState.Guard:
@@ -217,6 +231,265 @@ namespace Knockbox.Simulation
                     ApplyGravity(ref f, m, false, 0, 0);
                     break;
             }
+        }
+
+        // 표면 이동(CR-004 7절) -------------------------------------------------------------
+
+        /// <summary>좌우 키 집합: 1 A, 2 D, 3 둘 다, 0 없음.</summary>
+        static byte HorizontalKeys(in InputFrame input) =>
+            input.Held(InputButtons.BothHorizontal) ? (byte)3 : input.MoveX < 0 ? (byte)1 : input.MoveX > 0 ? (byte)2 : (byte)0;
+
+        static bool OuterWall(Vec2 p, float half, ArenaDef arena, int side) =>
+            side > 0 ? p.X + half >= arena.HalfWidth - 1f - 0.01f : p.X - half <= -(arena.HalfWidth - 1f) + 0.01f;
+
+        static bool OuterCeiling(Vec2 p, float half, ArenaDef arena) => p.Y + half >= arena.HalfHeight - 1f - 0.01f;
+
+        static bool OuterFloor(Vec2 p, float half, ArenaDef arena) => p.Y - half <= -(arena.HalfHeight - 1f) + 0.01f;
+
+        static int WallSideOf(sbyte surface) => surface == FighterState.SurfaceWallRight ? 1 : surface == FighterState.SurfaceWallLeft ? -1 : 0;
+
+        /// <summary>새로 누른 키(D = +1, A = -1)를 표면 기준 도는 방향으로(7절 매핑 표).</summary>
+        public static sbyte DecideCirculation(sbyte surface, int key)
+        {
+            switch (surface)
+            {
+                case FighterState.SurfaceFloor:
+                case FighterState.SurfaceWallRight:
+                    return (sbyte)key;
+                default:
+                    return (sbyte)-key;
+            }
+        }
+
+        /// <summary>표면 위 도는 방향 → 단위 이동 방향.</summary>
+        public static Vec2 AlongSurface(sbyte surface, int circulation)
+        {
+            switch (surface)
+            {
+                case FighterState.SurfaceFloor: return new Vec2(circulation, 0f);
+                case FighterState.SurfaceWallRight: return new Vec2(0f, circulation);
+                case FighterState.SurfaceCeiling: return new Vec2(-circulation, 0f);
+                case FighterState.SurfaceWallLeft: return new Vec2(0f, -circulation);
+                default: return Vec2.Zero;
+            }
+        }
+
+        /// <summary>떨어진다. 방향 기억도 지운다(점프, 박치기, S, 피격·던져짐, 잡힘).</summary>
+        static void Detach(ref FighterState f)
+        {
+            f.Surface = FighterState.SurfaceNone;
+            f.SurfaceOuter = false;
+            f.SurfaceCirc = 0;
+        }
+
+        /// <summary>
+        /// 매 틱 이동 전: 붙어 있을 수 없는 행동(경직, 던져짐, 잡힘, 박치기 등)이면 떨어뜨리고, 키 집합으로 방향 기억을 갱신한다.
+        /// 공격·충전·잡기·잡은 상태는 붙은 채 잠시 멈추며 기억을 유지한다.
+        /// </summary>
+        static void SurfacePrepare(ref FighterState f, in InputFrame input, SimConfig config, ArenaDef arena)
+        {
+            bool keepable = f.InMovementState || f.Action == ActionState.Attack || f.Action == ActionState.Charge
+                            || f.Action == ActionState.Grab || f.Action == ActionState.Holding;
+            if (f.Surface != FighterState.SurfaceNone && !keepable)
+            {
+                Detach(ref f);
+                // 회복한 뒤 키가 눌려 있어도 새로 누른 것으로 처리한다.
+                f.SurfaceKeys = 0;
+            }
+            byte keys = HorizontalKeys(input);
+            if (config.Combat.Body.SurfaceMode < 2)
+            {
+                f.SurfaceKeys = keys;
+                return;
+            }
+            sbyte decide = FighterState.SurfaceNone;
+            if (f.Surface != FighterState.SurfaceNone)
+            {
+                if (f.SurfaceOuter)
+                    decide = f.Surface;
+            }
+            else if (f.Grounded && OuterFloor(f.Position, config.HalfBody, arena))
+            {
+                decide = FighterState.SurfaceFloor;
+            }
+            else if (!f.Grounded)
+            {
+                // 공중(점프 등으로 떨어짐): A/D는 화면 좌우이고 기억은 없다.
+                f.SurfaceCirc = 0;
+            }
+            UpdateCirculation(ref f, keys, decide);
+        }
+
+        static void UpdateCirculation(ref FighterState f, byte keys, sbyte decide)
+        {
+            byte previous = f.SurfaceKeys;
+            f.SurfaceKeys = keys;
+            if (keys == 0)
+            {
+                // 키를 실제로 뗌: 정지하고 기억 삭제.
+                f.SurfaceCirc = 0;
+                return;
+            }
+            // 양쪽 동시: 중립 정지, 기억 유지. 방향을 정할 표면이 없으면(공중·내부 지형) 그대로.
+            if (keys == 3 || decide == FighterState.SurfaceNone)
+                return;
+            if (keys != previous || f.SurfaceCirc == 0)
+                f.SurfaceCirc = DecideCirculation(decide, keys == 2 ? 1 : -1);
+        }
+
+        /// <summary>
+        /// 붙은 채 이동 상태: 떼기(점프, S, 대시)를 처리하고, 아니면 E 모드 외곽에서 기억한 방향으로 달리거나 멈춘다.
+        /// 표면 쪽으로 살짝 밀어 접촉을 유지한다. 붙은 채 이동을 마쳤으면 true(떨어졌으면 false: 일반 이동이 이어진다).
+        /// </summary>
+        static bool IntegrateAttached(ref FighterState f, in InputFrame input, InputButtons pressed, SimConfig config, ArenaDef arena, ref MovementScratch scratch)
+        {
+            ref readonly var m = ref config.Movement;
+            ref readonly var body = ref config.Combat.Body;
+            sbyte surface = f.Surface;
+            if ((pressed & InputButtons.Dash) != 0 && f.DashCharges > 0 && f.DashCooldown == 0)
+            {
+                Detach(ref f);
+                return false;
+            }
+            if (f.JumpBuffer > 0)
+            {
+                Detach(ref f);
+                if (surface == FighterState.SurfaceCeiling)
+                {
+                    // 천장에서 점프: 아래로 떨어진다(벽은 일반 이동의 벽 점프가 처리한다).
+                    f.JumpBuffer = 0;
+                    f.Velocity = new Vec2(0f, -m.JumpSpeed * 0.25f);
+                }
+                return false;
+            }
+            if (input.MoveY < 0)
+            {
+                // S: 놓고 떨어진다. 벽 쪽 입력을 잠깐 무시해 바로 다시 붙지 않게 한다.
+                int side = WallSideOf(surface);
+                Detach(ref f);
+                f.Velocity = Vec2.Zero;
+                if (side != 0)
+                {
+                    f.WallJumpLockTicks = m.WallJumpInputLockTicks;
+                    f.WallJumpLockDirection = (sbyte)side;
+                }
+                return false;
+            }
+
+            var velocity = Vec2.Zero;
+            bool running = body.SurfaceMode >= 2 && f.SurfaceOuter && f.SurfaceCirc != 0 && (f.SurfaceKeys == 1 || f.SurfaceKeys == 2);
+            if (running)
+                velocity = AlongSurface(surface, f.SurfaceCirc) * m.MaxRunSpeed;
+            float push = body.SurfaceHoldPush;
+            if (surface == FighterState.SurfaceCeiling)
+                velocity.Y += push;
+            else
+                velocity.X += WallSideOf(surface) * push;
+            f.Velocity = velocity;
+            if (running)
+            {
+                var along = AlongSurface(surface, f.SurfaceCirc);
+                if (along.X > 0f) f.Facing = 1;
+                else if (along.X < 0f) f.Facing = -1;
+            }
+            TerrainCollision.Move(ref f.Position, ref f.Velocity, config.HalfBody, arena, m.SubstepMaxDistance, f.DropThroughBox, ref scratch.Contacts);
+            return true;
+        }
+
+        /// <summary>
+        /// 이동 뒤 접촉: 붙어 있으면 외곽 모서리 전환(E)·바닥 도착·떨어짐을 처리하고, 붙어 있지 않으면 이동·돌진 접촉으로 붙는다.
+        /// 붙어 있는 상태로 끝나면 true(접지·벽 미끄러짐 처리를 건너뛴다).
+        /// </summary>
+        static bool SurfaceContacts(ref FighterState f, in MovementScratch scratch, SimConfig config, ArenaDef arena, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var m = ref config.Movement;
+            ref readonly var contacts = ref scratch.Contacts;
+            float half = config.HalfBody;
+            bool run = config.Combat.Body.SurfaceMode >= 2;
+
+            if (f.Surface != FighterState.SurfaceNone)
+            {
+                if (run && f.SurfaceOuter && f.InMovementState)
+                {
+                    // 외곽 오목 모서리: 방향은 그대로, 표면만 바꾼다.
+                    if (f.Surface != FighterState.SurfaceCeiling && contacts.HitCeiling && OuterCeiling(f.Position, half, arena))
+                        f.Surface = FighterState.SurfaceCeiling;
+                    else if (f.Surface == FighterState.SurfaceCeiling && contacts.HitWall != 0 && OuterWall(f.Position, half, arena, contacts.HitWall))
+                        f.Surface = contacts.HitWall > 0 ? FighterState.SurfaceWallRight : FighterState.SurfaceWallLeft;
+                    else if (f.Surface != FighterState.SurfaceCeiling && contacts.Landed)
+                    {
+                        // 벽을 타고 내려와 바닥에 닿음: 서기로 돌아가고 기억은 그대로(바닥 매핑과 같은 방향).
+                        f.Surface = FighterState.SurfaceNone;
+                        f.SurfaceOuter = false;
+                        return false;
+                    }
+                }
+                bool touching = f.Surface == FighterState.SurfaceCeiling
+                    ? TerrainCollision.ProbeCeiling(f.Position, half, arena, m.GroundProbeDistance)
+                    : TerrainCollision.ProbeWall(f.Position, half, arena, m.GroundProbeDistance) == WallSideOf(f.Surface);
+                if (!touching)
+                {
+                    Detach(ref f);
+                    return false;
+                }
+                FinishAttached(ref f, config);
+                return true;
+            }
+
+            // 붙기: 이동 접촉(이동 상태)과 돌진 접촉(돌진이 지형에 닿아 끝난 직후)만. 피격 충돌은 이동 상태가 아니라서 붙지 않는다.
+            // S를 누르고 있으면 붙지 않는다(놓고 떨어지는 중).
+            if (!f.InMovementState || scratch.MoveY < 0)
+                return false;
+            sbyte surface;
+            bool outer;
+            if (contacts.HitWall != 0)
+            {
+                outer = OuterWall(f.Position, half, arena, contacts.HitWall);
+                // 바닥에 서서 벽을 미는 것은 붙기가 아니다. E 모드의 외곽 벽만 바닥 → 벽 모서리 전환으로 붙는다.
+                if (scratch.WasGrounded && !(run && outer && OuterFloor(f.Position, half, arena)))
+                    return false;
+                surface = contacts.HitWall > 0 ? FighterState.SurfaceWallRight : FighterState.SurfaceWallLeft;
+            }
+            else if (contacts.HitCeiling)
+            {
+                outer = OuterCeiling(f.Position, half, arena);
+                surface = FighterState.SurfaceCeiling;
+            }
+            else
+            {
+                return false;
+            }
+            f.Surface = surface;
+            f.SurfaceOuter = outer;
+            f.Velocity = Vec2.Zero;
+            f.DashTicksLeft = 0;
+            if (run && outer && (f.SurfaceKeys == 1 || f.SurfaceKeys == 2) && f.SurfaceCirc == 0)
+                f.SurfaceCirc = DecideCirculation(surface, f.SurfaceKeys == 2 ? 1 : -1);
+            int side = WallSideOf(surface);
+            var normal = side != 0 ? new Vec2(-side, 0f) : new Vec2(0f, -1f);
+            events.Add(new SimEvent(tick, SimEventType.SurfaceAttach, index, f.Position, normal, outer ? 1f : 0f));
+            FinishAttached(ref f, config);
+            return true;
+        }
+
+        static void FinishAttached(ref FighterState f, SimConfig config)
+        {
+            ref readonly var m = ref config.Movement;
+            f.Grounded = false;
+            f.GroundBox = FighterState.NoBox;
+            f.TicksSinceGrounded = SimMath.Min(f.TicksSinceGrounded + 1, FighterState.TimerCap);
+            int side = WallSideOf(f.Surface);
+            f.WallSide = (sbyte)side;
+            if (side != 0)
+            {
+                f.TicksSinceWall = 0;
+                f.LastWallSide = (sbyte)side;
+            }
+            f.AirJumpsLeft = m.AirJumps;
+            f.DashCharges = m.DashCharges;
+            f.JumpCutEligible = false;
+            if (f.InMovementState)
+                f.SetAction(ActionState.WallSlide);
         }
 
         /// <summary>점프 버퍼가 있으면 우선순위대로 처리한다: 발판 하강 → 땅·코요테 점프 → 벽 점프 → 공중 점프.</summary>
@@ -362,6 +635,10 @@ namespace Knockbox.Simulation
             {
                 bounced = LungeBounce(ref f, contacts, config, index, tick, events);
             }
+
+            // 표면 이동(CR-004 7절): 붙어 있거나 이번 틱에 붙으면 접지·벽 미끄러짐 처리 대신 여기서 끝낸다.
+            if (config.Combat.Body.SurfaceMode > 0 && SurfaceContacts(ref f, scratch, config, arena, index, tick, events))
+                return;
 
             int ground = FighterState.NoBox;
             if (!bounced && f.Velocity.Y <= 0f)
