@@ -46,6 +46,7 @@ namespace Knockbox.Game
         bool debugText;
         bool fighterLabelsAllowed = true;
         HitboxOverlay overlay;
+        AimLineView aimLine;
         HelpOverlay help;
         KoShatter koShatter;
         readonly bool[] shattered = new bool[2];
@@ -148,6 +149,8 @@ namespace Knockbox.Game
             }
             overlay = Create<HitboxOverlay>("Hitbox Overlay");
             overlay.Setup(palette, shapes);
+            aimLine = Create<AimLineView>("Aim Line");
+            aimLine.Setup(palette, shapes);
             overlay.gameObject.SetActive(false);
             help = Create<HelpOverlay>("Help");
             help.Setup(palette, shapes);
@@ -320,6 +323,7 @@ namespace Knockbox.Game
             propShadows.Render(propView, current.Props);
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
+            aimLine.Render(runner, alpha);
             UpdateKnockout(current, world.Config);
             UpdateCountdownSound(current, world.Config);
             dust.Tick(dt);

@@ -435,10 +435,19 @@ MonoBehaviour:
   combatPresets:
   - {fileID: 11400000, guid: e8c588e3c815b434b8e3625d02ee981d, type: 2}
   - {fileID: 11400000, guid: c9017ada75567184f92238157712e52d, type: 2}
-  mode: 0
-  grabEnabled: 1
+  rules:
+    StartForm: 0
+    SeparateP2Form: 0
+    StartFormP2: 0
+    OwnedForms: 0
+    Switches:
+      GuardEnabled: 0
+      GrabEnabled: 0
+      EnergyEnabled: 1
+    LegacyMatch: 0
   arenaFiles:
   - {fileID: 4900000, guid: 6e5e55105e542c54b86d1392e896a49d, type: 3}
+  - {fileID: 4900000, guid: 6c5740c39d2e442409dc20c2f44bd768, type: 3}
   - {fileID: 4900000, guid: 29ca9a804527acb4f83267716be334d8, type: 3}
   - {fileID: 4900000, guid: 26af8534970a06744a72da340347afcb, type: 3}
   - {fileID: 4900000, guid: d6b5f9c730c835b44aca73043f313ba1, type: 3}
@@ -450,6 +459,7 @@ MonoBehaviour:
   - {fileID: 4900000, guid: e5ff03fb447f936449090f4eadd7167d, type: 3}
   arenaMetaFiles:
   - {fileID: 4900000, guid: 8f99199c325d8424194432d6969f31f1, type: 3}
+  - {fileID: 4900000, guid: eeee09e928189414cb0dbb98862ffa78, type: 3}
   - {fileID: 4900000, guid: f43044767217c1743a4792f38929794a, type: 3}
   - {fileID: 4900000, guid: a4a1aedd3aaff394fb4c70aa8a742b23, type: 3}
   - {fileID: 4900000, guid: 4b389fb2e0521344fb9e3715cf78b6d4, type: 3}
@@ -466,6 +476,7 @@ MonoBehaviour:
   startOnAwake: 0
   skipCountdown: 0
   useLocalDevices: 0
+  brawlExperiment: 0
 --- !u!4 &1953808623
 Transform:
   m_ObjectHideFlags: 0

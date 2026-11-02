@@ -189,15 +189,13 @@ namespace Knockbox.EditorTools
             var runnerSo = new SerializedObject(runner);
             changed |= FillArray(runnerSo, "arenaFiles", LoadArenaFiles(".txt"));
             changed |= FillArray(runnerSo, "arenaMetaFiles", LoadArenaFiles(".json"));
-            // 직접 플레이하는 Main 씬은 라운드마다 맵 교체(CP12), 경기마다 다른 순서.
+            // 직접 플레이하는 Main 씬은 CR-004 실험 경기(Brawl 맵 고정, P2 샌드백). 맵·규칙은 MatchRunner.Awake가 정한다.
             if (localPlay)
             {
-                var name = runnerSo.FindProperty("arenaName");
-                var randomize = runnerSo.FindProperty("randomizeSeed");
-                if (name.stringValue != MatchRunner.RotationName || !randomize.boolValue)
+                var brawl = runnerSo.FindProperty("brawlExperiment");
+                if (!brawl.boolValue)
                 {
-                    name.stringValue = MatchRunner.RotationName;
-                    randomize.boolValue = true;
+                    brawl.boolValue = true;
                     runnerSo.ApplyModifiedPropertiesWithoutUndo();
                     changed = true;
                 }

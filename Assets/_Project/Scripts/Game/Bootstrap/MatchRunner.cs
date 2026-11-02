@@ -30,6 +30,8 @@ namespace Knockbox.Game
         [SerializeField] bool skipCountdown;
         [Tooltip("켜면 경기 시작 때 P1 키보드 왼쪽, P2 첫 게임패드(없으면 키보드 오른쪽)를 붙인다")]
         [SerializeField] bool useLocalDevices;
+        [Tooltip("CR-004 실험: Brawl 맵 고정, RuleSet.Brawl, 짧은 카운트다운과 3선승, 로컬 플레이면 P2는 샌드백(F6으로 바꿈)")]
+        [SerializeField] bool brawlExperiment;
 
         readonly FixedTickClock clock = new FixedTickClock();
         readonly InputDelayQueue delay1 = new InputDelayQueue();
@@ -125,7 +127,7 @@ namespace Knockbox.Game
             if (config == null)
             {
                 Debug.LogWarning("[Knockbox] 기록과 같은 튜닝 설정을 찾지 못해 재생 결과가 다를 수 있음");
-                config = SimConfigFactory.Create(movementTuning, combatTuning, RecordedRuleCandidates(recording.Mode)[0]);
+                config = CreateConfig(combatTuning, RecordedRuleCandidates(recording.Mode)[0]);
             }
             string[] names = recording.ArenaNames;
             var arenas = new ArenaDef[names.Length];
@@ -161,7 +163,7 @@ namespace Knockbox.Game
                     continue;
                 foreach (var candidate in candidates)
                 {
-                    var config = SimConfigFactory.Create(movementTuning, tuning, candidate);
+                    var config = CreateConfig(tuning, candidate);
                     if (config.ComputeChecksum() == recording.ConfigChecksum)
                         return config;
                 }
@@ -212,8 +214,32 @@ namespace Knockbox.Game
             }
         }
 
+        /// <summary>CR-004 실험 경기(브랜치 exp/brawl-v1).</summary>
+        public bool BrawlExperiment
+        {
+            get => brawlExperiment;
+            set => brawlExperiment = value;
+        }
+
+        /// <summary>CR-004 실험 맵(6절).</summary>
+        public const string BrawlArenaName = "Brawl";
+
+        /// <summary>CR-004: KO 60틱 + 카운트다운 30틱 ≈ KO 뒤 1.5초에 다음 라운드, 3선승(9절 기본값).</summary>
+        public static MatchParams BrawlMatch(MatchParams match)
+        {
+            match.CountdownTicks = 30;
+            match.KoTicks = 60;
+            match.RoundsToWin = 3;
+            return match;
+        }
+
         void Awake()
         {
+            if (brawlExperiment)
+            {
+                arenaName = BrawlArenaName;
+                rules = RuleSet.Brawl;
+            }
             if (startOnAwake && World == null)
                 StartNewMatch();
         }
@@ -230,7 +256,8 @@ namespace Knockbox.Game
             if (useLocalDevices)
             {
                 Player1Input = new KeyboardInputSource(KeyboardLayout.Left);
-                Player2Input = GamepadInputSource.Available(0) ? new GamepadInputSource(0) : new KeyboardInputSource(KeyboardLayout.Right);
+                Player2Input = brawlExperiment ? new DummyInputSource()
+                    : GamepadInputSource.Available(0) ? new GamepadInputSource(0) : new KeyboardInputSource(KeyboardLayout.Right);
             }
             Begin(config, arenas, SimState.CreateMatch(config, arenas, seed, phase));
             configFromTuning = true;
@@ -331,7 +358,17 @@ namespace Knockbox.Game
 #endif
         }
 
-        public SimConfig CreateConfig() => SimConfigFactory.Create(movementTuning, combatTuning, rules);
+        public SimConfig CreateConfig() => CreateConfig(combatTuning, rules);
+
+        SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet)
+        {
+            var match = movementTuning != null ? movementTuning.Match : MatchParams.Default;
+            return new SimConfig(
+                movementTuning != null ? movementTuning.Movement : MovementParams.Default,
+                brawlExperiment ? BrawlMatch(match) : match,
+                combat != null ? combat.Combat : CombatParams.Default,
+                ruleSet);
+        }
 
         /// <summary>등록된 맵 텍스트에서 찾고, 에디터에서는 없으면 디스크에서 읽는다.</summary>
         public ArenaDef ResolveArena(string name)
