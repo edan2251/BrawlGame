@@ -9,6 +9,7 @@ namespace Knockbox.Game
     /// 개발 빌드나 에디터에서만 동작한다. 사람이 하는 플레이에는 영향이 없다(인수가 없으면 아무것도 하지 않음).
     ///   -autobots            두 선수를 봇으로(선택 단계도 봇이 고른다)
     ///   -ticksperframe N     프레임마다 N틱 더 진행(시뮬레이션 결과는 같고 화면만 빨리 감김)
+    ///   -replaycheck 기록     입력 기록 재생 검사만 하고 끝냄(ReplayCheck, CR-004 온라인 1단계)
     /// 로그 형식: "[Knockbox][flow] t=틱 단계 ..." (Player.log)
     /// </summary>
     [RequireComponent(typeof(MatchRunner))]
@@ -19,6 +20,7 @@ namespace Knockbox.Game
         bool bots;
         MatchPhase lastPhase = (MatchPhase)255;
         int matches;
+        bool replayCheck;
 
         public static bool HasArg(string name) => Array.IndexOf(Environment.GetCommandLineArgs(), name) >= 0;
 
@@ -37,14 +39,24 @@ namespace Knockbox.Game
                 enabled = false;
                 return;
             }
+            replayCheck = HasArg(ReplayCheck.Arg);
             bots = HasArg("-autobots");
             extraTicks = Mathf.Clamp(IntArg("-ticksperframe", 0), 0, 200);
-            if (!bots && extraTicks == 0)
+            if (!bots && extraTicks == 0 && !replayCheck)
                 enabled = false;
         }
 
         void Start()
         {
+            if (replayCheck)
+            {
+                runner.Running = false;
+                var outcome = ReplayCheck.RunFromCommandLine(runner);
+                if (!Application.isEditor)
+                    Application.Quit(outcome.ExitCode);
+                enabled = false;
+                return;
+            }
             if (!bots)
                 return;
             runner.Player1Input = new BotInputSource(() => runner.World, 0, 0xA11u);

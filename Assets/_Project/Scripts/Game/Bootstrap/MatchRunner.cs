@@ -155,7 +155,7 @@ namespace Knockbox.Game
         }
 
         /// <summary>지금 프리셋들과 기록의 규칙 후보 중에서 기록의 설정 체크섬과 같은 설정을 찾는다. 없으면 null.</summary>
-        SimConfig FindRecordedConfig(InputRecording recording)
+        public SimConfig FindRecordedConfig(InputRecording recording)
         {
             var candidates = RecordedRuleCandidates(recording.Mode);
             for (int p = -1; p < (combatPresets != null ? combatPresets.Length : 0); p++)
