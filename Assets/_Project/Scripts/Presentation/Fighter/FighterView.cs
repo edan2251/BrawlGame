@@ -20,6 +20,8 @@ namespace Knockbox.Presentation
         /// <summary>몸 그림 중심이 충돌 상자 중심보다 이만큼 위에 있다. 그 아래로 다리가 보인다.</summary>
         public const float VisualLift = 0.2f;
         const float BodySize = 1f;
+        /// <summary>몸 그림을 숨겼는지(3D 시험 외형이 대신 그림). 잔상도 켜지 않는다.</summary>
+        bool bodyHidden;
         /// <summary>그림을 돌리는 중력 각도(도). 시뮬레이션 GravityDir × 90을 부드럽게 따라간다.</summary>
         float gravityAngle;
         const float OutlineSize = 1.12f;
@@ -164,6 +166,14 @@ namespace Knockbox.Presentation
             weaponOutline = ShapeLibrary.CreateSliced(transform, "WeaponOutline", shapes.LimbCapsule, SortingLayers.Weapon, 0, palette.ink);
             weaponFill = ShapeLibrary.CreateSliced(transform, "WeaponFill", shapes.LimbCapsule, SortingLayers.Weapon, 1, palette.FighterShade(fighter));
             weaponOutline.enabled = weaponFill.enabled = false;
+        }
+
+        /// <summary>몸 그림(스프라이트·팔다리)을 보이거나 숨긴다. 3D 시험 외형이 이 파이터를 대신 그릴 때 숨긴다(CR-004).</summary>
+        public void SetBodyVisible(bool visible)
+        {
+            bodyHidden = !visible;
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                r.enabled = visible;
         }
 
         /// <summary>순간 이동 뒤(라운드·시나리오 시작) 변형과 발 위치를 처음 상태로.</summary>
@@ -677,7 +687,7 @@ namespace Knockbox.Presentation
             ghost.transform.position = body.transform.position;
             ghost.transform.rotation = pose.rotation;
             ShapeLibrary.SetSize(ghost, BodySize * scale.x, BodySize * scale.y);
-            ghost.enabled = true;
+            ghost.enabled = !bodyHidden;
             ghostAge[ghostNext] = 0f;
             ghostLife[ghostNext] = life;
             ghostNext = (ghostNext + 1) % GhostCount;

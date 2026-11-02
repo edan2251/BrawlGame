@@ -34,6 +34,9 @@ namespace Knockbox.Game
         public PickPanelView PickPanel => pickPanel;
         PropShadowView propShadows;
         FighterShadowView fighterShadows;
+        /// <summary>3D 시험 외형(CR-004, 에디터 전용 로컬 설정이 있을 때만).</summary>
+        FighterModelRig modelRig;
+        int modelFighter = -1;
         BoundaryView boundaryView;
         FighterView fighter0;
         FighterView fighter1;
@@ -122,6 +125,7 @@ namespace Knockbox.Game
             fighterShadows.Setup(palette, ShapeLibrary.ActiveMaterial);
             fighter0 = CreateFighter(0);
             fighter1 = CreateFighter(1);
+            CreateTestModel();
             dust = Create<DustPool>("Dust");
             dust.Setup(palette, shapes);
             projectileView = Create<ProjectileView>("Projectiles");
@@ -187,6 +191,33 @@ namespace Knockbox.Game
             var go = new GameObject(name);
             go.transform.SetParent(transform, false);
             return go.AddComponent<T>();
+        }
+
+        /// <summary>
+        /// 3D 시험 외형(CR-004): 로컬 전용 설정(FighterModelSettings.LocalPath)이 있으면 외형 프리팹을 만들어 그 파이터의 2D 몸 그림을 숨긴다.
+        /// 권리 미확인 모델이 빌드·저장소에 들어가지 않도록 에디터에서만 읽는다. 외형은 시뮬레이션 상태를 보여 주기만 한다.
+        /// </summary>
+        void CreateTestModel()
+        {
+#if UNITY_EDITOR
+            // 실험 경기(Main)에서만. 측정용 장면(Sandbox 등)은 2D 외형 그대로.
+            if (!runner.BrawlExperiment)
+                return;
+            var settings = UnityEditor.AssetDatabase.LoadAssetAtPath<FighterModelSettings>(FighterModelSettings.LocalPath);
+            if (settings == null || !settings.use || settings.prefab == null)
+                return;
+            var instance = Instantiate(settings.prefab, transform);
+            modelRig = instance.GetComponent<FighterModelRig>();
+            if (modelRig == null)
+            {
+                Destroy(instance);
+                Debug.LogWarning("[Knockbox] 3D 외형 프리팹에 FighterModelRig가 없음");
+                return;
+            }
+            modelFighter = Mathf.Clamp(settings.fighter, 0, 1);
+            Fighter(modelFighter).SetBodyVisible(false);
+            Debug.Log($"[Knockbox] 3D 시험 외형: {settings.prefab.name} → P{modelFighter + 1}");
+#endif
         }
 
         FighterView CreateFighter(int index)
@@ -330,6 +361,12 @@ namespace Knockbox.Game
             fighter0.Render(previous.Fighter0, current.Fighter0, alpha, dt, world.Arena, world.Config);
             fighter1.Render(previous.Fighter1, current.Fighter1, alpha, dt, world.Arena, world.Config);
             aimLine.Render(runner, alpha);
+            if (modelRig != null)
+            {
+                var prevModel = modelFighter == 0 ? previous.Fighter0 : previous.Fighter1;
+                var curModel = modelFighter == 0 ? current.Fighter0 : current.Fighter1;
+                modelRig.Render(prevModel, curModel, alpha, dt, world.Config);
+            }
             // 몸 그림(BodySize 1 × 크기 배율)에 맞춘 그림자.
             fighterShadows.Render(fighter0.transform.localPosition, fighter1.transform.localPosition, world.Config.Movement.BodySize / 0.9f * 0.5f);
             UpdateKnockout(current, world.Config);

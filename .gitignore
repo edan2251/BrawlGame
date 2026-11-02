@@ -163,3 +163,7 @@ Desktop.ini
 
 # 임시 캡처(CLAUDE.md 12절). CP를 마치면 비운다.
 /Captures/
+
+# 로컬 전용 시험 에셋(외부 3D 모델 등, 권리·배포 허용 미확인). 저장소가 공개라 절대 커밋하지 않고 빌드에도 넣지 않는다(CR-004 3D 시험 외형).
+/Assets/_Project/LocalOnly/
+/Assets/_Project/LocalOnly.meta
