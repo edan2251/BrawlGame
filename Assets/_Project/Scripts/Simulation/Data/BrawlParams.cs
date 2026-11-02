@@ -30,7 +30,7 @@ namespace Knockbox.Simulation
             combat.Charge.LungeStopRecoil = 4f;
             combat.Charge.LungeStopKeep = 0.25f;
             combat.Body = BodyParams.Default;
-            // 단계 C(5.2): 마우스로 겨누고 클릭하기에 20틱은 짧다 → 60틱 뒤 자동 던짐.
+            // 단계 C(5.2): 마우스로 겨누고 클릭하기에 20틱은 짧다 → 60틱. 피드백 뒤로는 자동 던짐 대신 그때 놓아준다.
             combat.Grab.MaxHoldTicks = 60;
             // 단계 C 피드백: 잡기 판정이 패링처럼 빡빡하다 → 선딜 5 → 3, 활성 3 → 9, 상자 0.7×0.9 → 1.1×1.3(중심 0.65 → 0.75, 커서 방향).
             combat.Grab.StartupTicks = 3;

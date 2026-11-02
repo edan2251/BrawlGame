@@ -156,12 +156,18 @@ namespace Knockbox.Simulation
                     f.RestartAction(ActionState.Airborne);
                     break;
                 case ActionState.Holding when f.Form == FighterForm.Body:
-                    // 몸 폼(5.2): 좌클릭을 누르는 순간(탭/홀드 구분 없음) 또는 최대 유지 뒤 커서 방향으로 던진다.
+                    // 몸 폼(5.2): 좌클릭을 누르는 순간(탭/홀드 구분 없음) 커서 방향으로 던진다.
                     // 잡는 순간 이미 눌려 있던 좌클릭은 눌림이 아니므로 무시된다(뗐다가 다시 눌러야 한다).
-                    if (!f.ThrowPending && ((pressed & InputButtons.Attack) != 0 || f.ActionTick >= c.Grab.MaxHoldTicks))
+                    // 최대 유지 시간 동안 던지지 않으면 놓아준다(단계 C 피드백: 자동 던짐 대신 해제). 방향 0 = 놓기.
+                    if (!f.ThrowPending && (pressed & InputButtons.Attack) != 0)
                     {
                         f.ThrowPending = true;
                         f.ThrowDirection = AimOrMove(f, input);
+                    }
+                    else if (!f.ThrowPending && f.ActionTick >= c.Grab.MaxHoldTicks)
+                    {
+                        f.ThrowPending = true;
+                        f.ThrowDirection = Vec2.Zero;
                     }
                     return pressed;
                 case ActionState.Holding:
@@ -700,23 +706,24 @@ namespace Knockbox.Simulation
         }
 
         /// <summary>
-        /// 받아내기 성공(단계 C 피드백): 붙잡고 바로 박치기가 날아온 쪽으로 되던진다(패링 느낌). 두 파이터 모두 짧은 히트스탑으로 멈췄다가 날아간다.
+        /// 받아내기 성공(단계 C 피드백): 붙잡고 바로 박치기의 진행 방향 그대로 등 뒤로 넘겨 내던진다(내 쪽으로 오는 반동을 이용하는 패링 느낌).
+        /// 날아온 쪽을 바라보고 잡으므로 뒤로 던지기가 되어 잡힌 쪽은 등 뒤로 옮겨진 뒤 날아간다. 두 파이터 모두 짧은 히트스탑으로 멈췄다가 날아간다.
         /// </summary>
         static void CatchAndThrow(ref FighterState catcher, ref FighterState lunger, int lungerIndex, SimConfig config, ArenaDef arena, int tick, SimEventBuffer events)
         {
-            var back = SimMath.Normalize(-lunger.Velocity);
-            if (back.LengthSquared == 0f)
-                back = SimMath.Normalize(lunger.Position - catcher.Position);
-            if (back.LengthSquared == 0f)
-                back = new Vec2(catcher.Facing, 0f);
-            // 날아온 쪽을 바라보고 잡아야 던지기가 "뒤로 던지기" 위치 옮김을 하지 않는다.
-            if (back.X > SimMath.Epsilon)
-                catcher.Facing = 1;
-            else if (back.X < -SimMath.Epsilon)
+            var onward = SimMath.Normalize(lunger.Velocity);
+            if (onward.LengthSquared == 0f)
+                onward = SimMath.Normalize(catcher.Position - lunger.Position);
+            if (onward.LengthSquared == 0f)
+                onward = new Vec2(-catcher.Facing, 0f);
+            // 날아온 쪽(진행 방향의 반대)을 바라보고 잡는다.
+            if (onward.X > SimMath.Epsilon)
                 catcher.Facing = -1;
+            else if (onward.X < -SimMath.Epsilon)
+                catcher.Facing = 1;
             Hold(ref catcher, ref lunger, lungerIndex, config, arena, tick, events);
-            events.Add(new SimEvent(tick, SimEventType.LungeCaught, lungerIndex, lunger.Position, back, 0f));
-            catcher.ThrowDirection = back;
+            events.Add(new SimEvent(tick, SimEventType.LungeCaught, lungerIndex, lunger.Position, onward, 0f));
+            catcher.ThrowDirection = onward;
             Throw(ref catcher, ref lunger, lungerIndex, config, arena, tick, events);
             int stop = config.Combat.Body.CatchHitstop;
             catcher.HitstopTicks = SimMath.Max(catcher.HitstopTicks, stop);
@@ -764,6 +771,14 @@ namespace Knockbox.Simulation
             thrower.RestartAction(ActionState.Airborne);
             if (victim.Action != ActionState.Held)
                 return;
+            if (direction.X == 0f && direction.Y == 0f)
+            {
+                // 놓기(몸 폼의 최대 유지 시간 초과): 피해·속도 없이 둘 다 풀려난다.
+                victim.Velocity = Vec2.Zero;
+                victim.RestartAction(ActionState.Airborne);
+                events.Add(new SimEvent(tick, SimEventType.GrabRelease, victimIndex, victim.Position, Vec2.Zero, 0f));
+                return;
+            }
             if (direction.X * thrower.Facing < 0f)
             {
                 victim.Position = new Vec2(thrower.Position.X - g.BackThrowOffset * thrower.Facing, thrower.Position.Y);

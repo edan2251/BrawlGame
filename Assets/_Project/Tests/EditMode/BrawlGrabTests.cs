@@ -65,7 +65,7 @@ namespace Knockbox.Tests.EditMode
         }
 
         [Test]
-        public void Holding_AutoThrowsAfterMaxHold()
+        public void Holding_ReleasesAfterMaxHoldWithoutThrow()
         {
             var config = Config();
             var w = World(config);
@@ -76,9 +76,12 @@ namespace Knockbox.Tests.EditMode
                 w.Step(In(InputButtons.None, 16), default);
                 held++;
             }
-            Assert.AreEqual(ActionState.Thrown, w.State.Fighter1.Action);
-            Assert.That(held, Is.InRange(config.Combat.Grab.MaxHoldTicks - 2, config.Combat.Grab.MaxHoldTicks + 2), "약 60틱 뒤 자동 던짐");
-            Assert.Greater(w.State.Fighter1.Velocity.Y, 0f, "커서 방향(위)으로");
+            var s = w.State;
+            Assert.That(held, Is.InRange(config.Combat.Grab.MaxHoldTicks - 2, config.Combat.Grab.MaxHoldTicks + 2), "약 60틱 뒤 해제");
+            Assert.AreNotEqual(ActionState.Held, s.Fighter1.Action);
+            Assert.AreNotEqual(ActionState.Thrown, s.Fighter1.Action, "던지지 않고 놓아줌");
+            Assert.AreEqual(config.Combat.MaxHealth, s.Fighter1.Health, "피해 없음");
+            Assert.AreEqual(0f, s.Fighter1.Velocity.X, 1e-3f);
         }
 
         [Test]
@@ -226,9 +229,11 @@ namespace Knockbox.Tests.EditMode
                 caught |= w.Events[e].Type == SimEventType.LungeCaught;
             Assert.IsTrue(caught, "박치기를 받아냄");
             Assert.AreEqual(config.Combat.MaxHealth, s.Fighter0.Health, "같은 틱 박치기 타격 무효");
-            // 받아내면 바로 날아온 쪽(오른쪽)으로 되던진다. 두 파이터는 잠깐 멈춘다.
+            // 받아내면 박치기 진행 방향(왼쪽) 그대로 등 뒤로 넘겨 내던진다. 두 파이터는 잠깐 멈춘다.
             Assert.AreEqual(ActionState.Thrown, s.Fighter1.Action);
-            Assert.AreEqual(1f, SimMath.Normalize(s.Fighter1.Velocity).X, 1e-3f, "박치기가 날아온 반대 방향");
+            Assert.AreEqual(-1f, SimMath.Normalize(s.Fighter1.Velocity).X, 1e-3f, "박치기 진행 방향 그대로");
+            Assert.Less(s.Fighter1.Position.X, s.Fighter0.Position.X, "잡은 쪽 등 뒤로 넘어감");
+            Assert.AreEqual(1, s.Fighter0.Facing, "날아온 쪽을 바라봄");
             Assert.AreEqual(config.Combat.Grab.ThrowSpeed, SimMath.Length(s.Fighter1.Velocity), 1e-3f);
             Assert.AreEqual(config.Combat.Body.CatchHitstop, s.Fighter0.HitstopTicks);
             Assert.AreEqual(config.Combat.Body.CatchHitstop, s.Fighter1.HitstopTicks);
@@ -241,7 +246,7 @@ namespace Knockbox.Tests.EditMode
             // 왼쪽을 보고 있어도 커서(오른쪽) 방향 잡기면 등 뒤에서 오는 박치기를 받아낸다.
             var w = CatchSetup(1.3f, -1, 30f, 1f);
             Assert.AreEqual(ActionState.Thrown, w.State.Fighter1.Action);
-            Assert.Greater(w.State.Fighter1.Velocity.X, 0f);
+            Assert.Less(w.State.Fighter1.Velocity.X, 0f, "진행 방향 그대로");
         }
 
         [Test]

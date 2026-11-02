@@ -76,6 +76,8 @@ namespace Knockbox.Simulation
         AugmentActive,
         /// <summary>받아내기(CR-004 5.2): 잡기가 박치기 중인 상대를 잡음. Fighter는 잡힌 쪽. Grab 이벤트도 함께 나온다.</summary>
         LungeCaught,
+        /// <summary>잡기 해제(CR-004 몸 폼: 최대 유지 시간 동안 던지지 않음). Fighter는 풀려난 쪽.</summary>
+        GrabRelease,
     }
 
     /// <summary>
