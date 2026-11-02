@@ -92,6 +92,7 @@ namespace Knockbox.Tests.PlayMode
                 {
                     Assert.IsTrue(sample.FistChecked, $"{kind}: 주먹을 끝까지 뻗은 순간을 확인함");
                     Assert.IsTrue(sample.FistOk, $"{kind}: 주먹 끝이 판정 원 안");
+                    Assert.IsTrue(sample.R3FistChecked && sample.R3FistOk, $"{kind}: R3 주먹 끝이 판정 원 안");
                 }
             }
             sample.Overlay = false;

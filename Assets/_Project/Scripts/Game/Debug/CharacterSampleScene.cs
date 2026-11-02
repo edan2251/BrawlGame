@@ -78,6 +78,18 @@ namespace Knockbox.Game
             r3.Setup(shapes, palette.p1Body, palette.p1Shade, palette.ink, palette.flash);
         }
 
+        /// <summary>R3는 어깨 위치가 달라 팔을 따로 푼다. 주먹을 끝까지 뻗은 순간 그 손이 판정 원 경로 안인지.</summary>
+        public bool R3FistChecked { get; private set; }
+        public bool R3FistOk { get; private set; }
+
+        void CheckR3Fist(in DollPose pose)
+        {
+            if (!pose.Punching || pose.PunchProgress < 0.99f)
+                return;
+            R3FistChecked = true;
+            R3FistOk = InsidePath(r3.FrontHand, punch.Circle0, pose.AimDegrees) || InsidePath(r3.FrontHand, punch.Circle1, pose.AimDegrees);
+        }
+
         /// <summary>R3 셰이더를 찾았는지(빌드·테스트 확인용).</summary>
         public bool SdfReady => r3 != null && r3.ShaderFound;
 
@@ -122,7 +134,8 @@ namespace Knockbox.Game
             var skeleton = DollSkeleton.Solve(pose);
             r1.Render(skeleton, pose.WorldAngle);
             r2.Render(skeleton, pose.WorldAngle, Time.deltaTime);
-            r3.Render(skeleton, pose.WorldAngle);
+            r3.Render(skeleton, pose.WorldAngle, Time.deltaTime);
+            CheckR3Fist(pose);
             CheckFist(pose, skeleton);
             for (int i = 0; i < Count; i++)
                 RenderOverlay(i, pose);
@@ -146,6 +159,8 @@ namespace Knockbox.Game
             time = 0f;
             fistResult = "-";
             fistOk = false;
+            R3FistChecked = false;
+            R3FistOk = false;
         }
 
         /// <summary>주먹을 끝까지 뻗은(활성) 순간 손 중심이 두 판정 원이 지나는 길(시작 → 끝) 안에 있는지.</summary>
