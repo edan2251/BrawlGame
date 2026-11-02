@@ -4,7 +4,12 @@
   "references": [
     "Knockbox.Simulation",
     "Knockbox.Presentation",
-    "Unity.InputSystem"
+    "Unity.InputSystem",
+    "Unity.Networking.Transport",
+    "Unity.Collections",
+    "Unity.Services.Core",
+    "Unity.Services.Authentication",
+    "Unity.Services.Multiplayer"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

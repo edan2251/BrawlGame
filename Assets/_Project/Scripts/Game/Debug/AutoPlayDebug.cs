@@ -10,7 +10,7 @@ namespace Knockbox.Game
     ///   -autobots            두 선수를 봇으로(선택 단계도 봇이 고른다)
     ///   -ticksperframe N     프레임마다 N틱 더 진행(시뮬레이션 결과는 같고 화면만 빨리 감김)
     ///   -replaycheck 기록     입력 기록 재생 검사만 하고 끝냄(ReplayCheck, CR-004 온라인 1단계)
-    ///   -host 포트 / -join 주소:포트   온라인 락스텝 경기(Online.OnlineMatch, CR-004 온라인 2단계)
+    ///   (온라인 인수 -host/-join/-relayhost/-relayjoin은 Online.OnlineMatch가 직접 본다)
     /// 로그 형식: "[Knockbox][flow] t=틱 단계 ..." (Player.log)
     /// </summary>
     [RequireComponent(typeof(MatchRunner))]
@@ -41,8 +41,6 @@ namespace Knockbox.Game
                 return;
             }
             replayCheck = HasArg(ReplayCheck.Arg);
-            if (Online.OnlineMatch.Requested && GetComponent<Online.OnlineMatch>() == null)
-                gameObject.AddComponent<Online.OnlineMatch>();
             bots = HasArg("-autobots");
             extraTicks = Mathf.Clamp(IntArg("-ticksperframe", 0), 0, 200);
             if (!bots && extraTicks == 0 && !replayCheck)

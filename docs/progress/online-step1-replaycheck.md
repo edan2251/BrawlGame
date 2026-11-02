@@ -84,3 +84,13 @@
 | 대표 기록 재생 검사(1단계 묶음) | 새 빌드에서도 1362틱 모두 기준과 일치 |
 
 직접 해 보기(같은 PC): `Builds/ReplayCheck/OnlineTwoWindows.bat` → 창 둘(왼쪽 방장 P1, 손님 P2). 각 창에서 마우스 조준·키 그대로. 경기 끝에는 둘 다 공격을 누르고 있으면 재대결. 인수로 입력 지연을 바꿀 수 있다(`OnlineTwoWindows.bat 5`). 창을 닫으면 `Replays/online_P*.kbrp`에 기록.
+
+## 6. 3단계 결과: Unity Relay 방 코드 (2026-11-03, D-074, S-176)
+
+| 확인 | 결과 |
+|---|---|
+| 같은 PC 두 실행, 실제 Relay(방장이 코드를 파일로, 손님이 읽어 참가), 봇, 지연 4틱 | 경기 2개와 재대결, 왕복 74 ms(최대 86), 체크섬 205회 일치, 대기 0~2회, 종료 0/0 |
+| 방 화면 | 캡처 1장: 제목·CREATE ROOM·CODE/JOIN·PRACTICE·조작 안내가 읽힘, 디버그 글자 숨김 |
+| 대표 기록 재생 검사 | 새 빌드에서도 PASS |
+
+친구 묶음: `Builds/Knockbox_OnlineTest.zip`(약 69 MB, 개발 빌드). 안내 `ONLINE_README.txt`. 친구는 압축 풀고 실행 → CREATE ROOM 또는 코드 입력 JOIN.
