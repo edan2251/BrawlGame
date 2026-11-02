@@ -224,15 +224,6 @@ namespace Knockbox.Game
         /// <summary>CR-004 실험 맵(6절).</summary>
         public const string BrawlArenaName = "Brawl";
 
-        /// <summary>CR-004: KO 60틱 + 카운트다운 30틱 ≈ KO 뒤 1.5초에 다음 라운드, 3선승(9절 기본값).</summary>
-        public static MatchParams BrawlMatch(MatchParams match)
-        {
-            match.CountdownTicks = 30;
-            match.KoTicks = 60;
-            match.RoundsToWin = 3;
-            return match;
-        }
-
         void Awake()
         {
             if (brawlExperiment)
@@ -363,10 +354,11 @@ namespace Knockbox.Game
         SimConfig CreateConfig(CombatTuning combat, in RuleSet ruleSet)
         {
             var match = movementTuning != null ? movementTuning.Match : MatchParams.Default;
+            var combatParams = combat != null ? combat.Combat : CombatParams.Default;
             return new SimConfig(
                 movementTuning != null ? movementTuning.Movement : MovementParams.Default,
-                brawlExperiment ? BrawlMatch(match) : match,
-                combat != null ? combat.Combat : CombatParams.Default,
+                brawlExperiment ? BrawlParams.Match(match) : match,
+                brawlExperiment ? BrawlParams.Combat(combatParams) : combatParams,
                 ruleSet);
         }
 

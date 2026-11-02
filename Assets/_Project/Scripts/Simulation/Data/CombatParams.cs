@@ -167,6 +167,15 @@ namespace Knockbox.Simulation
         public int LungeMaxTicks;
         public float LungeBounceRestitution;
         public int LungeMaxBounces;
+        /// <summary>돌진 감속(유닛/초²). 0이면 감속 없음(CP16 규칙). CR-004: 짧고 빠른 박치기.</summary>
+        public float LungeDrag;
+        /// <summary>
+        /// 0보다 크면 튕김을 다 쓴 돌진이 지형에 부딪힐 때 반사 대신 멈추고 법선 쪽으로 이 속도만큼 작은 반동을 받는다(CR-004 5.1 "벽에 닿음: 종료").
+        /// 0이면 CP16 규칙(속도를 그대로 두고 돌진만 끝냄).
+        /// </summary>
+        public float LungeStopRecoil;
+        /// <summary>LungeStopRecoil로 멈출 때 남기는 접선 속도 비율.</summary>
+        public float LungeStopKeep;
         public float LungeAggression;
         public float DashAggression;
         /// <summary>위력이 이 이상이어야 피해를 준다.</summary>
@@ -243,6 +252,13 @@ namespace Knockbox.Simulation
             v.Value(nameof(LungeMaxTicks), LungeMaxTicks);
             v.Value(nameof(LungeBounceRestitution), LungeBounceRestitution);
             v.Value(nameof(LungeMaxBounces), LungeMaxBounces);
+            // CR-004 값은 켰을 때만 체크섬에 넣는다(0이면 이전 설정 체크섬·입력 기록과 같다).
+            if (LungeDrag != 0f || LungeStopRecoil != 0f || LungeStopKeep != 0f)
+            {
+                v.Value(nameof(LungeDrag), LungeDrag);
+                v.Value(nameof(LungeStopRecoil), LungeStopRecoil);
+                v.Value(nameof(LungeStopKeep), LungeStopKeep);
+            }
             v.Value(nameof(LungeAggression), LungeAggression);
             v.Value(nameof(DashAggression), DashAggression);
             v.Value(nameof(PowerThreshold), PowerThreshold);

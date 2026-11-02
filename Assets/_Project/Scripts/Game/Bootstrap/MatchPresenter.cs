@@ -220,7 +220,7 @@ namespace Knockbox.Game
             CurrentTheme = palette.Theme(ThemeIndex(arena));
             background.Build(arena, CurrentTheme, palette, shapes, LightPosition(arena));
             background.ResetMotes();
-            arenaView.Build(arena, CurrentTheme, palette, shapes);
+            arenaView.Build(arena, CurrentTheme, palette, shapes, runner.GetMeta(arena.Name).Ceiling);
             propView.Build(arena, CurrentTheme, shapes);
             propShadows.SetArena(arena, LightPosition(arena));
             boundaryView.SetArena(arena);

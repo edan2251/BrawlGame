@@ -189,6 +189,12 @@ namespace Knockbox.Simulation
                 case ActionState.Lunge:
                     if (!f.Grounded)
                         f.Velocity.Y -= m.RiseGravity * c.Charge.LungeGravityMultiplier * dt;
+                    if (c.Charge.LungeDrag > 0f)
+                    {
+                        float speed = SimMath.Length(f.Velocity);
+                        if (speed > SimMath.Epsilon)
+                            f.Velocity = f.Velocity * (SimMath.Max(0f, speed - c.Charge.LungeDrag * dt) / speed);
+                    }
                     break;
                 default:
                     f.Velocity.X = SimMath.MoveTowards(f.Velocity.X, 0f, (f.Grounded ? m.GroundDecel : m.AirDecel) * dt);
@@ -519,7 +525,9 @@ namespace Knockbox.Simulation
             if (f.LungeBounces >= c.Charge.LungeMaxBounces)
             {
                 f.RestartAction(ActionState.Airborne);
-                return false;
+                if (c.Charge.LungeStopRecoil <= 0f)
+                    return false;
+                return LungeStop(ref f, contacts, wall, floor, ceiling, strongest, config, index, tick, events);
             }
 
             var v = f.Velocity;
@@ -554,6 +562,42 @@ namespace Knockbox.Simulation
             }
             events.Add(new SimEvent(tick, SimEventType.BounceRebound, index, point, normal, strongest));
             return true;
+        }
+
+        /// <summary>
+        /// CR-004: 튕김 대신 멈춤. 부딪힌 면의 법선 쪽으로 LungeStopRecoil만큼 작은 반동, 접선 속도는 LungeStopKeep만 남긴다.
+        /// 바닥에 닿았으면 반동 없이 착지한다. 충격 연출용으로 BounceRebound 이벤트를 낸다.
+        /// </summary>
+        static bool LungeStop(ref FighterState f, in MoveContacts contacts, float wall, float floor, float ceiling, float strongest,
+            SimConfig config, int index, int tick, SimEventBuffer events)
+        {
+            ref readonly var p = ref config.Combat.Charge;
+            float half = config.HalfBody;
+            var v = f.Velocity * p.LungeStopKeep;
+            Vec2 normal, point;
+            if (wall >= floor && wall >= ceiling)
+            {
+                normal = new Vec2(-contacts.HitWall, 0f);
+                point = new Vec2(f.Position.X + contacts.HitWall * half, f.Position.Y);
+                v.X = normal.X * p.LungeStopRecoil;
+                f.Facing = (sbyte)-contacts.HitWall;
+            }
+            else if (floor >= ceiling)
+            {
+                normal = new Vec2(0f, 1f);
+                point = new Vec2(f.Position.X, f.Position.Y - half);
+                v.Y = 0f;
+            }
+            else
+            {
+                normal = new Vec2(0f, -1f);
+                point = new Vec2(f.Position.X, f.Position.Y + half);
+                v.Y = -p.LungeStopRecoil;
+            }
+            f.Velocity = v;
+            events.Add(new SimEvent(tick, SimEventType.BounceRebound, index, point, normal, strongest));
+            // 반사가 아니므로 땅 확인을 그대로 한다(바닥을 달리던 돌진이 벽에 멈추면 서 있다).
+            return false;
         }
 
         /// <summary>면역 중이거나 붙잡기 중(둘이 함께 멈춰 있음)이면 가시에 닿지 않는다.</summary>

@@ -18,13 +18,15 @@ namespace Knockbox.Presentation
 
         ArenaDef current;
         string currentTheme;
+        bool currentCeiling;
 
-        public void Build(ArenaDef arena, ArenaTheme theme, PaletteAsset palette, ShapeLibrary shapes)
+        public void Build(ArenaDef arena, ArenaTheme theme, PaletteAsset palette, ShapeLibrary shapes, bool drawCeiling = false)
         {
-            if (arena == current && theme.name == currentTheme)
+            if (arena == current && theme.name == currentTheme && drawCeiling == currentCeiling)
                 return;
             current = arena;
             currentTheme = theme.name;
+            currentCeiling = drawCeiling;
             for (int i = transform.childCount - 1; i >= 0; i--)
                 Destroy(transform.GetChild(i).gameObject);
 
@@ -32,8 +34,8 @@ namespace Knockbox.Presentation
             {
                 var b = arena.GetBox(i);
                 // 경기장 맨 위 테두리 줄은 그리지 않는다: 화면 위에 띠나 액자가 없어야 하고(08 4·7절), 광원이 그 바깥에 있다.
-                // 천장은 시뮬레이션에 그대로 있다(화면 위 끝에 부딪힌다).
-                if (b.MinY >= arena.HalfHeight - 1f - 1e-3f)
+                // 천장은 시뮬레이션에 그대로 있다(화면 위 끝에 부딪힌다). 짝 파일의 "ceiling": true면 그린다(CR-004).
+                if (!drawCeiling && b.MinY >= arena.HalfHeight - 1f - 1e-3f)
                     continue;
                 switch (b.Kind)
                 {
